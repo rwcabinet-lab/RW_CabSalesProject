@@ -9,17 +9,18 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const requestedUserId = req.cookies.get("cab_sales_user_id")?.value;
     const monthFilter = searchParams.get("month"); // 格式 "2026-09"
+    if (!requestedUserId) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
 
-    // 取得登入使用者；開發初次登入前仍以預設預覽使用者提供工作台資料
-    const DEFAULT_USER_ID = "cmuf2wbfq000314yab0dvs2jo";
-    const userId = requestedUserId || DEFAULT_USER_ID;
     const [user, allProjects] = await Promise.all([
-      DataService.getUserById(userId),
+      DataService.getUserById(requestedUserId),
       DataService.getProjects(),
     ]);
-    const currentUser = user
-      ? { id: user.id, name: user.name, role: user.role }
-      : { id: userId, name: "業務人員", role: "SALES" };
+    if (!user) {
+      return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
+    }
+    const currentUser = { id: user.id, name: user.name, role: user.role };
 
     // 業務/業助：只顯示自己負責或被分配的案件
     const isManager = currentUser.role === "MANAGER" || currentUser.role === "ADMIN";

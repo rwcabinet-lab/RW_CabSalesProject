@@ -121,9 +121,9 @@ export default function CustomersPage() {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "LONGMEI_STORE":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">隆美店面</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">隆美</span>;
       case "CABINET_FACTORY":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-800">櫥櫃工廠</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-800">工廠</span>;
       case "DESIGN_COMPANY":
       case "DESIGNER":
         return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">設計公司</span>;
@@ -133,12 +133,12 @@ export default function CustomersPage() {
       case "PR":
         return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">公關客戶</span>;
       case "CONSTRUCTION":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">營造建設</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">建設/營造</span>;
       case "LABOR_MATERIAL":
         return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">連工帶料</span>;
       case "INDIVIDUAL":
       case "HOMEOWNER":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">個人客戶</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">一般消費者</span>;
       default:
         return null;
     }
@@ -274,13 +274,13 @@ export default function CustomersPage() {
                   onChange={(e) => handleTypeChange(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                 >
-                  <option value="LONGMEI_STORE">隆美店面</option>
-                  <option value="CABINET_FACTORY">櫥櫃工廠</option>
+                  <option value="LONGMEI_STORE">隆美</option>
                   <option value="DESIGN_COMPANY">設計公司</option>
                   <option value="DEALER_COMPANY">經銷公司</option>
-                  <option value="CONSTRUCTION">營造建設</option>
-                  <option value="LABOR_MATERIAL">連工帶料</option>
-                  <option value="INDIVIDUAL">個人客戶</option>
+                  <option value="CABINET_FACTORY">工廠</option>
+                  <option value="CONSTRUCTION">建設/營造</option>
+                  <option value="INDIVIDUAL">一般消費者</option>
+                  <option value="PR">公關案</option>
                 </select>
               </div>
 

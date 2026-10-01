@@ -5,7 +5,6 @@ import {
   ProjectMilestoneItem, QuotationData, SalesTaskItem, MilestoneStageCode, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
 } from "./mock-data";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
-import { DEFAULT_PREVIEW_USER_ID, DEFAULT_PREVIEW_USER_NAME } from "./current-user";
 
 const dateValue = (value: Date | null | undefined) => value?.toISOString() || undefined;
 const dateOnlyValue = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) || null;
@@ -20,19 +19,6 @@ const projectInclude = { customer: true, salesRep: true, salesAssistant: true } 
 const milestoneInclude = { assignedTo: true } as const;
 const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
 const customerTypeForDatabase = (type: string): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
-
-async function ensurePreviewUser() {
-  return prisma.user.upsert({
-    where: { id: DEFAULT_PREVIEW_USER_ID },
-    update: {},
-    create: {
-      id: DEFAULT_PREVIEW_USER_ID,
-      name: DEFAULT_PREVIEW_USER_NAME,
-      email: `preview-${DEFAULT_PREVIEW_USER_ID}@cabsales.local`,
-      role: Role.SALES,
-    },
-  });
-}
 
 export const DataService = {
   async getCatalog(): Promise<{ boards: MasterBoardItem[]; hardware: MasterHardwareItem[]; processing: MasterProcessingItem[] }> {
@@ -68,13 +54,13 @@ export const DataService = {
   },
 
   async getUserById(id: string) {
-    if (id === DEFAULT_PREVIEW_USER_ID) return ensurePreviewUser();
-    return prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findUnique({ where: { id } });
+    return user?.email.startsWith("preview-") ? null : user;
   },
 
   async getLoginUsers() {
-    await ensurePreviewUser();
     return prisma.user.findMany({
+      where: { NOT: { email: { startsWith: "preview-" } } },
       select: { id: true, name: true, role: true },
       orderBy: { name: "asc" },
     });
@@ -266,9 +252,6 @@ export const DataService = {
   },
 
   async addCustomer(data: any) {
-    if (data.salesRepId === DEFAULT_PREVIEW_USER_ID) {
-      await ensurePreviewUser();
-    }
     const c = await prisma.customer.create({ data: { ...data, paymentTerms: data.paymentTerms || "MONTHLY_30", customerType: customerTypeForDatabase(data.customerType || "DESIGNER") } });
     return this.getCustomerById(c.id);
   },
@@ -277,9 +260,6 @@ export const DataService = {
     name: string; customerType: string; taxId?: string; phone: string; address?: string;
     defaultDiscount: number; paymentTerms: string; salesRepId: string;
   }) {
-    if (data.salesRepId === DEFAULT_PREVIEW_USER_ID) {
-      await ensurePreviewUser();
-    }
     await prisma.customer.update({
       where: { id },
       data: {

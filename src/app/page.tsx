@@ -47,7 +47,7 @@ export default function HomePage() {
             客戶主檔管理 (B2B / B2C)
           </h3>
           <p className="text-xs text-slate-600 mt-2 line-clamp-3">
-            支援室內設計師、公關客戶、經銷商及自住業主。設定預設折率 (0.85/1.00)、付款條件 (月結30天/三階段) 與統一編號。
+            支援隆美、設計公司、經銷公司、工廠、建設/營造、一般消費者與公關案，並設定預設折率、付款條件與統一編號。
           </p>
           <div className="mt-4 flex items-center text-xs font-semibold text-emerald-600 gap-1">
             查看現有客戶名冊 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { DEFAULT_PREVIEW_USER_ID } from "@/lib/current-user";
 
 export async function GET() {
   try {
@@ -14,6 +13,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const body = await req.json();
     const { name, customerType, taxId, phone, address, defaultDiscount, paymentTerms, salesRepId } = body;
 
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
       address: address || undefined,
       defaultDiscount: Number(defaultDiscount) || (customerType === "INDIVIDUAL" ? 1.0 : 0.85),
       paymentTerms: paymentTerms || "DEPOSIT_BALANCE",
-      salesRepId: salesRepId || req.cookies.get("cab_sales_user_id")?.value || DEFAULT_PREVIEW_USER_ID,
+      salesRepId: salesRepId || sessionUserId,
     });
 
     return NextResponse.json(newCustomer, { status: 201 });

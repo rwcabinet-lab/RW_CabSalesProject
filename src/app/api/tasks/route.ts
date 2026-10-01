@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { DEFAULT_PREVIEW_USER_ID } from "@/lib/current-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,6 +27,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const body = await req.json();
     const { projectId, subject, taskType, dueDatetime, priority, assignedToId, assignedToName } = body;
 
@@ -35,7 +37,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "請填寫必要欄位 (案場、主題、到期時間)" }, { status: 400 });
     }
 
-    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
     const newTask = await DataService.addTask({
       projectId,
       subject,
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
       dueDatetime,
       priority: priority || "MEDIUM",
       isCompleted: false,
-      assignedToId: sessionUserId || assignedToId || DEFAULT_PREVIEW_USER_ID,
+      assignedToId: assignedToId || sessionUserId,
     });
 
     return NextResponse.json(newTask, { status: 201 });
