@@ -10,12 +10,11 @@ export async function GET(req: NextRequest) {
     const monthFilter = searchParams.get("month");
 
     const projects = await DataService.getProjects();
-    const milestonesByProject = await DataService.getMilestonesByProjectIds(
-      projects.map((p) => p.id)
-    );
-    const latestQuotesByProject = await DataService.getLatestQuotesByProjectIds(
-      projects.map((p) => p.id)
-    );
+    const projectIds = projects.map((p) => p.id);
+    const [milestonesByProject, latestQuotesByProject] = await Promise.all([
+      DataService.getMilestonesByProjectIds(projectIds),
+      DataService.getLatestQuotesByProjectIds(projectIds),
+    ]);
 
     // 1. KPI 計算
     const totalProjects = projects.length;

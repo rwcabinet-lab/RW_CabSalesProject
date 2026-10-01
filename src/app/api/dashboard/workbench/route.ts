@@ -13,12 +13,13 @@ export async function GET(req: NextRequest) {
     // 取得登入使用者；開發初次登入前仍以預設預覽使用者提供工作台資料
     const DEFAULT_USER_ID = "cmuf2wbfq000314yab0dvs2jo";
     const userId = requestedUserId || DEFAULT_USER_ID;
-    const user = await DataService.getUserById(userId);
+    const [user, allProjects] = await Promise.all([
+      DataService.getUserById(userId),
+      DataService.getProjects(),
+    ]);
     const currentUser = user
       ? { id: user.id, name: user.name, role: user.role }
       : { id: userId, name: "業務人員", role: "SALES" };
-
-    const allProjects = await DataService.getProjects();
 
     // 業務/業助：只顯示自己負責或被分配的案件
     const isManager = currentUser.role === "MANAGER" || currentUser.role === "ADMIN";
@@ -28,12 +29,14 @@ export async function GET(req: NextRequest) {
           (p) => p.salesRepId === currentUser.id || p.salesAssistantId === currentUser.id
         );
 
-    const milestonesByProject = await DataService.getMilestonesByProjectIds(
-      myProjects.map((p) => p.id)
-    );
-    const latestQuotesByProject = await DataService.getLatestQuotesByProjectIds(
-      myProjects.map((p) => p.id)
-    );
+    const projectIds = myProjects.map((p) => p.id);
+    const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
+      DataService.getMilestonesByProjectIds(projectIds),
+      DataService.getLatestQuotesByProjectIds(projectIds),
+      DataService.getTasks(
+        isManager ? undefined : { assignedToId: currentUser.id }
+      ),
+    ]);
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
     const projectsWithDetails = await Promise.all(
@@ -90,11 +93,6 @@ export async function GET(req: NextRequest) {
     );
 
     const filteredProjects = projectsWithDetails.filter(Boolean);
-
-    // 業務待辦任務（僅自己的）
-    const tasks = await DataService.getTasks(
-      isManager ? undefined : { assignedToId: currentUser.id }
-    );
 
     return NextResponse.json({
       currentUser,
