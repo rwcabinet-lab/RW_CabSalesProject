@@ -18,6 +18,8 @@ function addDays(dateStr: string, days: number): string {
 
 const projectInclude = { customer: true, salesRep: true, salesAssistant: true } as const;
 const milestoneInclude = { assignedTo: true } as const;
+const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
+const customerTypeForDatabase = (type: string): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
 
 async function ensurePreviewUser() {
   return prisma.user.upsert({
@@ -49,7 +51,7 @@ export const DataService = {
   async getCustomers(): Promise<CustomerItem[]> {
     const customers = await prisma.customer.findMany({ include: { salesRep: true }, orderBy: { createdAt: "desc" } });
     return customers.map(c => ({
-      id: c.id, customerType: c.customerType, name: c.name, taxId: c.taxId || undefined,
+      id: c.id, customerType: customerTypeFromDatabase(c.customerType), name: c.name, taxId: c.taxId || undefined,
       phone: c.phone, address: c.address || undefined, defaultDiscount: Number(c.defaultDiscount),
       paymentTerms: c.paymentTerms, salesRepId: c.salesRepId, salesRepName: c.salesRep.name
     }));
@@ -59,7 +61,7 @@ export const DataService = {
     const c = await prisma.customer.findUnique({ where: { id }, include: { salesRep: true } });
     if (!c) return undefined;
     return {
-      id: c.id, customerType: c.customerType, name: c.name, taxId: c.taxId || undefined,
+      id: c.id, customerType: customerTypeFromDatabase(c.customerType), name: c.name, taxId: c.taxId || undefined,
       phone: c.phone, address: c.address || undefined, defaultDiscount: Number(c.defaultDiscount),
       paymentTerms: c.paymentTerms, salesRepId: c.salesRepId, salesRepName: c.salesRep.name
     };
@@ -85,7 +87,7 @@ export const DataService = {
     });
     return projects.map(p => ({
       id: p.id, projectName: p.projectName, customerId: p.customerId, customerName: p.customer.name,
-      customerType: p.customer.customerType, defaultDiscount: Number(p.customer.defaultDiscount),
+      customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
@@ -101,7 +103,7 @@ export const DataService = {
     if (!p) return undefined;
     const project = {
       id: p.id, projectName: p.projectName, customerId: p.customerId, customerName: p.customer.name,
-      customerType: p.customer.customerType, defaultDiscount: Number(p.customer.defaultDiscount),
+      customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
@@ -267,7 +269,7 @@ export const DataService = {
     if (data.salesRepId === DEFAULT_PREVIEW_USER_ID) {
       await ensurePreviewUser();
     }
-    const c = await prisma.customer.create({ data: { ...data, paymentTerms: data.paymentTerms || "MONTHLY_30", customerType: data.customerType || "DESIGNER" } });
+    const c = await prisma.customer.create({ data: { ...data, paymentTerms: data.paymentTerms || "MONTHLY_30", customerType: customerTypeForDatabase(data.customerType || "DESIGNER") } });
     return this.getCustomerById(c.id);
   },
 
@@ -281,7 +283,7 @@ export const DataService = {
     await prisma.customer.update({
       where: { id },
       data: {
-        name: data.name, customerType: data.customerType as CustomerType, taxId: data.taxId || null,
+        name: data.name, customerType: customerTypeForDatabase(data.customerType), taxId: data.taxId || null,
         phone: data.phone, address: data.address || null, defaultDiscount: data.defaultDiscount,
         paymentTerms: data.paymentTerms as any, salesRepId: data.salesRepId,
       },

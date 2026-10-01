@@ -26,7 +26,7 @@ async function seedData() {
       data: {
         id: c.id,
         name: c.name,
-        customerType: c.customerType as any,
+        customerType: c.customerType === "PR" ? "CONTRACTOR" : c.customerType as any,
         taxId: c.taxId,
         phone: c.phone,
         address: c.address,

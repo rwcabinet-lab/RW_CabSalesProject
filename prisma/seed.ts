@@ -72,7 +72,7 @@ async function seed() {
   await prisma.customer.createMany({
     data: INITIAL_CUSTOMERS.map((customer) => ({
       id: customer.id,
-      customerType: customer.customerType as CustomerType,
+      customerType: (customer.customerType === "PR" ? "CONTRACTOR" : customer.customerType) as CustomerType,
       name: customer.name,
       taxId: customer.taxId,
       phone: customer.phone,
