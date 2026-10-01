@@ -1,13 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Building2, KeyRound, LogIn } from "lucide-react";
 
 type LoginUser = { id: string; name: string; role: string };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<LoginUser[]>([]);
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("0000");
@@ -44,8 +42,7 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "登入失敗");
-      router.replace("/dashboard/workbench");
-      router.refresh();
+      window.location.replace("/dashboard/workbench");
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "登入失敗");
     } finally {
