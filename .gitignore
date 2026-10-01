@@ -8,7 +8,7 @@
 /out/
 /build/
 
-# Environment variables
+# Environment variablesgit rm -r --cached .next
 .env*
 !.env.example
 

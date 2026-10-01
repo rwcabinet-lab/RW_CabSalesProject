@@ -231,7 +231,7 @@ enum Role {
 
 enum CustomerType {
   DESIGNER
-  CONTRACTOR
+  PR
   DEALER
   HOMEOWNER
 }

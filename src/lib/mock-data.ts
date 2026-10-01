@@ -25,7 +25,7 @@ export interface MasterProcessingItem {
 
 export interface CustomerItem {
   id: string;
-  customerType: "DESIGNER" | "CONTRACTOR" | "DEALER" | "HOMEOWNER";
+  customerType: "DESIGNER" | "PR" | "DEALER" | "HOMEOWNER";
   name: string;
   taxId?: string;
   phone: string;
@@ -218,7 +218,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   },
   {
     id: "c2",
-    customerType: "CONTRACTOR",
+    customerType: "PR",
     name: "巨匠統包工程行",
     taxId: "42981765",
     phone: "02-89512345",
@@ -306,7 +306,7 @@ export const INITIAL_PROJECTS: ProjectDetail[] = [
     projectName: "板橋府中舊翻新案-巨匠統包",
     customerId: "c2",
     customerName: "巨匠統包工程行",
-    customerType: "CONTRACTOR",
+    customerType: "PR",
     defaultDiscount: 0.85,
     siteAddress: "新北市板橋區文化路一段120號5樓",
     siteCondition: "老屋全面翻新泥作完工",

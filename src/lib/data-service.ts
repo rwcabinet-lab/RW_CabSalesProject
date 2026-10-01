@@ -271,6 +271,24 @@ export const DataService = {
     return this.getCustomerById(c.id);
   },
 
+  async updateCustomer(id: string, data: {
+    name: string; customerType: string; taxId?: string; phone: string; address?: string;
+    defaultDiscount: number; paymentTerms: string; salesRepId: string;
+  }) {
+    if (data.salesRepId === DEFAULT_PREVIEW_USER_ID) {
+      await ensurePreviewUser();
+    }
+    await prisma.customer.update({
+      where: { id },
+      data: {
+        name: data.name, customerType: data.customerType as CustomerType, taxId: data.taxId || null,
+        phone: data.phone, address: data.address || null, defaultDiscount: data.defaultDiscount,
+        paymentTerms: data.paymentTerms as any, salesRepId: data.salesRepId,
+      },
+    });
+    return this.getCustomerById(id);
+  },
+
   async addQuoteVersion(projectId: string, data: any) {
     return prisma.quotation.create({ data: { projectId, ...data } });
   },

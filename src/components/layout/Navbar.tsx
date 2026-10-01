@@ -30,6 +30,8 @@ export function Navbar() {
     router.refresh();
   };
 
+  const roleLabel = user?.role === "ADMIN" ? "管理員" : user?.role === "MANAGER" ? "主管" : user?.role === "ASSISTANT" ? "業務助理" : user ? "業務專員" : "未登入";
+
   if (pathname === "/login") return null;
 
   return (
@@ -75,12 +77,12 @@ export function Navbar() {
         {/* 使用者資訊 */}
         <div className="flex items-center gap-2 pl-2 sm:pl-4 border-l border-slate-200">
           <div className="hidden sm:flex w-8 h-8 rounded-full bg-slate-800 text-white items-center justify-center text-xs font-bold shadow">
-            {user?.name.slice(0, 1) || "?"}
+            {user?.name?.slice(0, 1) || "?"}
           </div>
           <div className="hidden sm:block text-xs text-right">
-            <div className="font-semibold text-slate-800">{user?.name || "載入中"}</div>
+            <div className="font-semibold text-slate-800">{user?.name || "未登入"}</div>
             <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 rounded">
-              {user?.role === "ADMIN" ? "管理員" : user?.role === "MANAGER" ? "主管" : user?.role === "ASSISTANT" ? "業務助理" : "業務專員"}
+              {roleLabel}
             </span>
           </div>
           <button

@@ -15,13 +15,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, customerType, taxId, phone, address, defaultDiscount, paymentTerms } = body;
+    const { name, customerType, taxId, phone, address, defaultDiscount, paymentTerms, salesRepId } = body;
 
     if (!name || !phone || !customerType) {
       return NextResponse.json({ error: "請填寫必要欄位 (客戶名稱、電話、客戶類型)" }, { status: 400 });
     }
 
-    const salesRepId = req.cookies.get("cab_sales_user_id")?.value || DEFAULT_PREVIEW_USER_ID;
     const newCustomer = await DataService.addCustomer({
       name,
       customerType,
@@ -30,12 +29,31 @@ export async function POST(req: NextRequest) {
       address: address || undefined,
       defaultDiscount: Number(defaultDiscount) || (customerType === "HOMEOWNER" ? 1.0 : 0.85),
       paymentTerms: paymentTerms || "DEPOSIT_BALANCE",
-      salesRepId,
+      salesRepId: salesRepId || req.cookies.get("cab_sales_user_id")?.value || DEFAULT_PREVIEW_USER_ID,
     });
 
     return NextResponse.json(newCustomer, { status: 201 });
   } catch (error) {
     console.error("Failed to create customer:", error);
     return NextResponse.json({ error: "新增客戶失敗" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, name, customerType, taxId, phone, address, defaultDiscount, paymentTerms, salesRepId } = body;
+    if (!id || !name || !phone || !customerType || !salesRepId) {
+      return NextResponse.json({ error: "請填寫必要欄位" }, { status: 400 });
+    }
+    const customer = await DataService.updateCustomer(id, {
+      name, customerType, taxId: taxId || undefined, phone, address: address || undefined,
+      defaultDiscount: Number(defaultDiscount) || (customerType === "HOMEOWNER" ? 1.0 : 0.85),
+      paymentTerms: paymentTerms || "DEPOSIT_BALANCE", salesRepId,
+    });
+    return NextResponse.json(customer);
+  } catch (error) {
+    console.error("Failed to update customer:", error);
+    return NextResponse.json({ error: "更新客戶失敗" }, { status: 500 });
   }
 }

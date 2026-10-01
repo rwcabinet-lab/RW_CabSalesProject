@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Plus, Building2, Phone, MapPin, Receipt, Percent, Check, AlertCircle } from "lucide-react";
+import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil } from "lucide-react";
 import { CustomerItem } from "@/lib/mock-data";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [salesReps, setSalesReps] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
   // 新增表單狀態
   const [formData, setFormData] = useState({
@@ -18,13 +20,25 @@ export default function CustomersPage() {
     address: "",
     defaultDiscount: "0.85",
     paymentTerms: "MONTHLY_30",
+    salesRepId: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     fetchCustomers();
+    fetchSalesReps();
   }, []);
+
+  const fetchSalesReps = async () => {
+    try {
+      const res = await fetch("/api/auth/users");
+      const data = await res.json();
+      if (res.ok) setSalesReps(data.filter((user: { role: string }) => user.role === "SALES"));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -52,9 +66,9 @@ export default function CustomersPage() {
     setSubmitError("");
     try {
       const res = await fetch("/api/customers", {
-        method: "POST",
+        method: editingCustomerId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(editingCustomerId ? { id: editingCustomerId, ...formData } : formData),
       });
       const result = await res.json();
       if (res.ok) {
@@ -67,7 +81,9 @@ export default function CustomersPage() {
           address: "",
           defaultDiscount: "0.85",
           paymentTerms: "MONTHLY_30",
+          salesRepId: salesReps[0]?.id || "",
         });
+        setEditingCustomerId(null);
         fetchCustomers();
       } else {
         setSubmitError(result.error || "新增客戶失敗，請確認資料後重試。");
@@ -80,12 +96,30 @@ export default function CustomersPage() {
     }
   };
 
+  const openAddModal = () => {
+    setEditingCustomerId(null);
+    setFormData({ name: "", customerType: "DESIGNER", taxId: "", phone: "", address: "", defaultDiscount: "0.85", paymentTerms: "MONTHLY_30", salesRepId: salesReps[0]?.id || "" });
+    setSubmitError("");
+    setShowModal(true);
+  };
+
+  const openEditModal = (customer: CustomerItem) => {
+    setEditingCustomerId(customer.id);
+    setFormData({
+      name: customer.name, customerType: customer.customerType, taxId: customer.taxId || "", phone: customer.phone,
+      address: customer.address || "", defaultDiscount: customer.defaultDiscount.toString(), paymentTerms: customer.paymentTerms,
+      salesRepId: customer.salesRepId,
+    });
+    setSubmitError("");
+    setShowModal(true);
+  };
+
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "DESIGNER":
         return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">室內設計師 (B2B)</span>;
-      case "CONTRACTOR":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">統包工程商 (B2B)</span>;
+      case "PR":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">公關客戶 (B2B)</span>;
       case "DEALER":
         return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800">經銷商門市 (B2B)</span>;
       case "HOMEOWNER":
@@ -117,11 +151,11 @@ export default function CustomersPage() {
             <Users className="w-7 h-7 text-blue-600" /> 客戶主檔管理 (Customer Management)
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            支援 B2B (設計師、統包、經銷) 與 B2C (一般業主)，設定預設折率與付款帳期，報價單將自動連動套用。
+            支援 B2B (設計師、公關、經銷) 與 B2C (一般業主)，設定預設折率與付款帳期，報價單將自動連動套用。
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openAddModal}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow transition"
         >
           <Plus className="w-4 h-4" /> 新增客戶主檔
@@ -143,6 +177,7 @@ export default function CustomersPage() {
                   <th className="py-3.5 px-4 text-center">預設折率 (Discount)</th>
                   <th className="py-3.5 px-4">付款條件</th>
                   <th className="py-3.5 px-4">負責業務</th>
+                  <th className="py-3.5 px-4 text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
@@ -177,6 +212,11 @@ export default function CustomersPage() {
                         {c.defaultDiscount < 1.0 ? `${(c.defaultDiscount * 10).toFixed(1)} 折 (${c.defaultDiscount})` : "牌價無折 (1.00)"}
                       </span>
                     </td>
+                    <td className="py-4 px-4 text-right">
+                      <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                        <Pencil className="h-3.5 w-3.5" /> 編輯
+                      </button>
+                    </td>
                     <td className="py-4 px-4 text-xs font-medium text-slate-700">
                       {getTermsLabel(c.paymentTerms)}
                     </td>
@@ -199,7 +239,7 @@ export default function CustomersPage() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" /> 新增客戶主檔
+                <Users className="w-5 h-5 text-blue-600" /> {editingCustomerId ? "編輯客戶主檔" : "新增客戶主檔"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -215,7 +255,7 @@ export default function CustomersPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: "DESIGNER", label: "室內設計師 (B2B)" },
-                    { id: "CONTRACTOR", label: "統包工程商 (B2B)" },
+                    { id: "PR", label: "公關客戶 (B2B)" },
                     { id: "DEALER", label: "經銷商門市 (B2B)" },
                     { id: "HOMEOWNER", label: "一般自住業主 (B2C)" },
                   ].map((t) => (
@@ -282,6 +322,19 @@ export default function CustomersPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">負責業務 *</label>
+                <select
+                  required
+                  value={formData.salesRepId}
+                  onChange={(e) => setFormData({ ...formData, salesRepId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  <option value="">請選擇負責業務</option>
+                  {salesReps.map((salesRep) => <option key={salesRep.id} value={salesRep.id}>{salesRep.name}</option>)}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">預設折率 (如 0.85 代表 85折)</label>
@@ -329,7 +382,7 @@ export default function CustomersPage() {
                   disabled={submitting}
                   className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow transition disabled:opacity-50"
                 >
-                  {submitting ? "儲存中..." : "確認建立"}
+                  {submitting ? "儲存中..." : editingCustomerId ? "確認更新" : "確認建立"}
                 </button>
               </div>
             </form>
