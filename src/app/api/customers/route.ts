@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       taxId: taxId || undefined,
       phone,
       address: address || undefined,
-      defaultDiscount: Number(defaultDiscount) || (customerType === "HOMEOWNER" ? 1.0 : 0.85),
+      defaultDiscount: Number(defaultDiscount) || (customerType === "INDIVIDUAL" ? 1.0 : 0.85),
       paymentTerms: paymentTerms || "DEPOSIT_BALANCE",
       salesRepId: salesRepId || req.cookies.get("cab_sales_user_id")?.value || DEFAULT_PREVIEW_USER_ID,
     });
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
     }
     const customer = await DataService.updateCustomer(id, {
       name, customerType, taxId: taxId || undefined, phone, address: address || undefined,
-      defaultDiscount: Number(defaultDiscount) || (customerType === "HOMEOWNER" ? 1.0 : 0.85),
+      defaultDiscount: Number(defaultDiscount) || (customerType === "INDIVIDUAL" ? 1.0 : 0.85),
       paymentTerms: paymentTerms || "DEPOSIT_BALANCE", salesRepId,
     });
     return NextResponse.json(customer);

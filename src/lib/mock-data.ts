@@ -25,7 +25,18 @@ export interface MasterProcessingItem {
 
 export interface CustomerItem {
   id: string;
-  customerType: "DESIGNER" | "PR" | "DEALER" | "HOMEOWNER";
+  customerType:
+    | "LONGMEI_STORE"
+    | "CABINET_FACTORY"
+    | "DESIGN_COMPANY"
+    | "DEALER_COMPANY"
+    | "CONSTRUCTION"
+    | "LABOR_MATERIAL"
+    | "INDIVIDUAL"
+    | "DESIGNER"
+    | "PR"
+    | "DEALER"
+    | "HOMEOWNER";
   name: string;
   taxId?: string;
   phone: string;

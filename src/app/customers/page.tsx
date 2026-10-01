@@ -15,7 +15,7 @@ export default function CustomersPage() {
   // 新增表單狀態
   const [formData, setFormData] = useState({
     name: "",
-    customerType: "DESIGNER",
+    customerType: "LONGMEI_STORE",
     taxId: "",
     phone: "",
     address: "",
@@ -58,8 +58,8 @@ export default function CustomersPage() {
   };
 
   const handleTypeChange = (type: string) => {
-    const discount = type === "HOMEOWNER" ? "1.00" : "0.85";
-    const terms = type === "HOMEOWNER" ? "DEPOSIT_BALANCE" : "MONTHLY_30";
+    const discount = type === "INDIVIDUAL" ? "1.00" : "0.85";
+    const terms = type === "INDIVIDUAL" ? "DEPOSIT_BALANCE" : "MONTHLY_30";
     setFormData({ ...formData, customerType: type, defaultDiscount: discount, paymentTerms: terms });
   };
 
@@ -79,7 +79,7 @@ export default function CustomersPage() {
         setShowModal(false);
         setFormData({
           name: "",
-          customerType: "DESIGNER",
+          customerType: "LONGMEI_STORE",
           taxId: "",
           phone: "",
           address: "",
@@ -102,7 +102,7 @@ export default function CustomersPage() {
 
   const openAddModal = () => {
     setEditingCustomerId(null);
-    setFormData({ name: "", customerType: "DESIGNER", taxId: "", phone: "", address: "", defaultDiscount: "0.85", paymentTerms: "MONTHLY_30", salesRepId: salesReps[0]?.id || "" });
+    setFormData({ name: "", customerType: "LONGMEI_STORE", taxId: "", phone: "", address: "", defaultDiscount: "0.85", paymentTerms: "MONTHLY_30", salesRepId: salesReps[0]?.id || "" });
     setSubmitError("");
     setShowModal(true);
   };
@@ -120,14 +120,25 @@ export default function CustomersPage() {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
+      case "LONGMEI_STORE":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">隆美店面</span>;
+      case "CABINET_FACTORY":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-800">櫥櫃工廠</span>;
+      case "DESIGN_COMPANY":
       case "DESIGNER":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">室內設計師 (B2B)</span>;
-      case "PR":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">公關客戶 (B2B)</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">設計公司</span>;
+      case "DEALER_COMPANY":
       case "DEALER":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800">經銷商門市 (B2B)</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800">經銷公司</span>;
+      case "PR":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">公關客戶</span>;
+      case "CONSTRUCTION":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">營造建設</span>;
+      case "LABOR_MATERIAL":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">連工帶料</span>;
+      case "INDIVIDUAL":
       case "HOMEOWNER":
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">自住業主 (B2C)</span>;
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">個人客戶</span>;
       default:
         return null;
     }
@@ -257,27 +268,20 @@ export default function CustomersPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">客戶類型</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: "DESIGNER", label: "室內設計師 (B2B)" },
-                    { id: "PR", label: "公關客戶 (B2B)" },
-                    { id: "DEALER", label: "經銷商門市 (B2B)" },
-                    { id: "HOMEOWNER", label: "一般自住業主 (B2C)" },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => handleTypeChange(t.id)}
-                      className={`px-3 py-2 text-xs font-medium rounded-lg border text-left transition ${
-                        formData.customerType === t.id
-                          ? "border-blue-600 bg-blue-50 text-blue-700 font-semibold"
-                          : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  required
+                  value={formData.customerType}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  <option value="LONGMEI_STORE">隆美店面</option>
+                  <option value="CABINET_FACTORY">櫥櫃工廠</option>
+                  <option value="DESIGN_COMPANY">設計公司</option>
+                  <option value="DEALER_COMPANY">經銷公司</option>
+                  <option value="CONSTRUCTION">營造建設</option>
+                  <option value="LABOR_MATERIAL">連工帶料</option>
+                  <option value="INDIVIDUAL">個人客戶</option>
+                </select>
               </div>
 
               <div>
