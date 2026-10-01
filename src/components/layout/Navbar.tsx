@@ -18,11 +18,11 @@ export function Navbar() {
   const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/session")
+    fetch("/api/auth/session", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
       .then((data) => setUser(data?.user || null))
       .catch(() => setUser(null));
-  }, []);
+  }, [pathname]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
