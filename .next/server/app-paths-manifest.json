@@ -1,0 +1,10 @@
+{
+  "/dashboard/workbench/page": "app/dashboard/workbench/page.js",
+  "/page": "app/page.js",
+  "/customers/page": "app/customers/page.js",
+  "/dashboard/manager/page": "app/dashboard/manager/page.js",
+  "/login/page": "app/login/page.js",
+  "/api/dashboard/manager/route": "app/api/dashboard/manager/route.js",
+  "/api/dashboard/workbench/route": "app/api/dashboard/workbench/route.js",
+  "/api/customers/route": "app/api/customers/route.js"
+}

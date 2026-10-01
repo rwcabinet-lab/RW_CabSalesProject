@@ -1,0 +1,330 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  CheckSquare,
+  Clock,
+  Plus,
+  ArrowRight,
+  MapPin,
+  Sparkles,
+  Building,
+  Edit3,
+  CheckCircle2,
+  X,
+} from "lucide-react";
+import { CustomerItem, SalesTaskItem } from "@/lib/mock-data";
+
+interface WorkbenchProject {
+  id: string;
+  projectName: string;
+  customerId: string;
+  customerName: string;
+  customerType: string;
+  defaultDiscount: number;
+  siteCondition: string;
+  expectedDate: string;
+  currentStage: string;
+  siteAddress: string;
+  isDelayed: boolean;
+  totalAmount: number | null;
+  unitCount?: number;
+  cost?: number;
+  quoteAmount?: number;
+  activeMilestone: {
+    id: string;
+    stageName: string;
+    plannedDueDate: string;
+    status: string;
+  } | null;
+  trafficLight: {
+    color: "RED" | "YELLOW" | "GREEN" | "GRAY";
+    label: string;
+    daysDiff: number;
+  };
+}
+
+export default function SalesWorkbenchPage() {
+  const [projects, setProjects] = useState<WorkbenchProject[]>([]);
+  const [tasks, setTasks] = useState<SalesTaskItem[]>([]);
+  const [currentUser, setCurrentUser] = useState({ id: "", name: "使用者", role: "SALES" });
+  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+
+  // 篩選條件
+  const [monthFilter, setMonthFilter] = useState("");
+  const [timeStandard, setTimeStandard] = useState(""); // 簽約/生產/完工/結案等階段過濾
+
+  // 行內新增/編輯案場
+  const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [newProjectData, setNewProjectData] = useState({
+    projectName: "", customerId: "", siteAddress: "", siteCondition: "", expectedDate: "",
+    unitCount: "", cost: "", quoteAmount: "",
+  });
+  const [savingProject, setSavingProject] = useState(false);
+
+  // 快速推進 Modal
+  const [advanceModal, setAdvanceModal] = useState({ open: false, projectId: "", projectName: "", milestoneId: "", milestoneName: "", notes: "", attachments: "" });
+  const [advancing, setAdvancing] = useState(false);
+
+  // 待辦 Modal
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [newTaskData, setNewTaskData] = useState({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: new Date().toISOString().slice(0, 16), priority: "HIGH" });
+  const [creatingTask, setCreatingTask] = useState(false);
+
+  useEffect(() => {
+    fetchWorkbenchData();
+    fetchCustomers();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch("/api/customers");
+      const data = await res.json();
+      if (Array.isArray(data)) setCustomers(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchWorkbenchData = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/dashboard/workbench");
+      const json = await res.json();
+      if (json.currentUser) setCurrentUser(json.currentUser);
+      if (Array.isArray(json.myProjects)) setProjects(json.myProjects);
+      if (Array.isArray(json.tasks)) setTasks(json.tasks);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleTask = async (task: SalesTaskItem) => {
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: task.id, isCompleted: !task.isCompleted }),
+      });
+      if (res.ok) {
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, isCompleted: !task.isCompleted } : t)));
+      }
+    } catch (err) {}
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskData.subject || !newTaskData.projectId) return;
+    setCreatingTask(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newTaskData, assignedToId: currentUser.id, assignedToName: currentUser.name }),
+      });
+      if (res.ok) {
+        setShowTaskModal(false);
+        setNewTaskData({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: new Date().toISOString().slice(0, 16), priority: "HIGH" });
+        await fetchWorkbenchData();
+      }
+    } finally { setCreatingTask(false); }
+  };
+
+  const handleSaveProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress) return;
+    setSavingProject(true);
+    try {
+      const payload = {
+        ...newProjectData,
+        unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
+        cost: newProjectData.cost ? Number(newProjectData.cost) : undefined,
+        quoteAmount: newProjectData.quoteAmount ? Number(newProjectData.quoteAmount) : undefined,
+      };
+      await fetch("/api/projects", {
+        method: editingProjectId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingProjectId ? { id: editingProjectId, ...payload } : payload),
+      });
+      setIsProjectPanelOpen(false);
+      setEditingProjectId(null);
+      await fetchWorkbenchData();
+    } finally { setSavingProject(false); }
+  };
+
+  const openAddProject = () => {
+    setEditingProjectId(null);
+    setNewProjectData({ projectName: "", customerId: customers[0]?.id || "", siteAddress: "", siteCondition: "", expectedDate: "", unitCount: "", cost: "", quoteAmount: "" });
+    setIsProjectPanelOpen(true);
+  };
+
+  const openEditProject = (p: WorkbenchProject) => {
+    setEditingProjectId(p.id);
+    setNewProjectData({
+      projectName: p.projectName, customerId: p.customerId, siteAddress: p.siteAddress, siteCondition: p.siteCondition,
+      expectedDate: p.expectedDate ? p.expectedDate.slice(0,10) : "",
+      unitCount: p.unitCount?.toString() || "", cost: p.cost?.toString() || "", quoteAmount: p.quoteAmount?.toString() || ""
+    });
+    setIsProjectPanelOpen(true);
+  };
+
+  const handleConfirmAdvance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!advanceModal.projectId || !advanceModal.milestoneId) return;
+    setAdvancing(true);
+    try {
+      const res = await fetch(`/api/projects/${advanceModal.projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "advance", milestoneId: advanceModal.milestoneId, notes: advanceModal.notes }),
+      });
+      if (res.ok) {
+        setAdvanceModal({ open: false, projectId: "", projectName: "", milestoneId: "", milestoneName: "", notes: "", attachments: "" });
+        await fetchWorkbenchData();
+      }
+    } finally { setAdvancing(false); }
+  };
+
+  if (loading) return <div className="p-16 text-center">正在載入業務工作台...</div>;
+
+  // 過濾邏輯
+  const filteredProjects = projects.filter((p) => {
+    let match = true;
+    if (timeStandard && p.currentStage !== timeStandard) match = false;
+    if (monthFilter) {
+      const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
+      if (!dateToCheck.startsWith(monthFilter)) match = false;
+    }
+    return match;
+  });
+
+  return (
+    <div className="space-y-8 pb-16">
+      <div className="flex justify-between border-b pb-4">
+        <div>
+          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">業務工作台</span>
+          <h1 className="text-2xl font-black mt-1">今日待辦與負責案件追蹤</h1>
+        </div>
+        <button onClick={() => setShowTaskModal(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white"><Plus className="w-4 h-4"/> 建立待辦</button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border p-6">
+        <h2 className="text-base font-bold flex items-center gap-2 mb-4"><CheckSquare className="w-5 h-5 text-blue-600" /> 今日待辦事項</h2>
+        <div className="divide-y">
+          {tasks.map((task) => (
+            <div key={task.id} className="py-3 flex justify-between items-start">
+              <div className="flex gap-3 items-start">
+                <input type="checkbox" checked={task.isCompleted} onChange={() => handleToggleTask(task)} className="mt-1 cursor-pointer" />
+                <div>
+                  <div className="font-bold text-sm">[{task.projectName}] {task.subject}</div>
+                  <div className="text-xs text-slate-500 mt-1">到期：{new Date(task.dueDatetime).toLocaleString()} | 優先：{task.priority}</div>
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full font-bold ${task.isCompleted ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{task.isCompleted ? "已完成" : "待處理"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+        <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600"/> 負責案件時程燈號追蹤清單</h2>
+          <div className="flex items-center gap-3">
+            <button onClick={openAddProject} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="w-4 h-4"/> 新增案場</button>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 border-b flex gap-4 bg-slate-50/50">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            月份：<input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="border rounded px-2 py-1" />
+          </label>
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            階段：
+            <select value={timeStandard} onChange={(e) => setTimeStandard(e.target.value)} className="border rounded px-2 py-1">
+              <option value="">全部</option>
+              <option value="CONTACT">接洽期 (含報價/簽約)</option>
+              <option value="DESIGN">設計確認期</option>
+              <option value="PRODUCTION">生產施工期</option>
+              <option value="CLOSED">結案</option>
+            </select>
+          </label>
+        </div>
+
+        {isProjectPanelOpen && (
+          <form onSubmit={handleSaveProject} className="p-4 bg-emerald-50 border-b border-emerald-100">
+            <div className="flex justify-between font-bold mb-3">{editingProjectId ? "編輯案場" : "新增案場"} <button type="button" onClick={() => setIsProjectPanelOpen(false)}><X className="w-5 h-5 text-slate-500"/></button></div>
+            <div className="grid grid-cols-4 gap-4 text-sm">
+              <label>案場名稱 *<input required value={newProjectData.projectName} onChange={(e) => setNewProjectData({...newProjectData, projectName: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>客戶 *
+                <select required value={newProjectData.customerId} onChange={(e) => setNewProjectData({...newProjectData, customerId: e.target.value})} className="w-full border rounded p-1.5 mt-1">
+                  <option value="">選擇客戶</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <label>施工地址 *<input required value={newProjectData.siteAddress} onChange={(e) => setNewProjectData({...newProjectData, siteAddress: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>戶數<input type="number" value={newProjectData.unitCount} onChange={(e) => setNewProjectData({...newProjectData, unitCount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>成本金額<input type="number" value={newProjectData.cost} onChange={(e) => setNewProjectData({...newProjectData, cost: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>報價金額<input type="number" value={newProjectData.quoteAmount} onChange={(e) => setNewProjectData({...newProjectData, quoteAmount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>預計完工日<input type="date" value={newProjectData.expectedDate} onChange={(e) => setNewProjectData({...newProjectData, expectedDate: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <div className="flex items-end"><button disabled={savingProject || !newProjectData.projectName} className="w-full bg-emerald-600 text-white rounded p-1.5 font-bold">{savingProject ? "儲存中" : "儲存案場"}</button></div>
+            </div>
+          </form>
+        )}
+
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-100 text-slate-600">
+            <tr>
+              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3">預算/戶數</th><th className="p-3">目前大階段</th><th className="p-3">當前進度</th><th className="p-3">預定日</th><th className="p-3 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filteredProjects.map(p => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="p-3"><span className={`px-2 py-1 rounded-full font-bold ${p.trafficLight.color==="RED"?"bg-red-100 text-red-700":p.trafficLight.color==="YELLOW"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>● {p.trafficLight.label}</span></td>
+                <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
+                <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
+                <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
+                <td className="p-3 font-bold text-slate-700">{p.currentStage}</td>
+                <td className="p-3 font-bold">{p.activeMilestone?.stageName || "完結"}</td>
+                <td className="p-3">{p.activeMilestone?.plannedDueDate || p.expectedDate}</td>
+                <td className="p-3 flex gap-2 justify-center">
+                  {p.activeMilestone && <button onClick={() => setAdvanceModal({ open: true, projectId: p.id, projectName: p.projectName, milestoneId: p.activeMilestone!.id, milestoneName: p.activeMilestone!.stageName, notes: "", attachments: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">推進</button>}
+                  <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
+                  <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">詳細</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {advanceModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white p-6 rounded-xl w-96">
+            <h3 className="font-bold mb-2">推進：{advanceModal.milestoneName}</h3>
+            <textarea className="w-full border p-2 mb-4 text-sm" placeholder="備註..." value={advanceModal.notes} onChange={(e)=>setAdvanceModal({...advanceModal, notes: e.target.value})} />
+            <div className="flex justify-end gap-2"><button onClick={()=>setAdvanceModal({...advanceModal,open:false})} className="px-3 py-1 bg-slate-200 rounded">取消</button><button onClick={handleConfirmAdvance} disabled={advancing} className="px-3 py-1 bg-blue-600 text-white rounded">推進</button></div>
+          </div>
+        </div>
+      )}
+
+      {showTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white p-6 rounded-xl w-96">
+            <h3 className="font-bold mb-4">新增待辦</h3>
+            <form onSubmit={handleCreateTask} className="space-y-3 text-sm">
+              <label className="block">關聯案場<select required value={newTaskData.projectId} onChange={e=>setNewTaskData({...newTaskData, projectId: e.target.value})} className="w-full border p-1.5"><option value="">選擇</option>{projects.map(p=><option key={p.id} value={p.id}>{p.projectName}</option>)}</select></label>
+              <label className="block">主題<input required value={newTaskData.subject} onChange={e=>setNewTaskData({...newTaskData, subject: e.target.value})} className="w-full border p-1.5"/></label>
+              <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowTaskModal(false)} className="px-3 py-1 bg-slate-200 rounded">取消</button><button disabled={creatingTask} className="px-3 py-1 bg-blue-600 text-white rounded">建立</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
