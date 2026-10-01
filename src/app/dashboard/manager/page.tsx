@@ -16,6 +16,7 @@ interface ManagerDashboardData {
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   // 過濾條件
   const [monthFilter, setMonthFilter] = useState("");
@@ -36,9 +37,14 @@ export default function ManagerDashboardPage() {
       setLoading(true);
       const res = await fetch(`/api/dashboard/manager${monthFilter ? `?month=${monthFilter}` : ""}`);
       const json = await res.json();
+      if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview)) {
+        throw new Error(json.error || "無法取得主管看板資料");
+      }
       setData(json);
+      setLoadError("");
     } catch (err) {
       console.error(err);
+      setLoadError(err instanceof Error ? err.message : "無法取得主管看板資料");
     } finally {
       setLoading(false);
     }
@@ -66,6 +72,7 @@ export default function ManagerDashboardPage() {
   };
 
   if (loading && !data) return <div className="p-16 text-center">載入主管看板中...</div>;
+  if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
   if (!data) return null;
 
   // 案場總覽前端二次過濾 (大階段過濾)

@@ -8,6 +8,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
@@ -45,9 +46,12 @@ export default function CustomersPage() {
       setLoading(true);
       const res = await fetch("/api/customers");
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error(data.error || "無法取得客戶資料");
       setCustomers(data);
+      setLoadError("");
     } catch (err) {
       console.error(err);
+      setLoadError(err instanceof Error ? err.message : "無法取得客戶資料");
     } finally {
       setLoading(false);
     }
@@ -168,6 +172,7 @@ export default function CustomersPage() {
           <div className="p-12 text-center text-slate-500">載入客戶資料中...</div>
         ) : (
           <div className="overflow-x-auto">
+            {loadError && <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>}
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -212,11 +217,6 @@ export default function CustomersPage() {
                         {c.defaultDiscount < 1.0 ? `${(c.defaultDiscount * 10).toFixed(1)} 折 (${c.defaultDiscount})` : "牌價無折 (1.00)"}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
-                        <Pencil className="h-3.5 w-3.5" /> 編輯
-                      </button>
-                    </td>
                     <td className="py-4 px-4 text-xs font-medium text-slate-700">
                       {getTermsLabel(c.paymentTerms)}
                     </td>
@@ -224,6 +224,11 @@ export default function CustomersPage() {
                       <span className="text-xs px-2 py-1 rounded bg-slate-100 font-medium text-slate-800">
                         {c.salesRepName || "林宏遠"}
                       </span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                        <Pencil className="h-3.5 w-3.5" /> 編輯
+                      </button>
                     </td>
                   </tr>
                 ))}

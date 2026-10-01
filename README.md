@@ -26,7 +26,7 @@
 
 ### 1. 客戶與業務資料管理
 
-- 管理客戶類型：設計師、統包商、經銷商、自住業主
+- 管理客戶類型：設計師、公關客戶、經銷商、自住業主
 - 記錄統編、電話、地址、預設折率與付款條件
 - 綁定業務負責人
 - 可在工作台中快速選擇客戶建立案場
@@ -168,6 +168,16 @@ npx prisma db push
 ```bash
 npx prisma migrate deploy
 ```
+
+若既有 Supabase 資料庫是使用 `prisma db push` 建立，且尚未有 `_prisma_migrations` 紀錄，請先在確認資料庫結構與目前程式一致後執行 baseline，再套用公關客戶型別更新：
+
+```bash
+npx prisma migrate resolve --applied 0_init
+npx prisma migrate resolve --applied 1_add_quote_registration_fields
+npx prisma migrate deploy
+```
+
+上述操作會將既有資料庫標記為已完成前兩個 migration，最後執行 `2_customer_type_pr`，把 `CONTRACTOR` enum 改為 `PR`。正式資料庫請先備份，並確認連線使用 `DIRECT_URL`。
 
 ### 4. 建立開發資料
 
