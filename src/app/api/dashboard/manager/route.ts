@@ -11,9 +11,10 @@ export async function GET(req: NextRequest) {
 
     const projects = await DataService.getProjects();
     const projectIds = projects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject] = await Promise.all([
+    const [milestonesByProject, latestQuotesByProject, latestTasksByProject] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
+      DataService.getLatestTasksByProjectIds(projectIds),
     ]);
 
     // 1. KPI 計算
@@ -124,6 +125,14 @@ export async function GET(req: NextRequest) {
           : "完結",
         activeMilestoneId: activeMilestone?.id || null,
         activeMilestoneAssignedTo: activeMilestone?.assignedToName || null,
+        assignmentTask: latestTasksByProject[p.id]
+          ? {
+              id: latestTasksByProject[p.id].id,
+              assignedToId: latestTasksByProject[p.id].assignedToId,
+              subject: latestTasksByProject[p.id].subject,
+              priority: latestTasksByProject[p.id].priority,
+            }
+          : null,
       };
     });
 
@@ -165,7 +174,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { projectId, assignedToId, assignedToName, subject, taskType, dueDatetime, priority } = body;
+    const { projectId, assignedToId, subject, taskType, dueDatetime, priority } = body;
 
     if (!projectId || !assignedToId || !subject) {
       return NextResponse.json({ error: "缺少必填欄位：案場、負責人、任務主題" }, { status: 400 });
@@ -177,6 +186,9 @@ export async function POST(req: NextRequest) {
     }
     if (assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
       return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
+    }
+    if (priority && !["HIGH", "MEDIUM", "LOW"].includes(priority)) {
+      return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
     }
 
     const task = await DataService.addTask({
@@ -196,5 +208,34 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("指派任務失敗:", error);
     return NextResponse.json({ error: "指派任務失敗" }, { status: 500 });
+  }
+}
+
+// PATCH /api/dashboard/manager — 修改主管指派任務
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { taskId, assignedToId, subject, priority } = body;
+    if (!taskId || !assignedToId || !subject || !priority) {
+      return NextResponse.json({ error: "缺少必填欄位：任務、負責人、任務主題、優先度" }, { status: 400 });
+    }
+    if (!["HIGH", "MEDIUM", "LOW"].includes(priority)) {
+      return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
+    }
+
+    const assignee = await DataService.getUserById(assignedToId);
+    if (!assignee) {
+      return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
+    }
+    if (assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
+      return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
+    }
+
+    const task = await DataService.updateTask(taskId, { assignedToId, subject, priority });
+    if (!task) return NextResponse.json({ error: "查無此任務" }, { status: 404 });
+    return NextResponse.json({ task });
+  } catch (error) {
+    console.error("修改指派任務失敗:", error);
+    return NextResponse.json({ error: "修改指派任務失敗" }, { status: 500 });
   }
 }

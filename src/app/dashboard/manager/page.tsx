@@ -30,8 +30,8 @@ export default function ManagerDashboardPage() {
   const [timeStandard, setTimeStandard] = useState("");
 
   // 任務指派
-  const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; userId: string; subject: string }>({
-    open: false, projectId: "", projectName: "", userId: "", subject: ""
+  const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW" }>({
+    open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM"
   });
   const [assigning, setAssigning] = useState(false);
 
@@ -79,18 +79,25 @@ export default function ManagerDashboardPage() {
     setAssigning(true);
     try {
       const res = await fetch("/api/dashboard/manager", {
-        method: "POST",
+        method: assignModal.taskId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(assignModal.taskId ? {
+          taskId: assignModal.taskId,
+          assignedToId: assignModal.userId,
+          subject: assignModal.subject,
+          priority: assignModal.priority,
+        } : {
           projectId: assignModal.projectId,
           assignedToId: assignModal.userId,
           subject: assignModal.subject,
+          priority: assignModal.priority,
         }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
-      setAssignModal({ open: false, projectId: "", projectName: "", userId: "", subject: "" });
-      alert("指派成功！");
+      setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM" });
+      await fetchDashboardData();
+      alert(assignModal.taskId ? "任務已更新！" : "指派成功！");
     } catch (err) {
       alert(err instanceof Error ? err.message : "指派任務失敗");
     } finally {
@@ -219,7 +226,15 @@ export default function ManagerDashboardPage() {
                 <td className="p-3 font-bold text-slate-700">{p.currentStageLabel} - {p.activeMilestoneName}</td>
                 <td className="p-3">{p.expectedDate || "-"}</td>
                 <td className="p-3 text-center">
-                  <button onClick={() => setAssignModal({ open: true, projectId: p.id, projectName: p.projectName, userId: "", subject: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow hover:bg-blue-700">指派任務</button>
+                  <button onClick={() => setAssignModal({
+                    open: true,
+                    projectId: p.id,
+                    projectName: p.projectName,
+                    taskId: p.assignmentTask?.id || "",
+                    userId: p.assignmentTask?.assignedToId || "",
+                    subject: p.assignmentTask?.subject || "",
+                    priority: p.assignmentTask?.priority || "MEDIUM",
+                  })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow hover:bg-blue-700">{p.assignmentTask ? "變更" : "指派任務"}</button>
                 </td>
               </tr>
             ))}
@@ -231,7 +246,7 @@ export default function ManagerDashboardPage() {
       {assignModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><Sparkles className="text-blue-600 w-5 h-5"/> 指派任務 - {assignModal.projectName}</h3>
+            <h3 className="font-bold mb-4 flex items-center gap-2"><Sparkles className="text-blue-600 w-5 h-5"/> {assignModal.taskId ? "變更指派任務" : "指派任務"} - {assignModal.projectName}</h3>
             <form onSubmit={handleAssignTask} className="space-y-3 text-sm">
               <label className="block font-semibold">指派對象
                 <select required value={assignModal.userId} onChange={e=>setAssignModal({...assignModal, userId: e.target.value})} className="w-full border p-2 mt-1 rounded">
@@ -246,7 +261,14 @@ export default function ManagerDashboardPage() {
               <label className="block font-semibold">任務要求/主題
                 <textarea required rows={3} value={assignModal.subject} onChange={e=>setAssignModal({...assignModal, subject: e.target.value})} className="w-full border p-2 mt-1 rounded" placeholder="例如：請盡速確認客戶廚具圖面"/>
               </label>
-              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={()=>setAssignModal({...assignModal,open:false})} className="px-4 py-2 bg-slate-200 rounded font-bold">取消</button><button disabled={assigning} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">{assigning ? "傳送中..." : "確認指派"}</button></div>
+              <label className="block font-semibold">優先度
+                <select required value={assignModal.priority} onChange={e=>setAssignModal({...assignModal, priority: e.target.value as "HIGH" | "MEDIUM" | "LOW"})} className="w-full border p-2 mt-1 rounded">
+                  <option value="HIGH">高</option>
+                  <option value="MEDIUM">中</option>
+                  <option value="LOW">低</option>
+                </select>
+              </label>
+              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={()=>setAssignModal({...assignModal,open:false})} className="px-4 py-2 bg-slate-200 rounded font-bold">取消</button><button disabled={assigning} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">{assigning ? "儲存中..." : assignModal.taskId ? "儲存變更" : "確認指派"}</button></div>
             </form>
           </div>
         </div>

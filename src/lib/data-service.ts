@@ -235,6 +235,45 @@ export const DataService = {
     }));
   },
 
+  async getLatestTasksByProjectIds(projectIds: string[]): Promise<Record<string, SalesTaskItem>> {
+    if (projectIds.length === 0) return {};
+    const tasks = await prisma.salesTask.findMany({
+      where: { projectId: { in: projectIds } },
+      include: { project: true, assignedTo: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const result: Record<string, SalesTaskItem> = {};
+    for (const task of tasks) {
+      if (!result[task.projectId]) {
+        result[task.projectId] = {
+          id: task.id, projectId: task.projectId, projectName: task.project.projectName,
+          assignedToId: task.assignedToId, assignedToName: task.assignedTo.name,
+          taskType: task.taskType, subject: task.subject, dueDatetime: task.dueDatetime.toISOString(),
+          priority: task.priority, isCompleted: task.isCompleted, resultNotes: task.resultNotes,
+          completedAt: dateValue(task.completedAt) || null,
+        };
+      }
+    }
+    return result;
+  },
+
+  async updateTask(id: string, data: { assignedToId: string; subject: string; priority: TaskPriority }): Promise<SalesTaskItem | null> {
+    const existing = await prisma.salesTask.findUnique({ where: { id } });
+    if (!existing) return null;
+    const task = await prisma.salesTask.update({
+      where: { id },
+      data: { assignedToId: data.assignedToId, subject: data.subject, priority: data.priority },
+      include: { project: true, assignedTo: true },
+    });
+    return {
+      id: task.id, projectId: task.projectId, projectName: task.project.projectName,
+      assignedToId: task.assignedToId, assignedToName: task.assignedTo.name,
+      taskType: task.taskType, subject: task.subject, dueDatetime: task.dueDatetime.toISOString(),
+      priority: task.priority, isCompleted: task.isCompleted, resultNotes: task.resultNotes,
+      completedAt: dateValue(task.completedAt) || null,
+    };
+  },
+
   async addTask(data: Omit<SalesTaskItem, "id" | "projectName" | "assignedToName"> & { assignedToName?: string }): Promise<SalesTaskItem> {
     const task = await prisma.salesTask.create({
       data: {
