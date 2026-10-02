@@ -2,17 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   ArrowLeft,
-  Calendar,
-  User,
+  CheckCircle2,
   Edit3,
-  Save,
+  MapPin,
   X,
-  Sparkles,
 } from "lucide-react";
 import {
   ProjectMilestoneItem,
@@ -20,8 +16,9 @@ import {
   MilestoneStageCode,
   MILESTONE_STAGE_LABELS,
   PHASE_LABELS,
+  ProjectDetail,
+  SalesTaskItem,
 } from "@/lib/mock-data";
-import { ProjectDetail } from "@/lib/mock-data";
 
 interface MilestoneWithLight extends ProjectMilestoneItem {
   trafficLight: { color: string; label: string; daysDiff: number };
@@ -36,16 +33,26 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = 
 
 const PHASE_ORDER: MilestonePhase[] = ["CONTACT", "DESIGN", "PRODUCTION", "EXTRA"];
 
+interface MilestoneAssignee {
+  id: string;
+  name: string;
+  role: string;
+}
+
 export default function MilestonesPage({ params }: { params: { id: string } }) {
   const projectId = params.id;
+  const router = useRouter();
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [projects, setProjects] = useState<ProjectDetail[]>([]);
+  const [assignees, setAssignees] = useState<MilestoneAssignee[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<SalesTaskItem[]>([]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState<MilestonePhase>("CONTACT");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    plannedDueDate: "", actualDueDate: "", assignedToName: "", notes: "", attachments: ""
+    plannedDueDate: "", actualDueDate: "", assignedToId: "", notes: "", attachments: ""
   });
   const [saving, setSaving] = useState(false);
   const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", notes: "" });
@@ -53,7 +60,31 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
+    fetchProjects();
+    fetchAssignees();
   }, [projectId]);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      if (Array.isArray(data)) setProjects(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchAssignees = async () => {
+    try {
+      const res = await fetch("/api/auth/users");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setAssignees(data.filter((user) => user.role === "SALES" || user.role === "ASSISTANT"));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -62,6 +93,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (data.project) setProject(data.project);
       if (Array.isArray(data.milestones)) setMilestones(data.milestones);
+
+      const tasksRes = await fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`);
+      const tasksData = await tasksRes.json();
+      if (Array.isArray(tasksData)) setCompletedTasks(tasksData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -74,7 +109,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     setEditForm({
       plannedDueDate: m.plannedDueDate || "",
       actualDueDate: m.actualDueDate || "",
-      assignedToName: m.assignedToName || "",
+      assignedToId: m.assignedToId || "",
       notes: m.notes || "",
       attachments: m.attachments || "",
     });
@@ -124,13 +159,40 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         <Link href="/dashboard/workbench" className="inline-flex items-center gap-1.5 text-sm font-medium">
           <ArrowLeft className="w-4 h-4" /> 返回工作台
         </Link>
-        {project && (
-          <div className="text-right">
-            <h1 className="text-xl font-black">{project.projectName}</h1>
-            <p className="text-xs text-slate-500">{project.siteAddress}</p>
-          </div>
-        )}
+        <label className="text-sm font-semibold">
+          切換案件
+          <select
+            value={projectId}
+            onChange={(event) => router.push(`/projects/${event.target.value}/milestones`)}
+            className="ml-2 max-w-xs border rounded px-2 py-1.5"
+          >
+            {projects.map((item) => <option key={item.id} value={item.id}>{item.projectName}</option>)}
+          </select>
+        </label>
       </div>
+
+      {project && (
+        <section className="bg-white border rounded-xl p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
+            <div>
+              <h1 className="text-xl font-black">{project.projectName}</h1>
+              <p className="mt-1 flex items-center gap-1 text-sm text-slate-600"><MapPin className="h-4 w-4" />{project.siteAddress}</p>
+            </div>
+            <span className={`rounded px-2 py-1 text-xs font-bold ${project.isDelayed ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
+              {project.isDelayed ? "案件逾期" : "時程正常"}
+            </span>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
+            <div><dt className="text-xs text-slate-500">客戶</dt><dd className="font-semibold">{project.customerName}（{project.customerType}）</dd></div>
+            <div><dt className="text-xs text-slate-500">案件業務</dt><dd className="font-semibold">{project.salesRepName}</dd></div>
+            <div><dt className="text-xs text-slate-500">案件業助</dt><dd className="font-semibold">{project.salesAssistantName || "未指定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">預計日期</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">戶數</dt><dd className="font-semibold">{project.unitCount ?? "未設定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="font-semibold">{project.quoteAmount ?? project.estimatedBudget ?? "未設定"}</dd></div>
+            <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition || "未填寫"}</dd></div>
+          </dl>
+        </section>
+      )}
 
       <div className="bg-white rounded-2xl border overflow-hidden">
         <div className="flex border-b">
@@ -155,7 +217,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <label>預定完成日 <input type="date" value={editForm.plannedDueDate} onChange={(e) => setEditForm({...editForm, plannedDueDate: e.target.value})} className="border w-full p-1"/></label>
                     <label>實際完成日 <input type="date" value={editForm.actualDueDate} onChange={(e) => setEditForm({...editForm, actualDueDate: e.target.value})} className="border w-full p-1"/></label>
-                    <label>負責人 <input type="text" value={editForm.assignedToName} onChange={(e) => setEditForm({...editForm, assignedToName: e.target.value})} className="border w-full p-1"/></label>
+                    <label>負責人
+                      <select value={editForm.assignedToId} onChange={(e) => setEditForm({...editForm, assignedToId: e.target.value})} className="border w-full p-1">
+                        <option value="">未指定</option>
+                        {assignees.map((user) => <option key={user.id} value={user.id}>{user.role === "SALES" ? "業務" : "業助"}｜{user.name}</option>)}
+                      </select>
+                    </label>
                     <label>備註 <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
                   </div>
                   <button onClick={() => handleSaveEdit(m.id)} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">儲存</button>
@@ -178,6 +245,24 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           ))}
         </div>
       </div>
+
+      <section className="bg-white border rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 border-b px-4 py-3 font-bold"><CheckCircle2 className="h-5 w-5 text-emerald-600" />已完成待辦備查</div>
+        {completedTasks.length ? (
+          <div className="divide-y px-4">
+            {completedTasks.map((task) => (
+              <article key={task.id} className="py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{task.subject}</h3>
+                  <span className="text-xs text-slate-500">{task.completedAt ? new Date(task.completedAt).toLocaleString("zh-TW") : "已完成"}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">負責人：{task.assignedToName || "未指定"}｜原到期：{new Date(task.dueDatetime).toLocaleString("zh-TW")}</p>
+                {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}
+              </article>
+            ))}
+          </div>
+        ) : <p className="px-4 py-6 text-center text-sm text-slate-500">此案件尚無已完成待辦</p>}
+      </section>
 
       {advanceModal.open && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
