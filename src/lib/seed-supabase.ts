@@ -12,7 +12,7 @@ async function seedData() {
   await prisma.user.createMany({
     data: [
       { id: "u1", name: "張志豪", email: "admin@cabsales.tw", role: "ADMIN" },
-      { id: "u2", name: "王志明", email: "manager@cabsales.tw", role: "MANAGER" },
+      { id: "u2", name: "王志明", email: "manager@cabsales.tw", role: "SALES_MANAGER" },
       { id: "u3", name: "林宏遠", email: "sales.lin@cabsales.tw", role: "SALES" },
       { id: "u4", name: "陳廷瑋", email: "sales.chen@cabsales.tw", role: "SALES" },
       { id: "u5", name: "張育菁", email: "assistant.chang@cabsales.tw", role: "ASSISTANT" },

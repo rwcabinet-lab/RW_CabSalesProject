@@ -224,7 +224,8 @@ model SalesTask {
 
 enum Role {
   ADMIN
-  MANAGER
+  LEVEL_MANAGER
+  SALES_MANAGER
   SALES
   ASSISTANT
 }

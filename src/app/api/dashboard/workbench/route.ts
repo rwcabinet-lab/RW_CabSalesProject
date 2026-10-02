@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
     // 業務/業助：只顯示自己負責或被分配的案件
-    const isManager = currentUser.role === "MANAGER" || currentUser.role === "ADMIN";
+    const isManager =
+      currentUser.role === "LEVEL_MANAGER" ||
+      currentUser.role === "SALES_MANAGER" ||
+      currentUser.role === "ADMIN";
     const myProjects = isManager
       ? allProjects
       : allProjects.filter(
