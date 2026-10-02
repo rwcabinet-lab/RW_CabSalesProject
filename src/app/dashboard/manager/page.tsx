@@ -210,7 +210,7 @@ export default function ManagerDashboardPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/業助</th><th className="p-3">階段/進度</th><th className="p-3">預計完成日</th><th className="p-3 text-center">指派任務</th>
+              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/業助</th><th className="p-3">階段/進度</th><th className="p-3">預計完成日</th><th className="p-3 text-center">詳細</th><th className="p-3 text-center">指派任務</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -225,6 +225,9 @@ export default function ManagerDashboardPage() {
                 <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
                 <td className="p-3 font-bold text-slate-700">{p.currentStageLabel} - {p.activeMilestoneName}</td>
                 <td className="p-3">{p.expectedDate || "-"}</td>
+                <td className="p-3 text-center">
+                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex items-center rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">詳細</Link>
+                </td>
                 <td className="p-3 text-center">
                   <button onClick={() => setAssignModal({
                     open: true,
