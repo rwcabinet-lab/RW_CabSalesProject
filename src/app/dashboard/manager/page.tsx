@@ -13,8 +13,15 @@ interface ManagerDashboardData {
   allProjectsOverview: any[];
 }
 
+interface AssignableUser {
+  id: string;
+  name: string;
+  role: "SALES" | "ASSISTANT";
+}
+
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -31,6 +38,23 @@ export default function ManagerDashboardPage() {
   useEffect(() => {
     fetchDashboardData();
   }, [monthFilter]); // 只將 monthFilter 送入 API，timeStandard 給前端過濾用
+
+  useEffect(() => {
+    fetch("/api/auth/users")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("無法載入指派人員");
+        return res.json();
+      })
+      .then((users: { id: string; name: string; role: string }[]) => {
+        setAssignableUsers(users.filter((user): user is AssignableUser =>
+          user.role === "SALES" || user.role === "ASSISTANT"
+        ));
+      })
+      .catch((err) => {
+        console.error(err);
+        setAssignableUsers([]);
+      });
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -54,18 +78,21 @@ export default function ManagerDashboardPage() {
     e.preventDefault();
     setAssigning(true);
     try {
-      await fetch("/api/dashboard/manager", {
+      const res = await fetch("/api/dashboard/manager", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: assignModal.projectId,
-          assignedToId: assignModal.userId || "u3",
-          assignedToName: "指定業務",
+          assignedToId: assignModal.userId,
           subject: assignModal.subject,
         }),
       });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "指派任務失敗");
       setAssignModal({ open: false, projectId: "", projectName: "", userId: "", subject: "" });
       alert("指派成功！");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "指派任務失敗");
     } finally {
       setAssigning(false);
     }
@@ -209,9 +236,11 @@ export default function ManagerDashboardPage() {
               <label className="block font-semibold">指派對象
                 <select required value={assignModal.userId} onChange={e=>setAssignModal({...assignModal, userId: e.target.value})} className="w-full border p-2 mt-1 rounded">
                   <option value="">選擇人員</option>
-                  <option value="u3">林宏遠 (業務)</option>
-                  <option value="u4">陳廷瑋 (業務)</option>
-                  <option value="u5">張育菁 (業助)</option>
+                  {assignableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.role === "SALES" ? "業務" : "業助"})
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="block font-semibold">任務要求/主題

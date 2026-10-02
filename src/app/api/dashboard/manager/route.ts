@@ -171,10 +171,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "缺少必填欄位：案場、負責人、任務主題" }, { status: 400 });
     }
 
+    const assignee = await DataService.getUserById(assignedToId);
+    if (!assignee) {
+      return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
+    }
+    if (assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
+      return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
+    }
+
     const task = await DataService.addTask({
       projectId,
       assignedToId,
-      assignedToName: assignedToName || "業務人員",
+      assignedToName: assignee.name,
       subject,
       taskType: taskType || "QUOTE_FOLLOWUP",
       dueDatetime: dueDatetime || new Date().toISOString(),
