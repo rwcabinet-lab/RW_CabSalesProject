@@ -12,6 +12,7 @@ import {
   Building,
   Edit3,
   CheckCircle2,
+  Archive,
   X,
 } from "lucide-react";
 import { CustomerItem, SalesTaskItem } from "@/lib/mock-data";
@@ -73,6 +74,10 @@ export default function SalesWorkbenchPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [newTaskData, setNewTaskData] = useState({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: new Date().toISOString().slice(0, 16), priority: "HIGH" });
   const [creatingTask, setCreatingTask] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<SalesTaskItem | null>(null);
+  const [completionNotes, setCompletionNotes] = useState("");
+  const [completingTask, setCompletingTask] = useState(false);
+  const [completionError, setCompletionError] = useState("");
 
   useEffect(() => {
     fetchWorkbenchData();
@@ -104,17 +109,48 @@ export default function SalesWorkbenchPage() {
     }
   };
 
-  const handleToggleTask = async (task: SalesTaskItem) => {
+  const handleCompleteTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskToComplete) return;
+
+    setCompletingTask(true);
+    setCompletionError("");
     try {
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: task.id, isCompleted: !task.isCompleted }),
+        body: JSON.stringify({
+          taskId: taskToComplete.id,
+          isCompleted: true,
+          resultNotes: completionNotes.trim(),
+        }),
       });
-      if (res.ok) {
-        setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, isCompleted: !task.isCompleted } : t)));
+      const result = await res.json();
+      if (!res.ok) {
+        setCompletionError(result.error || "完成待辦失敗，請稍後再試");
+        return;
       }
-    } catch (err) {}
+
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskToComplete.id
+            ? {
+                ...task,
+                isCompleted: true,
+                resultNotes: completionNotes.trim(),
+                completedAt: result.task?.completedAt || new Date().toISOString(),
+              }
+            : task
+        )
+      );
+      setTaskToComplete(null);
+      setCompletionNotes("");
+    } catch (err) {
+      console.error("Failed to complete task:", err);
+      setCompletionError("完成待辦時發生錯誤，請稍後再試");
+    } finally {
+      setCompletingTask(false);
+    }
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -202,6 +238,8 @@ export default function SalesWorkbenchPage() {
     }
     return match;
   });
+  const pendingTasks = tasks.filter((task) => !task.isCompleted);
+  const completedTasks = tasks.filter((task) => task.isCompleted);
 
   return (
     <div className="space-y-8 pb-16">
@@ -216,18 +254,51 @@ export default function SalesWorkbenchPage() {
       <div className="bg-white rounded-2xl shadow-sm border p-6">
         <h2 className="text-base font-bold flex items-center gap-2 mb-4"><CheckSquare className="w-5 h-5 text-blue-600" /> 今日待辦事項</h2>
         <div className="divide-y">
-          {tasks.map((task) => (
+          {pendingTasks.map((task) => (
             <div key={task.id} className="py-3 flex justify-between items-start">
               <div className="flex gap-3 items-start">
-                <input type="checkbox" checked={task.isCompleted} onChange={() => handleToggleTask(task)} className="mt-1 cursor-pointer" />
                 <div>
                   <div className="font-bold text-sm">[{task.projectName}] {task.subject}</div>
                   <div className="text-xs text-slate-500 mt-1">到期：{new Date(task.dueDatetime).toLocaleString()} | 優先：{task.priority}</div>
                 </div>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full font-bold ${task.isCompleted ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{task.isCompleted ? "已完成" : "待處理"}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTaskToComplete(task);
+                  setCompletionNotes("");
+                  setCompletionError("");
+                }}
+                className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+              >
+                <CheckCircle2 className="h-4 w-4" /> 完成
+              </button>
             </div>
           ))}
+          {pendingTasks.length === 0 && <p className="py-6 text-center text-sm text-slate-500">目前沒有待處理事項</p>}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <h2 className="flex items-center gap-2 border-b px-6 py-4 text-base font-bold">
+          <Archive className="h-5 w-5 text-emerald-600" /> 已完成待辦備查
+        </h2>
+        <div className="divide-y px-6">
+          {completedTasks.map((task) => (
+            <article key={task.id} className="py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold">[{task.projectName}] {task.subject}</h3>
+                <span className="text-xs text-slate-500">
+                  {task.completedAt ? new Date(task.completedAt).toLocaleString("zh-TW") : "已完成"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                負責人：{task.assignedToName || "未指定"}｜原到期：{new Date(task.dueDatetime).toLocaleString("zh-TW")}
+              </p>
+              {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}
+            </article>
+          ))}
+          {completedTasks.length === 0 && <p className="py-6 text-center text-sm text-slate-500">尚無已完成待辦</p>}
         </div>
       </div>
 
@@ -251,6 +322,8 @@ export default function SalesWorkbenchPage() {
               <option value="DESIGN">設計確認期</option>
               <option value="PRODUCTION">生產施工期</option>
               <option value="CLOSED">結案</option>
+              <option value="WRAP_UP">收尾</option>
+              <option value="LOST">流標</option>
             </select>
           </label>
         </div>
@@ -289,11 +362,11 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
                 <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
-                <td className="p-3 font-bold text-slate-700">{p.currentStage}</td>
+                <td className="p-3 font-bold text-slate-700">{p.currentStage === "WRAP_UP" ? "收尾" : p.currentStage === "LOST" ? "流標" : p.currentStage}</td>
                 <td className="p-3 font-bold">{p.activeMilestone?.stageName || "完結"}</td>
                 <td className="p-3">{p.activeMilestone?.plannedDueDate || p.expectedDate}</td>
                 <td className="p-3 flex gap-2 justify-center">
-                  {p.activeMilestone && <button onClick={() => setAdvanceModal({ open: true, projectId: p.id, projectName: p.projectName, milestoneId: p.activeMilestone!.id, milestoneName: p.activeMilestone!.stageName, notes: "", attachments: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">推進</button>}
+                  {p.activeMilestone && p.activeMilestone.status !== "COMPLETED" && <button onClick={() => setAdvanceModal({ open: true, projectId: p.id, projectName: p.projectName, milestoneId: p.activeMilestone!.id, milestoneName: p.activeMilestone!.stageName, notes: "", attachments: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">推進</button>}
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
                   <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">詳細</Link>
                 </td>
@@ -323,6 +396,46 @@ export default function SalesWorkbenchPage() {
               <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowTaskModal(false)} className="px-3 py-1 bg-slate-200 rounded">取消</button><button disabled={creatingTask} className="px-3 py-1 bg-blue-600 text-white rounded">建立</button></div>
             </form>
           </div>
+        </div>
+      )}
+
+      {taskToComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleCompleteTask} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-lg font-bold">完成待辦</h3>
+            <p className="mb-4 text-sm text-slate-600">[{taskToComplete.projectName}] {taskToComplete.subject}</p>
+            <label className="block text-sm font-semibold">
+              完成備註
+              <textarea
+                value={completionNotes}
+                onChange={(e) => setCompletionNotes(e.target.value)}
+                rows={5}
+                placeholder="請填寫完成結果或處理備註"
+                className="mt-2 w-full rounded border p-2 font-normal"
+              />
+            </label>
+            {completionError && <p role="alert" className="mt-3 text-sm text-red-600">{completionError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTaskToComplete(null);
+                  setCompletionError("");
+                }}
+                disabled={completingTask}
+                className="rounded bg-slate-200 px-4 py-2 text-sm"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={completingTask}
+                className="rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {completingTask ? "完成中..." : "確認完成"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

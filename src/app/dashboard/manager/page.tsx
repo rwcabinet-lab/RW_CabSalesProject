@@ -203,6 +203,8 @@ export default function ManagerDashboardPage() {
                 <option value="DESIGN">設計確認期</option>
                 <option value="PRODUCTION">生產施工期</option>
                 <option value="CLOSED">結案</option>
+                <option value="WRAP_UP">收尾</option>
+                <option value="LOST">流標</option>
               </select>
             </label>
           </div>

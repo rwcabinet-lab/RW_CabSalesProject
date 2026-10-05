@@ -219,6 +219,81 @@ export const DataService = {
     return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
   },
 
+  async advanceProjectToSpecialStage(projectId: string, stageCode: "X-1" | "X-2", reason: string) {
+    const currentStage = STAGE_CODE_TO_PROJECT_STAGE[stageCode] as ProjectStage;
+    const actualDueDate = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      const existingMilestone = await tx.projectMilestone.findFirst({
+        where: { projectId, stageCode },
+      });
+      const stageOrder = existingMilestone
+        ? existingMilestone.stageOrder
+        : ((await tx.projectMilestone.aggregate({
+            where: { projectId },
+            _max: { stageOrder: true },
+          }))._max.stageOrder || 0) + 1;
+
+      if (existingMilestone) {
+        await tx.projectMilestone.update({
+          where: { id: existingMilestone.id },
+          data: { status: MilestoneStatus.COMPLETED, actualDueDate, notes: reason },
+        });
+      } else {
+        await tx.projectMilestone.create({
+          data: {
+            projectId,
+            stageCode,
+            phase: STAGE_CODE_TO_PHASE[stageCode],
+            stageOrder,
+            status: MilestoneStatus.COMPLETED,
+            actualDueDate,
+            notes: reason,
+          },
+        });
+      }
+
+      await tx.project.update({ where: { id: projectId }, data: { currentStage } });
+    });
+
+    return this.getMilestonesByProjectId(projectId);
+  },
+
+  async returnProjectToProduction(projectId: string) {
+    await prisma.$transaction(async (tx) => {
+      const productionMilestones = await tx.projectMilestone.findMany({
+        where: { projectId, phase: "PRODUCTION" },
+        orderBy: { stageOrder: "asc" },
+      });
+
+      const firstIncomplete = productionMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
+      const targetMilestone = firstIncomplete || productionMilestones[productionMilestones.length - 1];
+      if (!targetMilestone) {
+        throw new Error(`Project ${projectId} has no production milestones to resume`);
+      }
+
+      for (const milestone of productionMilestones) {
+        if (milestone.status === MilestoneStatus.COMPLETED && milestone.id !== targetMilestone?.id) continue;
+        await tx.projectMilestone.update({
+          where: { id: milestone.id },
+          data: {
+            status: milestone.id === targetMilestone?.id ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING,
+            ...(milestone.id === targetMilestone?.id && milestone.status === MilestoneStatus.COMPLETED
+              ? { actualDueDate: null }
+              : {}),
+          },
+        });
+      }
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStage: ProjectStage.PRODUCTION, isDelayed: false },
+      });
+    });
+
+    return this.getMilestonesByProjectId(projectId);
+  },
+
   async getTasks(filter?: { projectId?: string; assignedToId?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
     const tasks = await prisma.salesTask.findMany({
       where: {
@@ -314,7 +389,7 @@ export const DataService = {
     return prisma.quotation.create({ data: { projectId, ...data } });
   },
 
-  async updateProjectStage(projectId: string, currentStage: any, notes?: string) {
+  async updateProjectStage(projectId: string, currentStage: ProjectStage) {
     return prisma.project.update({ where: { id: projectId }, data: { currentStage } });
   },
 

@@ -80,8 +80,8 @@ export async function GET(req: NextRequest) {
       PRODUCTION: "生產施工期",
       CLOSED:     "已結案",
       BILLED:     "已立帳",
-      WRAP_UP:    "收尾中",
-      LOST:       "已流標",
+      WRAP_UP:    "收尾",
+      LOST:       "流標",
       DONE:       "完成",
     };
 

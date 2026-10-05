@@ -8,6 +8,7 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
+import type { FormEvent } from "react";
 import {
   Building,
   User,
@@ -20,7 +21,7 @@ import { ProjectDetail } from "@/lib/mock-data";
 
 interface KanbanProps {
   projects: any[];
-  onProjectStageChange: (projectId: string, newStage: string) => Promise<void>;
+  onProjectStageChange: (projectId: string, newStage: string, reason?: string) => Promise<boolean>;
 }
 
 const STAGES = [
@@ -31,10 +32,15 @@ const STAGES = [
   { id: "CAD_DRAWING", label: "圖面定稿拆單", color: "bg-amber-100 text-amber-800" },
   { id: "HANDOFF", label: "下單交廠", color: "bg-cyan-100 text-cyan-800" },
   { id: "DONE", label: "結案完工", color: "bg-emerald-100 text-emerald-800" },
+  { id: "WRAP_UP", label: "收尾", color: "bg-amber-100 text-amber-800" },
+  { id: "LOST", label: "流標", color: "bg-slate-200 text-slate-800" },
 ];
 
 export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
   const [items, setItems] = useState(projects);
+  const [specialAdvance, setSpecialAdvance] = useState<{ projectId: string; projectName: string; stage: string } | null>(null);
+  const [specialReason, setSpecialReason] = useState("");
+  const [stageError, setStageError] = useState("");
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -49,6 +55,14 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
     }
 
     const newStage = destination.droppableId;
+    setStageError("");
+    if (newStage === "WRAP_UP" || newStage === "LOST") {
+      const project = items.find((item) => item.id === draggableId);
+      if (!project) return;
+      setSpecialReason("");
+      setSpecialAdvance({ projectId: draggableId, projectName: project.projectName, stage: newStage });
+      return;
+    }
 
     // 樂觀更新前端狀態
     setItems((prev) =>
@@ -56,15 +70,38 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
     );
 
     // 呼叫後端 API 持久化
-    await onProjectStageChange(draggableId, newStage);
+    const updated = await onProjectStageChange(draggableId, newStage);
+    if (!updated) {
+      setItems((prev) =>
+        prev.map((p) => (p.id === draggableId ? { ...p, currentStage: source.droppableId } : p))
+      );
+      setStageError("變更階段失敗，請稍後再試。");
+    }
+  };
+
+  const handleSpecialAdvance = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!specialAdvance || !specialReason.trim()) return;
+
+    const updated = await onProjectStageChange(specialAdvance.projectId, specialAdvance.stage, specialReason.trim());
+    if (updated) {
+      setItems((prev) =>
+        prev.map((p) => (p.id === specialAdvance.projectId ? { ...p, currentStage: specialAdvance.stage } : p))
+      );
+      setSpecialAdvance(null);
+      setSpecialReason("");
+    } else {
+      setStageError("推進失敗，請確認原因後再試一次。");
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
-        <span>💡 提示：按住卡片即可自由拖曳至其他階段欄位，系統將即時同步更新案場狀態！</span>
-        <span className="font-semibold">共 7 大階段推進漏斗</span>
+        <span>💡 提示：按住卡片即可自由拖曳至其他階段欄位；推進至收尾或流標時須填寫原因。</span>
+        <span className="font-semibold">共 {STAGES.length} 大階段推進漏斗</span>
       </div>
+      {stageError && <p role="alert" className="text-sm text-red-600">{stageError}</p>}
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-6 min-h-[650px] pt-1">
@@ -191,6 +228,29 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
           })}
         </div>
       </DragDropContext>
+      {specialAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSpecialAdvance} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold">推進「{specialAdvance.projectName}」至{specialAdvance.stage === "WRAP_UP" ? "收尾" : "流標"}</h3>
+            {stageError && <p role="alert" className="mb-3 text-sm text-red-600">{stageError}</p>}
+            <label className="block text-sm font-semibold">
+              推進原因 *
+              <textarea
+                required
+                value={specialReason}
+                onChange={(event) => setSpecialReason(event.target.value)}
+                rows={4}
+                placeholder="請輸入推進原因"
+                className="mt-2 w-full rounded border p-2 font-normal"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setSpecialAdvance(null)} className="rounded bg-slate-200 px-4 py-2 text-sm">取消</button>
+              <button type="submit" disabled={!specialReason.trim()} className="rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">確認推進</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

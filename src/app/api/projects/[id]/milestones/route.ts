@@ -39,13 +39,49 @@ export async function PUT(
   try {
     const projectId = params.id;
     const body = await req.json();
-    const { action, milestoneId, notes, attachments, updates } = body;
+    const { action, milestoneId, notes, attachments, updates, stageCode, reason } = body;
+
+    if (action === "returnToProduction") {
+      const project = await DataService.getProjectById(projectId);
+      if (!project) {
+        return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
+      }
+      if (project.currentStage !== "WRAP_UP") {
+        return NextResponse.json({ error: "只有收尾階段可返回第三階段" }, { status: 409 });
+      }
+
+      const milestones = await DataService.returnProjectToProduction(projectId);
+      const updatedProject = await DataService.getProjectById(projectId);
+      return NextResponse.json({ success: true, project: updatedProject, milestones });
+    }
+
+    if (action === "specialAdvance") {
+      if (stageCode !== "X-1" && stageCode !== "X-2") {
+        return NextResponse.json({ error: "無效的額外階段" }, { status: 400 });
+      }
+      if (typeof reason !== "string" || !reason.trim()) {
+        return NextResponse.json({ error: "請填寫推進原因" }, { status: 400 });
+      }
+
+      const milestones = await DataService.advanceProjectToSpecialStage(projectId, stageCode, reason.trim());
+      const updatedProject = await DataService.getProjectById(projectId);
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones,
+      });
+    }
 
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }
 
     if (action === "advance") {
+      const project = await DataService.getProjectById(projectId);
+      if (project?.currentStage === "WRAP_UP" || project?.currentStage === "LOST") {
+        return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
+      }
+
       // 快速推進此里程碑完成，並啟動下一里程碑
       const result = await DataService.advanceMilestone(projectId, milestoneId, {
         notes,
@@ -63,6 +99,15 @@ export async function PUT(
     }
 
     // 一般修改
+    if (updates?.notes !== undefined) {
+      const milestone = (await DataService.getMilestonesByProjectId(projectId)).find((item) => item.id === milestoneId);
+      if ((milestone?.stageCode === "X-1" || milestone?.stageCode === "X-2") && (typeof updates.notes !== "string" || !updates.notes.trim())) {
+        return NextResponse.json({ error: "額外階段的推進原因不可空白" }, { status: 400 });
+      }
+      if (milestone?.stageCode === "X-1" || milestone?.stageCode === "X-2") {
+        updates.notes = updates.notes.trim();
+      }
+    }
     const updated = await DataService.updateMilestone(projectId, milestoneId, updates || {});
     const updatedProject = await DataService.getProjectById(projectId);
 

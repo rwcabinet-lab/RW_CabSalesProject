@@ -30,20 +30,23 @@ export default function VisualViewsPage() {
     }
   };
 
-  const handleStageChange = async (projectId: string, newStage: string) => {
+  const handleStageChange = async (projectId: string, newStage: string, reason?: string): Promise<boolean> => {
     try {
       const res = await fetch("/api/projects/stage", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, stage: newStage }),
+        body: JSON.stringify({ projectId, stage: newStage, reason }),
       });
       if (res.ok) {
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, currentStage: newStage } : p))
         );
+        return true;
       }
+      return false;
     } catch (err) {
       console.error("Failed to update project stage:", err);
+      return false;
     }
   };
 

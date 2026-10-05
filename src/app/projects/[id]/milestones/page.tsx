@@ -57,6 +57,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [saving, setSaving] = useState(false);
   const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", notes: "" });
   const [advancing, setAdvancing] = useState(false);
+  const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
+    stageCode: "X-1" | "X-2";
+    stageName: string;
+    reason: string;
+  } | null>(null);
+  const [specialAdvanceError, setSpecialAdvanceError] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -91,7 +97,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoading(true);
       const res = await fetch(`/api/projects/${projectId}/milestones`);
       const data = await res.json();
-      if (data.project) setProject(data.project);
+      if (data.project) {
+        setProject(data.project);
+        if (data.project.currentStage === "WRAP_UP") setActivePhase("EXTRA");
+      }
       if (Array.isArray(data.milestones)) setMilestones(data.milestones);
 
       const tasksRes = await fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`);
@@ -142,6 +151,62 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     } finally { setAdvancing(false); }
   };
 
+  const handleSpecialAdvance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!specialAdvanceModal) return;
+
+    setAdvancing(true);
+    setSpecialAdvanceError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "specialAdvance",
+          stageCode: specialAdvanceModal.stageCode,
+          reason: specialAdvanceModal.reason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSpecialAdvanceError(data.error || "推進失敗，請稍後再試");
+        return;
+      }
+
+      setSpecialAdvanceModal(null);
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to advance project to special stage:", error);
+      setSpecialAdvanceError("推進時發生錯誤，請稍後再試");
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
+  const handleReturnToProduction = async () => {
+    setAdvancing(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "returnToProduction" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSpecialAdvanceError(data.error || "返回第三階段失敗，請稍後再試");
+        return;
+      }
+
+      setActivePhase("PRODUCTION");
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to return project to production:", error);
+      setSpecialAdvanceError("返回第三階段時發生錯誤，請稍後再試");
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
   if (loading) return <div className="p-16 text-center">載入詳細資料中...</div>;
 
   const phaseGroups: Record<MilestonePhase, MilestoneWithLight[]> = { CONTACT: [], DESIGN: [], PRODUCTION: [], EXTRA: [] };
@@ -178,9 +243,41 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <h1 className="text-xl font-black">{project.projectName}</h1>
               <p className="mt-1 flex items-center gap-1 text-sm text-slate-600"><MapPin className="h-4 w-4" />{project.siteAddress}</p>
             </div>
-            <span className={`rounded px-2 py-1 text-xs font-bold ${project.isDelayed ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
-              {project.isDelayed ? "案件逾期" : "時程正常"}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded px-2 py-1 text-xs font-bold ${project.isDelayed ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
+                {project.isDelayed ? "案件逾期" : "時程正常"}
+              </span>
+              {project.currentStage === "WRAP_UP" && (
+                <button
+                  type="button"
+                  onClick={handleReturnToProduction}
+                  disabled={advancing}
+                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {advancing ? "處理中..." : "返回第三階段"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialAdvanceError("");
+                  setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
+                }}
+                className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                推進至收尾
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialAdvanceError("");
+                  setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
+                }}
+                className="rounded bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+              >
+                推進至流標
+              </button>
+            </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
             <div><dt className="text-xs text-slate-500">客戶</dt><dd className="font-semibold">{project.customerName}（{project.customerType}）</dd></div>
@@ -223,18 +320,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         {assignees.map((user) => <option key={user.id} value={user.id}>{user.role === "SALES" ? "業務" : "業助"}｜{user.name}</option>)}
                       </select>
                     </label>
-                    <label>備註 <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
+                    <label>{m.stageCode.startsWith("X-") ? "推進原因 *" : "備註"} <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
                   </div>
-                  <button onClick={() => handleSaveEdit(m.id)} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">儲存</button>
+                  <button onClick={() => handleSaveEdit(m.id)} disabled={saving || (m.stageCode.startsWith("X-") && !editForm.notes.trim())} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">儲存</button>
                 </div>
               ) : (
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2 font-bold text-sm">{MILESTONE_STAGE_LABELS[m.stageCode]} <span className={`text-[10px] px-1.5 rounded-full ${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`}>{STATUS_MAP[m.status].label}</span></div>
                     <div className="text-xs text-slate-500 mt-1">預定：{m.plannedDueDate || "無"} | 實際：{m.actualDueDate || "無"} | 負責：{m.assignedToName || "無"}</div>
+                    {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">原因／備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {(m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
+                    {project?.currentStage !== "WRAP_UP" && project?.currentStage !== "LOST" && (m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
                       <button onClick={() => setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], notes: "" })} className="bg-blue-600 text-white px-2 py-1 text-xs rounded">完成</button>
                     )}
                     <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>
@@ -274,6 +372,44 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <button onClick={handleAdvance} disabled={advancing} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">推進</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {specialAdvanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSpecialAdvance} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold">推進至{specialAdvanceModal.stageName}</h3>
+            <p className="mb-4 text-sm text-slate-600">此案件可從目前任何階段直接推進，請填寫原因後確認。</p>
+            <label className="block text-sm font-semibold">
+              推進原因 *
+              <textarea
+                required
+                value={specialAdvanceModal.reason}
+                onChange={(event) => setSpecialAdvanceModal({ ...specialAdvanceModal, reason: event.target.value })}
+                rows={4}
+                placeholder="請輸入推進至此階段的原因"
+                className="mt-2 w-full rounded border p-2 font-normal"
+              />
+            </label>
+            {specialAdvanceError && <p role="alert" className="mt-3 text-sm text-red-600">{specialAdvanceError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSpecialAdvanceModal(null)}
+                disabled={advancing}
+                className="rounded bg-slate-200 px-4 py-2 text-sm"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={advancing || !specialAdvanceModal.reason.trim()}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {advancing ? "推進中..." : "確認推進"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

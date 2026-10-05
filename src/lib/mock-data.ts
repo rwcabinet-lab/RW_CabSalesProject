@@ -117,8 +117,8 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "3-3": "驗收作業",
   "3-4": "已結案",
   "3-5": "已立帳",
-  "X-1": "收尾中",
-  "X-2": "已流標",
+  "X-1": "收尾",
+  "X-2": "流標",
 };
 
 /** 各子進度預設作業天數 */
@@ -133,7 +133,7 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
   CONTACT:    "第一階段：接洽/丈量/報價/繪圖/簽約",
   DESIGN:     "第二階段：已簽約/資料送審/覆量中/繪製施工",
   PRODUCTION: "第三階段：生產中/施工中/待驗收/已結案/已立帳",
-  EXTRA:      "額外階段：收尾中/已流標",
+  EXTRA:      "額外階段：收尾/流標",
 };
 
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
