@@ -35,7 +35,11 @@ export default function CustomersPage() {
     try {
       const res = await fetch("/api/auth/users");
       const data = await res.json();
-      if (res.ok) setSalesReps(data.filter((user: { role: string }) => user.role === "SALES"));
+      if (res.ok) {
+        setSalesReps(data.filter((user: { role: string }) =>
+          user.role === "SALES_MANAGER" || user.role === "SALES"
+        ));
+      }
     } catch (err) {
       console.error(err);
     }
@@ -340,7 +344,11 @@ export default function CustomersPage() {
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                 >
                   <option value="">請選擇負責業務</option>
-                  {salesReps.map((salesRep) => <option key={salesRep.id} value={salesRep.id}>{salesRep.name}</option>)}
+                  {salesReps.map((salesRep) => (
+                    <option key={salesRep.id} value={salesRep.id}>
+                      {salesRep.name}（{salesRep.role === "SALES_MANAGER" ? "業務主管" : "業務專員"}）
+                    </option>
+                  ))}
                 </select>
               </div>
 
