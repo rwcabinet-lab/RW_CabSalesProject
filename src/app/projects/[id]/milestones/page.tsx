@@ -45,6 +45,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [projects, setProjects] = useState<ProjectDetail[]>([]);
   const [assignees, setAssignees] = useState<MilestoneAssignee[]>([]);
+  const [canManageMilestones, setCanManageMilestones] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<SalesTaskItem[]>([]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,9 +53,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    plannedDueDate: "", actualDueDate: "", assignedToId: "", notes: "", attachments: ""
+    plannedDueDate: "", assignedToId: "", notes: ""
   });
   const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
   const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", notes: "" });
   const [advancing, setAdvancing] = useState(false);
   const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
@@ -68,6 +70,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     fetchData();
     fetchProjects();
     fetchAssignees();
+    fetch("/api/auth/session")
+      .then((response) => response.json())
+      .then((data) => {
+        const role = data.user?.role;
+        setCanManageMilestones(role === "ADMIN" || role === "LEVEL_MANAGER" || role === "SALES_MANAGER");
+      })
+      .catch((error) => console.error("Failed to load current user:", error));
   }, [projectId]);
 
   const fetchProjects = async () => {
@@ -117,26 +126,40 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const startEdit = (m: MilestoneWithLight) => {
     setEditingId(m.id);
+    setEditError("");
     setEditForm({
       plannedDueDate: m.plannedDueDate || "",
-      actualDueDate: m.actualDueDate || "",
       assignedToId: m.assignedToId || "",
       notes: m.notes || "",
-      attachments: m.attachments || "",
     });
   };
 
   const handleSaveEdit = async (milestoneId: string) => {
     setSaving(true);
+    setEditError("");
     try {
-      await fetch(`/api/projects/${projectId}/milestones`, {
+      const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ milestoneId, updates: { ...editForm, plannedDueDate: editForm.plannedDueDate || null, actualDueDate: editForm.actualDueDate || null } }),
+        body: JSON.stringify({
+          milestoneId,
+          updates: {
+            ...editForm,
+            plannedDueDate: editForm.plannedDueDate || null,
+            assignedToId: editForm.assignedToId || null,
+          },
+        }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "儲存里程碑失敗");
       setEditingId(null);
       await fetchData();
-    } finally { setSaving(false); }
+    } catch (error) {
+      console.error("Failed to save milestone:", error);
+      setEditError(error instanceof Error ? error.message : "儲存里程碑失敗");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAdvance = async (e: React.FormEvent) => {
@@ -325,7 +348,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <div className="flex justify-between font-bold text-sm">編輯 {MILESTONE_STAGE_LABELS[m.stageCode]}<button onClick={() => setEditingId(null)}><X className="w-4 h-4" /></button></div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <label>預定完成日 <input type="date" value={editForm.plannedDueDate} onChange={(e) => setEditForm({...editForm, plannedDueDate: e.target.value})} className="border w-full p-1"/></label>
-                    <label>實際完成日 <input type="date" value={editForm.actualDueDate} onChange={(e) => setEditForm({...editForm, actualDueDate: e.target.value})} className="border w-full p-1"/></label>
                     <label>負責人
                       <select value={editForm.assignedToId} onChange={(e) => setEditForm({...editForm, assignedToId: e.target.value})} className="border w-full p-1">
                         <option value="">未指定</option>
@@ -334,20 +356,21 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </label>
                     <label>{m.stageCode.startsWith("X-") ? "推進原因 *" : "備註"} <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
                   </div>
+                  {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
                   <button onClick={() => handleSaveEdit(m.id)} disabled={saving || (m.stageCode.startsWith("X-") && !editForm.notes.trim())} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">儲存</button>
                 </div>
               ) : (
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2 font-bold text-sm">{MILESTONE_STAGE_LABELS[m.stageCode]} <span className={`text-[10px] px-1.5 rounded-full ${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`}>{STATUS_MAP[m.status].label}</span></div>
-                    <div className="text-xs text-slate-500 mt-1">預定：{m.plannedDueDate || "無"} | 實際：{m.actualDueDate || "無"} | 負責：{m.assignedToName || "無"}</div>
+                    <div className="text-xs text-slate-500 mt-1">預定：{m.plannedDueDate || "無"} | 負責：{m.assignedToName || "無"}</div>
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">原因／備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
                     {project?.currentStage !== "WRAP_UP" && project?.currentStage !== "LOST" && (m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
                       <button onClick={() => setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], notes: "" })} className="bg-blue-600 text-white px-2 py-1 text-xs rounded">完成</button>
                     )}
-                    <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>
+                    {canManageMilestones && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
                   </div>
                 </div>
               )}
@@ -364,7 +387,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <article key={task.id} className="py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">{task.subject}</h3>
-                  <span className="text-xs text-slate-500">{task.completedAt ? new Date(task.completedAt).toLocaleString("zh-TW") : "已完成"}</span>
+                  <span className="text-xs text-slate-500">{task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : "已完成"}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">負責人：{task.assignedToName || "未指定"}｜原到期：{new Date(task.dueDatetime).toLocaleString("zh-TW")}</p>
                 {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}

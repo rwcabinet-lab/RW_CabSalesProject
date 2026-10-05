@@ -150,6 +150,7 @@ model ProjectMilestone {
   updatedAt      DateTime        @updatedAt @map("updated_at")
   assignedTo     User?           @relation(fields: [assignedToId], references: [id])
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  salesTask      SalesTask?
 
   @@index([status, plannedDueDate])
   @@map("project_milestones")
@@ -221,9 +222,11 @@ model SalesTask {
   isCompleted  Boolean      @default(false) @map("is_completed")
   resultNotes  String?      @map("result_notes")
   completedAt  DateTime?    @map("completed_at")
+  milestoneId  String?      @unique @map("milestone_id")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
   assignedTo   User         @relation(fields: [assignedToId], references: [id])
+  milestone    ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([isCompleted, dueDatetime])
@@ -265,8 +268,6 @@ enum HardwareCategory {
   HANDLE
   ACCESSORY
 }
-
-
 
 enum QuoteStatus {
   DRAFT

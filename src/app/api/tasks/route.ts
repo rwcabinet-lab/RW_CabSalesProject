@@ -57,13 +57,26 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { taskId, isCompleted, resultNotes } = body;
+    const { taskId, isCompleted, resultNotes, completedAt } = body;
 
     if (!taskId || typeof isCompleted !== "boolean") {
       return NextResponse.json({ error: "缺少 taskId 或 isCompleted 狀態" }, { status: 400 });
     }
+    if (completedAt !== undefined) {
+      const parsedDate =
+        typeof completedAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(completedAt)
+          ? new Date(`${completedAt}T00:00:00.000Z`)
+          : null;
+      if (
+        !parsedDate ||
+        Number.isNaN(parsedDate.getTime()) ||
+        parsedDate.toISOString().slice(0, 10) !== completedAt
+      ) {
+        return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
+      }
+    }
 
-    const updatedTask = await DataService.toggleTaskComplete(taskId, isCompleted, resultNotes);
+    const updatedTask = await DataService.toggleTaskComplete(taskId, isCompleted, resultNotes, completedAt);
 
     if (!updatedTask) {
       return NextResponse.json({ error: "查無此任務" }, { status: 404 });

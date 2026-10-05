@@ -76,6 +76,9 @@ export default function SalesWorkbenchPage() {
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<SalesTaskItem | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
+  const [completionDate, setCompletionDate] = useState(
+    new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+  );
   const [completingTask, setCompletingTask] = useState(false);
   const [completionError, setCompletionError] = useState("");
 
@@ -123,6 +126,7 @@ export default function SalesWorkbenchPage() {
           taskId: taskToComplete.id,
           isCompleted: true,
           resultNotes: completionNotes.trim(),
+          completedAt: completionDate,
         }),
       });
       const result = await res.json();
@@ -138,7 +142,7 @@ export default function SalesWorkbenchPage() {
                 ...task,
                 isCompleted: true,
                 resultNotes: completionNotes.trim(),
-                completedAt: result.task?.completedAt || new Date().toISOString(),
+                completedAt: result.task?.completedAt || `${completionDate}T00:00:00.000Z`,
               }
             : task
         )
@@ -266,6 +270,7 @@ export default function SalesWorkbenchPage() {
                 onClick={() => {
                   setTaskToComplete(task);
                   setCompletionNotes("");
+                  setCompletionDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10));
                   setCompletionError("");
                 }}
                 className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
@@ -391,6 +396,16 @@ export default function SalesWorkbenchPage() {
           <form onSubmit={handleCompleteTask} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
             <h3 className="mb-1 text-lg font-bold">完成待辦</h3>
             <p className="mb-4 text-sm text-slate-600">[{taskToComplete.projectName}] {taskToComplete.subject}</p>
+            <label className="mb-4 block text-sm font-semibold">
+              實際完成日
+              <input
+                type="date"
+                required
+                value={completionDate}
+                onChange={(e) => setCompletionDate(e.target.value)}
+                className="mt-2 w-full rounded border p-2 font-normal"
+              />
+            </label>
             <label className="block text-sm font-semibold">
               完成備註
               <textarea

@@ -2,7 +2,7 @@ import { CustomerType, MilestoneStatus, Prisma, ProjectStage, Role, TaskPriority
 import { prisma } from "./prisma";
 import {
   CustomerItem, MasterBoardItem, MasterHardwareItem, MasterProcessingItem, ProjectDetail,
-  ProjectMilestoneItem, QuotationData, SalesTaskItem, MilestoneStageCode, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
+  ProjectMilestoneItem, QuotationData, SalesTaskItem, MilestoneStageCode, MILESTONE_STAGE_LABELS, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
 } from "./mock-data";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
 
@@ -214,13 +214,57 @@ export const DataService = {
   },
 
   async updateMilestone(projectId: string, milestoneId: string, updates: Partial<ProjectMilestoneItem>) {
-    await prisma.projectMilestone.update({
-      where: { id: milestoneId },
-      data: {
-        plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : undefined,
-        actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : undefined,
-        status: updates.status, assignedToId: updates.assignedToId, attachments: updates.attachments, notes: updates.notes,
-      },
+    await prisma.$transaction(async (tx) => {
+      const milestone = await tx.projectMilestone.update({
+        where: { id: milestoneId, projectId },
+        data: {
+          plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
+          actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
+          status: updates.status,
+          assignedToId: updates.assignedToId,
+          attachments: updates.attachments,
+          notes: updates.notes,
+        },
+      });
+
+      if (updates.assignedToId !== undefined) {
+        if (!updates.assignedToId) {
+          await tx.salesTask.deleteMany({ where: { milestoneId } });
+        } else {
+          const existingTask = await tx.salesTask.findUnique({ where: { milestoneId } });
+          const isCompleted = milestone.status === MilestoneStatus.COMPLETED;
+          const assigneeChanged = existingTask && existingTask.assignedToId !== updates.assignedToId;
+          await tx.salesTask.upsert({
+            where: { milestoneId },
+            create: {
+              projectId,
+              milestoneId,
+              assignedToId: updates.assignedToId,
+              taskType: milestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+              subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode],
+              dueDatetime: milestone.plannedDueDate || new Date(),
+              priority: TaskPriority.MEDIUM,
+              isCompleted,
+              completedAt: isCompleted ? milestone.actualDueDate || new Date() : null,
+            },
+            update: {
+              assignedToId: updates.assignedToId,
+              taskType: milestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+              subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode],
+              dueDatetime: milestone.plannedDueDate || new Date(),
+              isCompleted: isCompleted || (
+                existingTask?.isCompleted === true &&
+                existingTask.assignedToId === updates.assignedToId
+              ),
+              ...(isCompleted
+                ? { completedAt: milestone.actualDueDate || new Date() }
+                : assigneeChanged
+                  ? { completedAt: null, resultNotes: null }
+                  : {}),
+            },
+          });
+        }
+      }
     });
     return (await this.getMilestonesByProjectId(projectId)).find(m => m.id === milestoneId);
   },
@@ -423,7 +467,16 @@ export const DataService = {
     return { alerts: [] }; // Mock for now
   },
 
-  async toggleTaskComplete(taskId: string, isCompleted: boolean, resultNotes?: string) {
-    return prisma.salesTask.update({ where: { id: taskId }, data: { isCompleted, completedAt: isCompleted ? new Date() : null, resultNotes: resultNotes || undefined } });
+  async toggleTaskComplete(taskId: string, isCompleted: boolean, resultNotes?: string, completedAt?: string) {
+    return prisma.salesTask.update({
+      where: { id: taskId },
+      data: {
+        isCompleted,
+        completedAt: isCompleted
+          ? completedAt ? new Date(`${completedAt}T00:00:00.000Z`) : new Date()
+          : null,
+        resultNotes: resultNotes || undefined,
+      },
+    });
   }
 };

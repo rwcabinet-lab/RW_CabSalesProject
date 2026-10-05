@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
+import { getUserFromRequest } from "@/lib/access-control";
+
+function isValidDateOnly(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
 export async function GET(
   req: NextRequest,
@@ -74,6 +81,40 @@ export async function PUT(
 
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
+    }
+
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
+    if (action !== "advance") {
+      if (!["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role)) {
+        return NextResponse.json({ error: "僅理級主管或業務主管可編輯里程碑" }, { status: 403 });
+      }
+      if (
+        !updates ||
+        Object.keys(updates).some((key) => !["plannedDueDate", "assignedToId", "notes"].includes(key))
+      ) {
+        return NextResponse.json({ error: "僅可編輯預定完成日、負責人及備註" }, { status: 400 });
+      }
+      if (
+        (updates.plannedDueDate !== undefined &&
+          updates.plannedDueDate !== null &&
+          !isValidDateOnly(updates.plannedDueDate)) ||
+        (updates.assignedToId !== undefined &&
+          updates.assignedToId !== null &&
+          typeof updates.assignedToId !== "string") ||
+        (updates.notes !== undefined && typeof updates.notes !== "string")
+      ) {
+        return NextResponse.json({ error: "里程碑欄位格式無效" }, { status: 400 });
+      }
+      if (typeof updates.assignedToId === "string" && updates.assignedToId) {
+        const assignee = await DataService.getUserById(updates.assignedToId);
+        if (!assignee || (assignee.role !== "SALES" && assignee.role !== "ASSISTANT")) {
+          return NextResponse.json({ error: "負責人必須是有效的業務或業助帳號" }, { status: 400 });
+        }
+      }
     }
 
     if (action === "advance") {
