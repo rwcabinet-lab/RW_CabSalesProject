@@ -3,19 +3,26 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Kanban, HardHat, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings } from "lucide-react";
+import { PageAccessKey } from "@/lib/page-access";
 
 const navItems = [
-  { href: "/dashboard/workbench", label: "業務工作台",   icon: LayoutDashboard },
-  { href: "/dashboard/manager",   label: "主管監控看板", icon: Kanban },
-  { href: "/views",               label: "多元可視化",   icon: HardHat },
-  { href: "/customers",           label: "客戶主檔",     icon: Users },
-];
+  { key: "workbench", href: "/dashboard/workbench", label: "業務工作台", icon: LayoutDashboard },
+  { key: "manager", href: "/dashboard/manager", label: "主管監控看板", icon: Kanban },
+  { key: "views", href: "/views", label: "多元可視化", icon: HardHat },
+  { key: "customers", href: "/customers", label: "客戶主檔", icon: Users },
+  { key: "admin", href: "/admin", label: "管理者設定", icon: Settings },
+] as const;
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    role: string;
+    accessiblePages: PageAccessKey[];
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })
@@ -51,11 +58,11 @@ export function Navbar() {
 
         {/* 導覽連結 — 使用 prefetch 消除首次點擊延遲 */}
         <nav className="flex items-center space-x-0.5 sm:space-x-1">
-          {navItems.map((item) => {
+          {navItems.filter((item) => user?.accessiblePages.includes(item.key)).map((item) => {
             const Icon = item.icon;
             const isActive =
               pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+              pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

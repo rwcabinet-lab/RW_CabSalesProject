@@ -16,9 +16,10 @@
 - 業務待辦任務管理
 - 外部報價單登記
 - 主管看板與視覺化檢視
+- 管理者帳號維護與角色頁面權限
 - Prisma + Supabase PostgreSQL 的資料持久化
 
-目前仍然沒有正式的登入系統與角色權限控管，預覽模式使用固定使用者 ID 直接載入資料，適合開發/演示使用。
+登入使用資料庫使用者與共用預覽密碼；管理者可維護帳號並設定角色可瀏覽頁面。這仍是簡易預覽登入，並非正式身分驗證系統。
 
 ---
 
@@ -86,6 +87,7 @@ API Route → DataService → Prisma Client → Supabase PostgreSQL
 - `/projects/[id]/milestones`：里程碑與進度回報
 - `/projects/[id]/quote`：報價版本記錄
 - `/views`：視覺化檢視頁（Kanban / Gantt / Calendar）
+- `/admin`：管理者專用帳號與角色頁面權限設定
 
 ---
 
@@ -216,6 +218,10 @@ npm run build
 若要覆寫共用預覽密碼，可在伺服器環境設定 `LOGIN_PASSWORD`。此為簡易預覽登入，不等同完整的 Supabase Auth。
 
 使用者清單直接讀取資料庫中的 `users` 表。登入不會自動建立使用者，請先在資料庫建立帳號，再從登入頁面選擇使用者登入。
+
+### 管理者帳號與頁面權限
+
+管理員登入後可在 `/admin` 新增或修改帳號（姓名、電子郵件與角色），並設定各角色可進入首頁、業務工作台、主管看板、可視化、客戶主檔及案場/里程碑/報價頁面的權限。管理者設定頁固定僅管理員可使用，且至少需保留一位管理員。頁面與其相關 API 會一併檢查權限；修改 schema 後，請套用 `prisma/migrations/5_add_role_page_access` migration。
 
 ---
 

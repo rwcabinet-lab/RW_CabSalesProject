@@ -24,6 +24,13 @@ model User {
   @@map("users")
 }
 
+model RolePageAccess {
+  role  Role     @id
+  pages String[] @default([])
+
+  @@map("role_page_access")
+}
+
 model Customer {
   id              String       @id @default(cuid())
   customerType    CustomerType @map("customer_type")
