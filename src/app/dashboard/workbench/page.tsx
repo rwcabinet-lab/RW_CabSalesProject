@@ -245,13 +245,13 @@ export default function SalesWorkbenchPage() {
       <div className="flex justify-between border-b pb-4">
         <div>
           <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">業務工作台</span>
-          <h1 className="text-2xl font-black mt-1">今日待辦與負責案件追蹤</h1>
+          <h1 className="text-2xl font-black mt-1">案件列表</h1>
         </div>
         <button onClick={() => setShowTaskModal(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white"><Plus className="w-4 h-4"/> 建立待辦</button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border p-6">
-        <h2 className="text-base font-bold flex items-center gap-2 mb-4"><CheckSquare className="w-5 h-5 text-blue-600" /> 今日待辦事項</h2>
+        <h2 className="text-base font-bold flex items-center gap-2 mb-4"><CheckSquare className="w-5 h-5 text-blue-600" /> 待辦事項</h2>
         <div className="divide-y">
           {pendingTasks.map((task) => (
             <div key={task.id} className="py-3 flex justify-between items-start">
@@ -280,7 +280,7 @@ export default function SalesWorkbenchPage() {
 
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600"/> 負責案件時程燈號追蹤清單</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-blue-600"/> 案件清單</h2>
           <div className="flex items-center gap-3">
             <button onClick={openAddProject} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="w-4 h-4"/> 新增案場</button>
           </div>

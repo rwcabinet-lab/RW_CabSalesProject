@@ -21,10 +21,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
-    const isManager =
-      currentUser.role === "LEVEL_MANAGER" ||
-      currentUser.role === "SALES_MANAGER" ||
-      currentUser.role === "ADMIN";
 
     const myProjects = allProjects.filter(
       (p) =>
@@ -37,9 +33,7 @@ export async function GET(req: NextRequest) {
     const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
-      DataService.getTasks(
-        isManager ? undefined : { assignedToId: currentUser.id }
-      ),
+      DataService.getTasks({ assignedToId: currentUser.id }),
     ]);
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
