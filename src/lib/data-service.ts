@@ -15,7 +15,11 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-const projectInclude = { customer: true, salesRep: true, salesAssistant: true } as const;
+const projectInclude = {
+  customer: { include: { salesRep: true } },
+  salesRep: true,
+  salesAssistant: true,
+} as const;
 const milestoneInclude = { assignedTo: true } as const;
 const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
 const customerTypeForDatabase = (type: string): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
@@ -68,6 +72,7 @@ export const DataService = {
 
   async getProjects(): Promise<ProjectDetail[]> {
     const projects = await prisma.project.findMany({
+      relationLoadStrategy: "join",
       include: projectInclude,
       orderBy: { createdAt: "desc" }
     });
@@ -76,6 +81,7 @@ export const DataService = {
       customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
+      customerSalesRepName: p.customer.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
       expectedDate: dateValue(p.expectedDate),
@@ -85,13 +91,18 @@ export const DataService = {
   },
 
   async getProjectById(id: string): Promise<ProjectDetail | undefined> {
-    const p = await prisma.project.findUnique({ where: { id }, include: projectInclude });
+    const p = await prisma.project.findUnique({
+      where: { id },
+      relationLoadStrategy: "join",
+      include: projectInclude,
+    });
     if (!p) return undefined;
     const project = {
       id: p.id, projectName: p.projectName, customerId: p.customerId, customerName: p.customer.name,
       customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
+      customerSalesRepName: p.customer.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
       expectedDate: dateValue(p.expectedDate),
@@ -176,7 +187,12 @@ export const DataService = {
 
   async getMilestonesByProjectIds(projectIds: string[]): Promise<Record<string, ProjectMilestoneItem[]>> {
     if (projectIds.length === 0) return {};
-    const ms = await prisma.projectMilestone.findMany({ where: { projectId: { in: projectIds } }, include: milestoneInclude, orderBy: { stageOrder: "asc" } });
+    const ms = await prisma.projectMilestone.findMany({
+      where: { projectId: { in: projectIds } },
+      relationLoadStrategy: "join",
+      include: milestoneInclude,
+      orderBy: { stageOrder: "asc" },
+    });
     const result: Record<string, ProjectMilestoneItem[]> = {};
     for (const m of ms) {
       const list = result[m.projectId] || [];
@@ -301,6 +317,7 @@ export const DataService = {
         ...(filter?.assignedToId ? { assignedToId: filter.assignedToId } : {}),
         ...(filter?.isCompleted !== undefined ? { isCompleted: filter.isCompleted } : {}),
       },
+      relationLoadStrategy: "join",
       include: { project: true, assignedTo: true }, orderBy: { dueDatetime: "asc" }
     });
     return tasks.map(t => ({
@@ -314,6 +331,7 @@ export const DataService = {
     if (projectIds.length === 0) return {};
     const tasks = await prisma.salesTask.findMany({
       where: { projectId: { in: projectIds } },
+      relationLoadStrategy: "join",
       include: { project: true, assignedTo: true },
       orderBy: { createdAt: "desc" },
     });

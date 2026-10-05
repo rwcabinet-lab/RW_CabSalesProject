@@ -328,7 +328,7 @@ export default function SalesWorkbenchPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3">預算/戶數</th><th className="p-3">目前大階段</th><th className="p-3">當前進度</th><th className="p-3">預定日</th><th className="p-3 text-center">操作</th>
+              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3">預算/戶數</th><th className="p-3">目前階段</th><th className="p-3">當前進度</th><th className="p-3">預定完成日</th><th className="p-3 text-center">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -350,8 +350,8 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
                 <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
                 <td className="p-3 font-bold text-slate-700">{p.currentStage === "WRAP_UP" ? "收尾" : p.currentStage === "LOST" ? "流標" : p.currentStage}</td>
-                <td className="p-3 font-bold">{p.activeMilestone?.stageName || "完結"}</td>
-                <td className="p-3">{p.activeMilestone?.plannedDueDate || p.expectedDate}</td>
+                <td className="p-3 font-bold">{p.currentStage === "LOST" ? "流標" : p.activeMilestone?.stageName || "完結"}</td>
+                <td className="p-3">{(p.activeMilestone?.plannedDueDate || p.expectedDate)?.slice(0, 10)}</td>
                 <td className="p-3 flex gap-2 justify-center">
                   {p.activeMilestone && p.activeMilestone.status !== "COMPLETED" && <button onClick={() => setAdvanceModal({ open: true, projectId: p.id, projectName: p.projectName, milestoneId: p.activeMilestone!.id, milestoneName: p.activeMilestone!.stageName, notes: "", attachments: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">推進</button>}
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>

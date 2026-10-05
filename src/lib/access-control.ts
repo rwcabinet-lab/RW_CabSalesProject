@@ -24,10 +24,21 @@ export async function canAccessPath(role: Role | AppRole, pathname: string): Pro
 }
 
 export async function canUserAccessPath(userId: string, pathname: string): Promise<boolean> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true, email: true },
-  });
+  const [user] = await prisma.$queryRaw<Array<{
+    id: string;
+    role: Role;
+    email: string;
+    pages: string[] | null;
+  }>>`
+    SELECT u.id, u.role, u.email, r.pages
+    FROM users AS u
+    LEFT JOIN role_page_access AS r ON r.role = u.role
+    WHERE u.id = ${userId}
+    LIMIT 1
+  `;
   if (!user || user.email.startsWith("preview-")) return false;
-  return canAccessPath(user.role, pathname);
+  const pageKey = getPageAccessKey(pathname);
+  if (pageKey === "admin") return user.role === "ADMIN";
+  const pages = user.pages as PageAccessKey[] | null || DEFAULT_ROLE_PAGES[user.role as AppRole];
+  return pages.includes(pageKey);
 }

@@ -77,6 +77,7 @@ export interface ProjectDetail {
   siteCondition?: string;
   salesRepId: string;
   salesRepName: string;
+  customerSalesRepName?: string;
   salesAssistantId?: string;
   salesAssistantName?: string;
   currentStage: string;

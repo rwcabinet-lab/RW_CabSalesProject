@@ -60,7 +60,9 @@ export async function GET(req: NextRequest) {
           return null;
         }
 
-        const trafficLight = activeMilestone
+        const trafficLight = p.currentStage === "LOST"
+          ? { color: "RED" as const, label: "流標", daysDiff: 0 }
+          : activeMilestone
           ? ScheduleEngine.getTrafficLight(activeMilestone)
           : { color: "GREEN" as const, label: "正常", daysDiff: 0 };
 

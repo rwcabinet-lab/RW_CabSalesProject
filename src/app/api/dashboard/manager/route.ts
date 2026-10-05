@@ -112,15 +112,19 @@ export async function GET(req: NextRequest) {
         customerName: p.customerName,
         customerType: p.customerType,
         currentStage: p.currentStage,
-        currentStageLabel: stageLabels[p.currentStage] || p.currentStage,
-        salesRepName: p.salesRepName,
-        salesAssistantName: p.salesAssistantName,
+        currentStageLabel: p.currentStage === "LOST" ? "流標" : stageLabels[p.currentStage] || p.currentStage,
+        salesRepName: p.customerSalesRepName || p.salesRepName,
+        salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.isDelayed,
-        trafficLight,
+        trafficLight: p.currentStage === "LOST"
+          ? { color: "RED" as const, label: "流標", daysDiff: 0 }
+          : trafficLight,
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,
         totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
-        activeMilestoneName: activeMilestone
+        activeMilestoneName: p.currentStage === "LOST"
+          ? "流標"
+          : activeMilestone
           ? MILESTONE_STAGE_LABELS[activeMilestone.stageCode]
           : "完結",
         activeMilestoneId: activeMilestone?.id || null,

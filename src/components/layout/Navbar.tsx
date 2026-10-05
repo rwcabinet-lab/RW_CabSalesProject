@@ -29,7 +29,7 @@ export function Navbar() {
       .then((response) => response.ok ? response.json() : null)
       .then((data) => setUser(data?.user || null))
       .catch(() => setUser(null));
-  }, [pathname]);
+  }, []);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
