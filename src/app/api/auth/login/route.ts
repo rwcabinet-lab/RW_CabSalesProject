@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
+import { getRolePages } from "@/lib/access-control";
+import { getRoleLandingPath } from "@/lib/page-access";
 
 const LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
 
@@ -15,8 +17,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "找不到此使用者" }, { status: 404 });
     }
 
+    const accessiblePages = await getRolePages(user.role);
     const response = NextResponse.json({
       user: { id: user.id, name: user.name, role: user.role },
+      redirectTo: getRoleLandingPath(user.role, accessiblePages),
     });
     response.cookies.set("cab_sales_user_id", user.id, {
       httpOnly: true,

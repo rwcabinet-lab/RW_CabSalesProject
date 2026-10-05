@@ -27,6 +27,19 @@ export const DEFAULT_ROLE_PAGES: Record<AppRole, PageAccessKey[]> = {
   ASSISTANT: ["home", "workbench", "views", "projects"],
 };
 
+const ROLE_LANDING_PREFERENCES: Record<AppRole, PageAccessKey[]> = {
+  ADMIN: ["workbench", "manager", "views", "customers", "projects", "home", "admin"],
+  LEVEL_MANAGER: ["manager", "workbench", "views", "customers", "projects", "home"],
+  SALES_MANAGER: ["manager", "workbench", "views", "customers", "projects", "home"],
+  SALES: ["workbench", "views", "customers", "projects", "home"],
+  ASSISTANT: ["workbench", "views", "projects", "home"],
+};
+
+export function getRoleLandingPath(role: AppRole, pages: PageAccessKey[]): string {
+  const landingPage = ROLE_LANDING_PREFERENCES[role].find((page) => pages.includes(page));
+  return PAGE_ACCESS_OPTIONS.find((page) => page.key === landingPage)?.href || "/forbidden";
+}
+
 const PAGE_PATHS: Array<{ prefix: string; key: PageAccessKey }> = [
   { prefix: "/api/dashboard/workbench", key: "workbench" },
   { prefix: "/dashboard/workbench", key: "workbench" },

@@ -42,7 +42,7 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "登入失敗");
-      window.location.replace("/dashboard/workbench");
+      window.location.replace(data.redirectTo || "/forbidden");
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "登入失敗");
     } finally {
