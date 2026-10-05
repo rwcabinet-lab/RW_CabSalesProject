@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { getRolePages } from "@/lib/access-control";
+import { cacheUserAccessProfile, getRolePages } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
 
 const LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
@@ -18,6 +18,11 @@ export async function POST(req: NextRequest) {
     }
 
     const accessiblePages = await getRolePages(user.role);
+    cacheUserAccessProfile(user.id, {
+      role: user.role,
+      email: user.email,
+      pages: accessiblePages,
+    });
     const response = NextResponse.json({
       user: { id: user.id, name: user.name, role: user.role },
       redirectTo: getRoleLandingPath(user.role, accessiblePages),

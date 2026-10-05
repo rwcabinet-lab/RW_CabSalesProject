@@ -27,7 +27,10 @@ export async function GET(req: NextRequest) {
       currentUser.role === "ADMIN";
 
     const myProjects = allProjects.filter(
-      (p) => p.salesRepId === currentUser.id || p.salesAssistantId === currentUser.id
+      (p) =>
+        p.salesRepId === currentUser.id ||
+        p.customerSalesRepId === currentUser.id ||
+        p.salesAssistantId === currentUser.id
     );
 
     const projectIds = myProjects.map((p) => p.id);

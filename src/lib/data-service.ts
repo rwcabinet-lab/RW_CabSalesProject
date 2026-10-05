@@ -81,6 +81,7 @@ export const DataService = {
       customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
+      customerSalesRepId: p.customer.salesRepId,
       customerSalesRepName: p.customer.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
@@ -102,6 +103,7 @@ export const DataService = {
       customerType: customerTypeFromDatabase(p.customer.customerType), defaultDiscount: Number(p.customer.defaultDiscount),
       siteAddress: p.siteAddress, siteCondition: p.siteCondition || undefined,
       salesRepId: p.salesRepId, salesRepName: p.salesRep.name,
+      customerSalesRepId: p.customer.salesRepId,
       customerSalesRepName: p.customer.salesRep.name,
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
@@ -116,7 +118,7 @@ export const DataService = {
 
   async addProject(data: {
     projectName: string; customerId: string; siteAddress: string; siteCondition?: string;
-    expectedDate?: string; salesRepId?: string; unitCount?: number; cost?: number; quoteAmount?: number;
+    expectedDate?: string; unitCount?: number; cost?: number; quoteAmount?: number;
   }): Promise<ProjectDetail | undefined> {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) return undefined;
@@ -125,7 +127,7 @@ export const DataService = {
       const p = await tx.project.create({
         data: {
           projectName: data.projectName, customerId: data.customerId, siteAddress: data.siteAddress,
-          siteCondition: data.siteCondition, salesRepId: data.salesRepId || customer.salesRepId,
+          siteCondition: data.siteCondition, salesRepId: customer.salesRepId,
           currentStage: ProjectStage.CONTACT, expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
           unitCount: data.unitCount, cost: data.cost, quoteAmount: data.quoteAmount, estimatedBudget: data.quoteAmount || data.cost,
         },
@@ -270,6 +272,12 @@ export const DataService = {
       }
 
       await tx.project.update({ where: { id: projectId }, data: { currentStage } });
+      if (stageCode === "X-2") {
+        await tx.salesTask.updateMany({
+          where: { projectId, isCompleted: false },
+          data: { isCompleted: true, completedAt: actualDueDate, resultNotes: "流標" },
+        });
+      }
     });
 
     return this.getMilestonesByProjectId(projectId);

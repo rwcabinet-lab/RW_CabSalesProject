@@ -11,7 +11,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { projectName, customerId, siteAddress, siteCondition, expectedDate, salesRepId, unitCount, cost, quoteAmount } = body;
+    const { projectName, customerId, siteAddress, siteCondition, expectedDate, unitCount, cost, quoteAmount } = body;
 
     if (!projectName || !customerId || !siteAddress) {
       return NextResponse.json({ error: "案場名稱、關聯客戶、施工地址為必填欄位" }, { status: 400 });
@@ -23,7 +23,6 @@ export async function POST(req: NextRequest) {
       siteAddress,
       siteCondition,
       expectedDate,
-      salesRepId: req.cookies.get("cab_sales_user_id")?.value || salesRepId,
       unitCount: unitCount ? Number(unitCount) : undefined,
       cost: cost ? Number(cost) : undefined,
       quoteAmount: quoteAmount ? Number(quoteAmount) : undefined,

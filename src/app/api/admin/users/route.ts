@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getUserFromRequest } from "@/lib/access-control";
+import { getUserFromRequest, invalidateUserAccessProfile } from "@/lib/access-control";
 import { ROLE_OPTIONS } from "@/lib/page-access";
 
 const validRoles = new Set<string>(ROLE_OPTIONS.map(({ value }) => value));
@@ -91,6 +91,7 @@ export async function PATCH(request: NextRequest) {
       data: { name: body.name.trim(), email: body.email.trim().toLowerCase(), role: body.role as Role },
       select: { id: true, name: true, email: true, role: true },
     });
+    invalidateUserAccessProfile(user.id);
     return NextResponse.json(user);
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {

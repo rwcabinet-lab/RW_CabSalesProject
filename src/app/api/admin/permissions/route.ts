@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Role } from "@prisma/client";
-import { getRolePages, getUserFromRequest } from "@/lib/access-control";
+import {
+  getRolePages,
+  getUserFromRequest,
+  invalidateRoleAccessProfiles,
+} from "@/lib/access-control";
 import { PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import { prisma } from "@/lib/prisma";
 
@@ -78,6 +82,7 @@ export async function PUT(request: NextRequest) {
         }),
       ),
     );
+    invalidateRoleAccessProfiles();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to save role permissions:", error);
