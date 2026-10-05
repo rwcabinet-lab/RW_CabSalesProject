@@ -99,7 +99,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (data.project) {
         setProject(data.project);
-        if (data.project.currentStage === "WRAP_UP") setActivePhase("EXTRA");
+        if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
+          setActivePhase("EXTRA");
+        }
       }
       if (Array.isArray(data.milestones)) setMilestones(data.milestones);
 
@@ -244,39 +246,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <p className="mt-1 flex items-center gap-1 text-sm text-slate-600"><MapPin className="h-4 w-4" />{project.siteAddress}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {(project.currentStage === "WRAP_UP" || project.currentStage === "LOST") && (
+                <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-800">
+                  目前階段：{project.currentStage === "WRAP_UP" ? "收尾" : "流標"}
+                </span>
+              )}
               <span className={`rounded px-2 py-1 text-xs font-bold ${project.isDelayed ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
                 {project.isDelayed ? "案件逾期" : "時程正常"}
               </span>
-              {project.currentStage === "WRAP_UP" && (
-                <button
-                  type="button"
-                  onClick={handleReturnToProduction}
-                  disabled={advancing}
-                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {advancing ? "處理中..." : "返回第三階段"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSpecialAdvanceError("");
-                  setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
-                }}
-                className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
-              >
-                推進至收尾
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSpecialAdvanceError("");
-                  setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
-                }}
-                className="rounded bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-              >
-                推進至流標
-              </button>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
@@ -306,6 +283,41 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="p-4 space-y-2">
+          {activePhase === "EXTRA" && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-red-100 bg-red-50 p-3">
+              <span className="mr-auto text-sm font-bold text-red-900">額外階段操作</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialAdvanceError("");
+                  setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
+                }}
+                className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                推進至收尾
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialAdvanceError("");
+                  setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
+                }}
+                className="rounded bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+              >
+                推進至流標
+              </button>
+              {project?.currentStage === "WRAP_UP" && (
+                <button
+                  type="button"
+                  onClick={handleReturnToProduction}
+                  disabled={advancing}
+                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {advancing ? "處理中..." : "返回第三階段"}
+                </button>
+              )}
+            </div>
+          )}
           {phaseGroups[activePhase].map((m) => (
             <div key={m.id} className={`border p-3 rounded-xl ${m.status === "OVERDUE" ? "bg-red-50" : m.status === "IN_PROGRESS" ? "bg-blue-50" : "bg-white"}`}>
               {editingId === m.id ? (

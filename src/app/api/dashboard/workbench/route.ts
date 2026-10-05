@@ -21,17 +21,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
-
-    // 業務/業助：只顯示自己負責或被分配的案件
     const isManager =
       currentUser.role === "LEVEL_MANAGER" ||
       currentUser.role === "SALES_MANAGER" ||
       currentUser.role === "ADMIN";
-    const myProjects = isManager
-      ? allProjects
-      : allProjects.filter(
-          (p) => p.salesRepId === currentUser.id || p.salesAssistantId === currentUser.id
-        );
+
+    const myProjects = allProjects.filter(
+      (p) => p.salesRepId === currentUser.id || p.salesAssistantId === currentUser.id
+    );
 
     const projectIds = myProjects.map((p) => p.id);
     const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
@@ -87,6 +84,7 @@ export async function GET(req: NextRequest) {
             ? {
                 id: activeMilestone.id,
                 stageCode: activeMilestone.stageCode,
+                phase: activeMilestone.phase,
                 stageName: MILESTONE_STAGE_LABELS[activeMilestone.stageCode],
                 plannedDueDate: activeMilestone.plannedDueDate,
                 status: activeMilestone.status,

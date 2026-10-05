@@ -12,7 +12,6 @@ import {
   Building,
   Edit3,
   CheckCircle2,
-  Archive,
   X,
 } from "lucide-react";
 import { CustomerItem, SalesTaskItem } from "@/lib/mock-data";
@@ -35,6 +34,7 @@ interface WorkbenchProject {
   quoteAmount?: number;
   activeMilestone: {
     id: string;
+    phase: "CONTACT" | "DESIGN" | "PRODUCTION" | "EXTRA";
     stageName: string;
     plannedDueDate: string;
     status: string;
@@ -239,7 +239,6 @@ export default function SalesWorkbenchPage() {
     return match;
   });
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
-  const completedTasks = tasks.filter((task) => task.isCompleted);
 
   return (
     <div className="space-y-8 pb-16">
@@ -276,29 +275,6 @@ export default function SalesWorkbenchPage() {
             </div>
           ))}
           {pendingTasks.length === 0 && <p className="py-6 text-center text-sm text-slate-500">目前沒有待處理事項</p>}
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-        <h2 className="flex items-center gap-2 border-b px-6 py-4 text-base font-bold">
-          <Archive className="h-5 w-5 text-emerald-600" /> 已完成待辦備查
-        </h2>
-        <div className="divide-y px-6">
-          {completedTasks.map((task) => (
-            <article key={task.id} className="py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-bold">[{task.projectName}] {task.subject}</h3>
-                <span className="text-xs text-slate-500">
-                  {task.completedAt ? new Date(task.completedAt).toLocaleString("zh-TW") : "已完成"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                負責人：{task.assignedToName || "未指定"}｜原到期：{new Date(task.dueDatetime).toLocaleString("zh-TW")}
-              </p>
-              {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}
-            </article>
-          ))}
-          {completedTasks.length === 0 && <p className="py-6 text-center text-sm text-slate-500">尚無已完成待辦</p>}
         </div>
       </div>
 
@@ -357,7 +333,18 @@ export default function SalesWorkbenchPage() {
           </thead>
           <tbody className="divide-y">
             {filteredProjects.map(p => (
-              <tr key={p.id} className="hover:bg-slate-50">
+              <tr
+                key={p.id}
+                className={`hover:brightness-95 ${
+                  p.activeMilestone?.phase === "EXTRA" || p.currentStage === "WRAP_UP" || p.currentStage === "LOST"
+                    ? "bg-red-50"
+                    : p.activeMilestone?.phase === "PRODUCTION" || ["PRODUCTION", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
+                      ? "bg-green-50"
+                      : p.activeMilestone?.phase === "DESIGN" || p.currentStage === "DESIGN"
+                        ? "bg-blue-50"
+                        : "bg-yellow-50"
+                }`}
+              >
                 <td className="p-3"><span className={`px-2 py-1 rounded-full font-bold ${p.trafficLight.color==="RED"?"bg-red-100 text-red-700":p.trafficLight.color==="YELLOW"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>● {p.trafficLight.label}</span></td>
                 <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
