@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
       }
 
-      assignedToId = user.id;
+      const canReviewProjectTasks =
+        projectId && (user.role === "LEVEL_MANAGER" || user.role === "SALES_MANAGER");
+      assignedToId = canReviewProjectTasks ? undefined : user.id;
     }
 
     const tasks = await DataService.getTasks({
