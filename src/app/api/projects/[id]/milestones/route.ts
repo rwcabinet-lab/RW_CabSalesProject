@@ -138,7 +138,24 @@ export async function PUT(
         return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
       }
       const project = await DataService.getProjectById(projectId);
-      if (project?.currentStage === "WRAP_UP" || project?.currentStage === "LOST") {
+      if (!project) {
+        return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
+      }
+      if (project.currentStage === "WRAP_UP") {
+        const wrapUpMilestone = (await DataService.getMilestonesByProjectId(projectId))
+          .find((milestone) => milestone.id === milestoneId);
+        if (!wrapUpMilestone || wrapUpMilestone.stageCode !== "X-1") {
+          return NextResponse.json({ error: "收尾階段僅可完成收尾項目" }, { status: 409 });
+        }
+
+        const milestones = await DataService.completeWrapUpMilestone(projectId, milestoneId, {
+          notes: typeof notes === "string" ? notes : undefined,
+          completedDate: actualDueDate || new Date().toISOString().slice(0, 10),
+        });
+        const updatedProject = await DataService.getProjectById(projectId);
+        return NextResponse.json({ success: true, project: updatedProject, milestones });
+      }
+      if (project.currentStage === "LOST") {
         return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
       }
 
@@ -181,6 +198,8 @@ export async function PUT(
     console.error("Failed to update milestone:", error);
     if (error instanceof Error && (
       error.message === "只能完成目前進行中的里程碑" ||
+      error.message === "只能完成目前進行中的收尾項目" ||
+      error.message === "案件已離開收尾階段" ||
       error.message === "找不到已完成的里程碑" ||
       error.message === "請由最後一個已完成的里程碑開始回退"
     )) {

@@ -241,7 +241,7 @@ export default function ManagerDashboardPage() {
                 </td>
                 <td className="p-3">{p.expectedDate?.slice(0, 10) || "-"}</td>
                 <td className="p-3 text-center">
-                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex items-center rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
+                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex h-8 w-24 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
                 </td>
                 <td className="p-3 text-center">
                   <button onClick={() => setAssignModal({
@@ -253,7 +253,7 @@ export default function ManagerDashboardPage() {
                     subject: p.assignmentTask?.subject || "",
                     priority: p.assignmentTask?.priority || "MEDIUM",
                     dueDate: p.assignmentTask?.dueDatetime?.slice(0, 10) || todayDate(),
-                  })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow hover:bg-blue-700">{p.assignmentTask ? "變更" : "指派任務"}</button>
+                  })} className="inline-flex h-8 w-24 items-center justify-center rounded bg-blue-600 px-2 text-xs font-bold text-white shadow hover:bg-blue-700">{p.assignmentTask ? "變更" : "指派任務"}</button>
                 </td>
               </tr>
             ))}

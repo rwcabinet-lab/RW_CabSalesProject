@@ -430,7 +430,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {project?.currentStage !== "WRAP_UP" && project?.currentStage !== "LOST" && (m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
+                    {(project?.currentStage === "WRAP_UP"
+                      ? m.stageCode === "X-1"
+                      : project?.currentStage !== "LOST") &&
+                      (m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
                       <button onClick={() => {
                         setAdvanceError("");
                         setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], actualDueDate: todayDate(), notes: "" });
