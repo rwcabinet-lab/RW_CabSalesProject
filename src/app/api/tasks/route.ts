@@ -85,6 +85,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true, task: updatedTask });
   } catch (error) {
     console.error("Failed to update task:", error);
+    if (error instanceof Error && (
+      error.message === "只能完成目前進行中的里程碑" ||
+      error.message === "里程碑待辦請由案件細節執行回退" ||
+      error.message === "案件已進入額外階段，無法完成一般里程碑"
+    )) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json({ error: "更新任務狀態失敗" }, { status: 500 });
   }
 }

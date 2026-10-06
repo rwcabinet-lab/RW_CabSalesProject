@@ -19,6 +19,9 @@ interface AssignableUser {
   role: "SALES" | "ASSISTANT";
 }
 
+const todayDate = () =>
+  new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
@@ -30,8 +33,8 @@ export default function ManagerDashboardPage() {
   const [timeStandard, setTimeStandard] = useState("");
 
   // 任務指派
-  const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW" }>({
-    open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM"
+  const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
+    open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate()
   });
   const [assigning, setAssigning] = useState(false);
 
@@ -86,16 +89,18 @@ export default function ManagerDashboardPage() {
           assignedToId: assignModal.userId,
           subject: assignModal.subject,
           priority: assignModal.priority,
+          dueDatetime: `${assignModal.dueDate}T00:00:00.000Z`,
         } : {
           projectId: assignModal.projectId,
           assignedToId: assignModal.userId,
           subject: assignModal.subject,
           priority: assignModal.priority,
+          dueDatetime: `${assignModal.dueDate}T00:00:00.000Z`,
         }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
-      setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM" });
+      setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
       await fetchDashboardData();
       alert(assignModal.taskId ? "任務已更新！" : "指派成功！");
     } catch (err) {
@@ -212,7 +217,7 @@ export default function ManagerDashboardPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th><th className="p-3 text-center">詳細</th><th className="p-3 text-center">指派任務</th>
+              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th><th className="p-3 text-center">案件細節</th><th className="p-3 text-center">指派任務</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -225,10 +230,18 @@ export default function ManagerDashboardPage() {
                 </td>
                 <td className="p-3 font-bold">{p.projectName}</td>
                 <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
-                <td className="p-3 font-bold text-slate-700">{p.currentStageLabel} - {p.activeMilestoneName}</td>
+                <td className="p-3 font-bold text-slate-700">
+                  {p.currentStageLabel} - {p.activeMilestoneName}
+                  {p.unassignedNextMilestoneName && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-black text-red-700">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      下一項「{p.unassignedNextMilestoneName}」尚未指派負責人
+                    </div>
+                  )}
+                </td>
                 <td className="p-3">{p.expectedDate?.slice(0, 10) || "-"}</td>
                 <td className="p-3 text-center">
-                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex items-center rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">詳細</Link>
+                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex items-center rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
                 </td>
                 <td className="p-3 text-center">
                   <button onClick={() => setAssignModal({
@@ -239,6 +252,7 @@ export default function ManagerDashboardPage() {
                     userId: p.assignmentTask?.assignedToId || "",
                     subject: p.assignmentTask?.subject || "",
                     priority: p.assignmentTask?.priority || "MEDIUM",
+                    dueDate: p.assignmentTask?.dueDatetime?.slice(0, 10) || todayDate(),
                   })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold shadow hover:bg-blue-700">{p.assignmentTask ? "變更" : "指派任務"}</button>
                 </td>
               </tr>
@@ -265,6 +279,9 @@ export default function ManagerDashboardPage() {
               </label>
               <label className="block font-semibold">任務要求/主題
                 <textarea required rows={3} value={assignModal.subject} onChange={e=>setAssignModal({...assignModal, subject: e.target.value})} className="w-full border p-2 mt-1 rounded" placeholder="例如：請盡速確認客戶廚具圖面"/>
+              </label>
+              <label className="block font-semibold">預定完成日
+                <input required type="date" value={assignModal.dueDate} onChange={e=>setAssignModal({...assignModal, dueDate: e.target.value})} className="w-full border p-2 mt-1 rounded"/>
               </label>
               <label className="block font-semibold">優先度
                 <select required value={assignModal.priority} onChange={e=>setAssignModal({...assignModal, priority: e.target.value as "HIGH" | "MEDIUM" | "LOW"})} className="w-full border p-2 mt-1 rounded">

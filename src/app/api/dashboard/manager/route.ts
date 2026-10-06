@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
+import { getUserFromRequest } from "@/lib/access-control";
+
+const MANAGER_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"];
+
+function isValidDueDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const datePart = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+  const date = new Date(`${datePart}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === datePart;
+}
 
 // GET /api/dashboard/manager?month=2026-09&timeStandard=sign
 export async function GET(req: NextRequest) {
@@ -129,12 +140,22 @@ export async function GET(req: NextRequest) {
           : "完結",
         activeMilestoneId: activeMilestone?.id || null,
         activeMilestoneAssignedTo: activeMilestone?.assignedToName || null,
+        unassignedNextMilestoneName: (() => {
+          if (p.currentStage === "WRAP_UP" || p.currentStage === "LOST") return null;
+          const nextIndex = milestones.findIndex((milestone) => milestone.status !== "COMPLETED");
+          return nextIndex > 0 &&
+            milestones[nextIndex - 1].status === "COMPLETED" &&
+            !milestones[nextIndex].assignedToId
+            ? MILESTONE_STAGE_LABELS[milestones[nextIndex].stageCode]
+            : null;
+        })(),
         assignmentTask: latestTasksByProject[p.id]
           ? {
               id: latestTasksByProject[p.id].id,
               assignedToId: latestTasksByProject[p.id].assignedToId,
               subject: latestTasksByProject[p.id].subject,
               priority: latestTasksByProject[p.id].priority,
+              dueDatetime: latestTasksByProject[p.id].dueDatetime,
             }
           : null,
       };
@@ -177,11 +198,16 @@ export async function GET(req: NextRequest) {
 // POST /api/dashboard/manager — 主管指派任務給業務/業助
 export async function POST(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    if (!MANAGER_ROLES.includes(user.role)) {
+      return NextResponse.json({ error: "僅主管可指派待辦任務" }, { status: 403 });
+    }
     const body = await req.json();
     const { projectId, assignedToId, subject, taskType, dueDatetime, priority } = body;
 
-    if (!projectId || !assignedToId || !subject) {
-      return NextResponse.json({ error: "缺少必填欄位：案場、負責人、任務主題" }, { status: 400 });
+    if (!projectId || !assignedToId || !subject || !isValidDueDate(dueDatetime)) {
+      return NextResponse.json({ error: "請填寫案場、負責人、任務主題及有效的預定完成日" }, { status: 400 });
     }
 
     const assignee = await DataService.getUserById(assignedToId);
@@ -199,9 +225,10 @@ export async function POST(req: NextRequest) {
       projectId,
       assignedToId,
       assignedToName: assignee.name,
+      assignedById: user.id,
       subject,
       taskType: taskType || "QUOTE_FOLLOWUP",
-      dueDatetime: dueDatetime || new Date().toISOString(),
+      dueDatetime: `${dueDatetime.slice(0, 10)}T00:00:00.000Z`,
       priority: priority || "MEDIUM",
       isCompleted: false,
       resultNotes: null,
@@ -218,10 +245,15 @@ export async function POST(req: NextRequest) {
 // PATCH /api/dashboard/manager — 修改主管指派任務
 export async function PATCH(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    if (!MANAGER_ROLES.includes(user.role)) {
+      return NextResponse.json({ error: "僅主管可修改指派待辦" }, { status: 403 });
+    }
     const body = await req.json();
-    const { taskId, assignedToId, subject, priority } = body;
-    if (!taskId || !assignedToId || !subject || !priority) {
-      return NextResponse.json({ error: "缺少必填欄位：任務、負責人、任務主題、優先度" }, { status: 400 });
+    const { taskId, assignedToId, subject, priority, dueDatetime } = body;
+    if (!taskId || !assignedToId || !subject || !priority || !isValidDueDate(dueDatetime)) {
+      return NextResponse.json({ error: "請填寫任務、負責人、主題、優先度及有效的預定完成日" }, { status: 400 });
     }
     if (!["HIGH", "MEDIUM", "LOW"].includes(priority)) {
       return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
@@ -235,7 +267,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
     }
 
-    const task = await DataService.updateTask(taskId, { assignedToId, subject, priority });
+    const task = await DataService.updateTask(taskId, {
+      assignedToId, subject, priority, dueDatetime: `${dueDatetime.slice(0, 10)}T00:00:00.000Z`,
+    });
     if (!task) return NextResponse.json({ error: "查無此任務" }, { status: 404 });
     return NextResponse.json({ task });
   } catch (error) {

@@ -138,6 +138,23 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
   EXTRA:      "額外階段：收尾/流標",
 };
 
+export const PROJECT_STAGE_LABELS: Record<string, string> = {
+  INQUIRY: "接洽期",
+  MEASUREMENT: "接洽期",
+  QUOTE: "接洽期",
+  CONTRACT: "接洽期",
+  CAD_DRAWING: "設計確認期",
+  HANDOFF: "生產施工期",
+  DONE: "完成",
+  CONTACT: "接洽期",
+  DESIGN: "設計確認期",
+  PRODUCTION: "生產施工期",
+  CLOSED: "已結案",
+  BILLED: "已立帳",
+  WRAP_UP: "收尾",
+  LOST: "流標",
+};
+
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "1-1": "CONTACT", "1-2": "CONTACT", "1-3": "CONTACT", "1-4": "CONTACT", "1-5": "CONTACT",
   "2-1": "DESIGN",  "2-2": "DESIGN",  "2-3": "DESIGN",  "2-4": "DESIGN",
@@ -159,6 +176,7 @@ export interface ProjectMilestoneItem {
   /** 實際完成日 */
   actualDueDate?: string | null;
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
+  priority?: "HIGH" | "MEDIUM" | "LOW";
   assignedToId?: string | null;
   assignedToName?: string | null;
   attachments?: string | null;
@@ -171,6 +189,8 @@ export interface SalesTaskItem {
   projectName?: string;
   assignedToId: string;
   assignedToName?: string;
+  assignedByName?: string | null;
+  milestoneId?: string | null;
   taskType: "SITE_VISIT" | "DRAWING" | "QUOTE_FOLLOWUP" | "PAYMENT_REMINDER";
   subject: string;
   dueDatetime: string;

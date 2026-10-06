@@ -6,15 +6,12 @@ import {
   CheckSquare,
   Clock,
   Plus,
-  ArrowRight,
-  MapPin,
-  Sparkles,
   Building,
   Edit3,
   CheckCircle2,
   X,
 } from "lucide-react";
-import { CustomerItem, SalesTaskItem } from "@/lib/mock-data";
+import { CustomerItem, SalesTaskItem, PROJECT_STAGE_LABELS } from "@/lib/mock-data";
 
 interface WorkbenchProject {
   id: string;
@@ -65,10 +62,6 @@ export default function SalesWorkbenchPage() {
     unitCount: "", cost: "", quoteAmount: "",
   });
   const [savingProject, setSavingProject] = useState(false);
-
-  // 快速推進 Modal
-  const [advanceModal, setAdvanceModal] = useState({ open: false, projectId: "", projectName: "", milestoneId: "", milestoneName: "", notes: "", attachments: "" });
-  const [advancing, setAdvancing] = useState(false);
 
   // 待辦 Modal
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -135,18 +128,7 @@ export default function SalesWorkbenchPage() {
         return;
       }
 
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskToComplete.id
-            ? {
-                ...task,
-                isCompleted: true,
-                resultNotes: completionNotes.trim(),
-                completedAt: result.task?.completedAt || `${completionDate}T00:00:00.000Z`,
-              }
-            : task
-        )
-      );
+      await fetchWorkbenchData();
       setTaskToComplete(null);
       setCompletionNotes("");
     } catch (err) {
@@ -213,23 +195,6 @@ export default function SalesWorkbenchPage() {
     setIsProjectPanelOpen(true);
   };
 
-  const handleConfirmAdvance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!advanceModal.projectId || !advanceModal.milestoneId) return;
-    setAdvancing(true);
-    try {
-      const res = await fetch(`/api/projects/${advanceModal.projectId}/milestones`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "advance", milestoneId: advanceModal.milestoneId, notes: advanceModal.notes }),
-      });
-      if (res.ok) {
-        setAdvanceModal({ open: false, projectId: "", projectName: "", milestoneId: "", milestoneName: "", notes: "", attachments: "" });
-        await fetchWorkbenchData();
-      }
-    } finally { setAdvancing(false); }
-  };
-
   if (loading) return <div className="p-16 text-center">正在載入業務工作台...</div>;
 
   // 過濾邏輯
@@ -262,7 +227,10 @@ export default function SalesWorkbenchPage() {
               <div className="flex gap-3 items-start">
                 <div>
                   <div className="font-bold text-sm">[{task.projectName}] {task.subject}</div>
-                  <div className="text-xs text-slate-500 mt-1">到期：{new Date(task.dueDatetime).toLocaleString()} | 優先：{task.priority}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    預定完成：{task.dueDatetime.slice(0, 10)} | 優先：{task.priority}
+                    {task.assignedByName && ` | 指派者：${task.assignedByName}`}
+                  </div>
                 </div>
               </div>
               <button
@@ -354,29 +322,18 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
                 <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
-                <td className="p-3 font-bold text-slate-700">{p.currentStage === "WRAP_UP" ? "收尾" : p.currentStage === "LOST" ? "流標" : p.currentStage}</td>
+                <td className="p-3 font-bold text-slate-700">{PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}</td>
                 <td className="p-3 font-bold">{p.currentStage === "LOST" ? "流標" : p.activeMilestone?.stageName || "完結"}</td>
                 <td className="p-3">{(p.activeMilestone?.plannedDueDate || p.expectedDate)?.slice(0, 10)}</td>
                 <td className="p-3 flex gap-2 justify-center">
-                  {p.activeMilestone && p.activeMilestone.status !== "COMPLETED" && <button onClick={() => setAdvanceModal({ open: true, projectId: p.id, projectName: p.projectName, milestoneId: p.activeMilestone!.id, milestoneName: p.activeMilestone!.stageName, notes: "", attachments: "" })} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">推進</button>}
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
-                  <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">詳細</Link>
+                  <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">案件細節</Link>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {advanceModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-xl w-96">
-            <h3 className="font-bold mb-2">推進：{advanceModal.milestoneName}</h3>
-            <textarea className="w-full border p-2 mb-4 text-sm" placeholder="備註..." value={advanceModal.notes} onChange={(e)=>setAdvanceModal({...advanceModal, notes: e.target.value})} />
-            <div className="flex justify-end gap-2"><button onClick={()=>setAdvanceModal({...advanceModal,open:false})} className="px-3 py-1 bg-slate-200 rounded">取消</button><button onClick={handleConfirmAdvance} disabled={advancing} className="px-3 py-1 bg-blue-600 text-white rounded">推進</button></div>
-          </div>
-        </div>
-      )}
 
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

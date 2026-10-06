@@ -20,7 +20,8 @@ model User {
   milestones          ProjectMilestone[]
   projectsAsAssistant Project[]          @relation("ProjectAssistant")
   projectsAsSalesRep  Project[]          @relation("ProjectSalesRep")
-  tasks               SalesTask[]
+  tasks               SalesTask[]        @relation("TaskAssignee")
+  assignedTasks       SalesTask[]        @relation("TaskAssigner")
 
   @@map("users")
 }
@@ -143,6 +144,7 @@ model ProjectMilestone {
   plannedDueDate DateTime?       @map("planned_due_date")
   actualDueDate  DateTime?       @map("actual_due_date")
   status         MilestoneStatus @default(PENDING)
+  priority       TaskPriority    @default(MEDIUM)
   assignedToId   String?         @map("assigned_to_id")
   attachments    String?
   notes          String?
@@ -215,6 +217,7 @@ model SalesTask {
   id           String       @id @default(cuid())
   projectId    String       @map("project_id")
   assignedToId String       @map("assigned_to_id")
+  assignedById String?      @map("assigned_by_id")
   taskType     TaskType     @map("task_type")
   subject      String
   dueDatetime  DateTime     @map("due_datetime")
@@ -225,7 +228,8 @@ model SalesTask {
   milestoneId  String?      @unique @map("milestone_id")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
-  assignedTo   User         @relation(fields: [assignedToId], references: [id])
+  assignedTo   User         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedBy   User?        @relation("TaskAssigner", fields: [assignedById], references: [id])
   milestone    ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

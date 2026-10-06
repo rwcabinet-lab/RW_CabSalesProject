@@ -46,9 +46,17 @@ export async function PUT(
   try {
     const projectId = params.id;
     const body = await req.json();
-    const { action, milestoneId, notes, attachments, updates, stageCode, reason } = body;
+    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate } = body;
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
 
     if (action === "returnToProduction") {
+      if (!isManager) {
+        return NextResponse.json({ error: "僅主管可回到第三階段" }, { status: 403 });
+      }
       const project = await DataService.getProjectById(projectId);
       if (!project) {
         return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
@@ -63,6 +71,9 @@ export async function PUT(
     }
 
     if (action === "specialAdvance") {
+      if (!isManager) {
+        return NextResponse.json({ error: "僅主管可推進至額外階段" }, { status: 403 });
+      }
       if (stageCode !== "X-1" && stageCode !== "X-2") {
         return NextResponse.json({ error: "無效的額外階段" }, { status: 400 });
       }
@@ -83,20 +94,24 @@ export async function PUT(
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }
 
-    const user = await getUserFromRequest(req);
-    if (!user) {
-      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    if (action === "rollback") {
+      if (!isManager) {
+        return NextResponse.json({ error: "僅主管可回退已完成的里程碑" }, { status: 403 });
+      }
+      const milestones = await DataService.rollbackMilestone(projectId, milestoneId);
+      const updatedProject = await DataService.getProjectById(projectId);
+      return NextResponse.json({ success: true, project: updatedProject, milestones });
     }
 
     if (action !== "advance") {
-      if (!["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role)) {
+      if (!isManager) {
         return NextResponse.json({ error: "僅理級主管或業務主管可編輯里程碑" }, { status: 403 });
       }
       if (
         !updates ||
-        Object.keys(updates).some((key) => !["plannedDueDate", "assignedToId", "notes"].includes(key))
+        Object.keys(updates).some((key) => !["plannedDueDate", "assignedToId", "priority", "notes"].includes(key))
       ) {
-        return NextResponse.json({ error: "僅可編輯預定完成日、負責人及備註" }, { status: 400 });
+        return NextResponse.json({ error: "僅可編輯預定完成日、負責人、優先度及備註" }, { status: 400 });
       }
       if (
         (updates.plannedDueDate !== undefined &&
@@ -105,7 +120,8 @@ export async function PUT(
         (updates.assignedToId !== undefined &&
           updates.assignedToId !== null &&
           typeof updates.assignedToId !== "string") ||
-        (updates.notes !== undefined && typeof updates.notes !== "string")
+        (updates.notes !== undefined && typeof updates.notes !== "string") ||
+        (updates.priority !== undefined && !["HIGH", "MEDIUM", "LOW"].includes(updates.priority))
       ) {
         return NextResponse.json({ error: "里程碑欄位格式無效" }, { status: 400 });
       }
@@ -118,6 +134,9 @@ export async function PUT(
     }
 
     if (action === "advance") {
+      if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
+        return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
+      }
       const project = await DataService.getProjectById(projectId);
       if (project?.currentStage === "WRAP_UP" || project?.currentStage === "LOST") {
         return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
@@ -127,6 +146,7 @@ export async function PUT(
       const result = await DataService.advanceMilestone(projectId, milestoneId, {
         notes,
         attachments,
+        completedDate: actualDueDate,
       });
 
       const updatedProject = await DataService.getProjectById(projectId);
@@ -159,6 +179,13 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Failed to update milestone:", error);
+    if (error instanceof Error && (
+      error.message === "只能完成目前進行中的里程碑" ||
+      error.message === "找不到已完成的里程碑" ||
+      error.message === "請由最後一個已完成的里程碑開始回退"
+    )) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json({ error: "更新里程碑失敗" }, { status: 500 });
   }
 }
