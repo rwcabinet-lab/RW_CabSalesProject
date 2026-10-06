@@ -281,33 +281,33 @@ export const DataService = {
   async advanceMilestone(projectId: string, milestoneId: string, options?: { notes?: string; attachments?: string; completedDate?: string }) {
     const list = await this.getMilestonesByProjectId(projectId);
     const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
-    await prisma.$transaction(async (tx) => {
-      for (const milestone of result.updatedMilestones) {
-        await tx.projectMilestone.update({
-          where: { id: milestone.id },
+    const operations: Prisma.PrismaPromise<unknown>[] = [];
+    for (const milestone of result.updatedMilestones) {
+      operations.push(prisma.projectMilestone.update({
+        where: { id: milestone.id },
+        data: {
+          status: milestone.status,
+          actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
+          notes: milestone.notes,
+          attachments: milestone.attachments,
+        },
+      }));
+      if (milestone.id === milestoneId) {
+        operations.push(prisma.salesTask.updateMany({
+          where: { milestoneId },
           data: {
-            status: milestone.status,
-            actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
-            notes: milestone.notes,
-            attachments: milestone.attachments,
+            isCompleted: true,
+            completedAt: milestone.actualDueDate ? new Date(milestone.actualDueDate) : new Date(),
+            resultNotes: milestone.notes || null,
           },
-        });
-        if (milestone.id === milestoneId) {
-          await tx.salesTask.updateMany({
-            where: { milestoneId },
-            data: {
-              isCompleted: true,
-              completedAt: milestone.actualDueDate ? new Date(milestone.actualDueDate) : new Date(),
-              resultNotes: milestone.notes || null,
-            },
-          });
-        }
+        }));
       }
-      await tx.project.update({
-        where: { id: projectId },
-        data: { currentStage: result.newCurrentStage as ProjectStage, isDelayed: result.isProjectDelayed },
-      });
-    });
+    }
+    operations.push(prisma.project.update({
+      where: { id: projectId },
+      data: { currentStage: result.newCurrentStage as ProjectStage, isDelayed: result.isProjectDelayed },
+    }));
+    await prisma.$transaction(operations);
     return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
   },
 
