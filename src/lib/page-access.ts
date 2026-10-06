@@ -64,8 +64,7 @@ export function getPageAccessKey(pathname: string, method?: string): PageAccessK
   if (
     routePath === "/api/tasks" &&
     method === "GET" &&
-    url.searchParams.has("projectId") &&
-    url.searchParams.get("isCompleted") === "true"
+    url.searchParams.has("projectId")
   ) {
     return "projects";
   }

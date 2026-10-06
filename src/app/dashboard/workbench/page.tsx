@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { CustomerItem, SalesTaskItem, PROJECT_STAGE_LABELS } from "@/lib/mock-data";
 
+const getDefaultTaskDueDatetime = () =>
+  new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+
 interface WorkbenchProject {
   id: string;
   projectName: string;
@@ -65,7 +68,7 @@ export default function SalesWorkbenchPage() {
 
   // 待辦 Modal
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [newTaskData, setNewTaskData] = useState({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: new Date().toISOString().slice(0, 16), priority: "HIGH" });
+  const [newTaskData, setNewTaskData] = useState({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: getDefaultTaskDueDatetime(), priority: "HIGH" });
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<SalesTaskItem | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
@@ -147,11 +150,15 @@ export default function SalesWorkbenchPage() {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newTaskData, assignedToId: currentUser.id, assignedToName: currentUser.name }),
+        body: JSON.stringify({
+          ...newTaskData,
+          dueDatetime: new Date(newTaskData.dueDatetime).toISOString(),
+          assignedToId: currentUser.id,
+        }),
       });
       if (res.ok) {
         setShowTaskModal(false);
-        setNewTaskData({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: new Date().toISOString().slice(0, 16), priority: "HIGH" });
+        setNewTaskData({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: getDefaultTaskDueDatetime(), priority: "HIGH" });
         await fetchWorkbenchData();
       }
     } finally { setCreatingTask(false); }
@@ -236,7 +243,7 @@ export default function SalesWorkbenchPage() {
                   <tr key={task.id} className="hover:bg-slate-50">
                     <td className="p-3 font-bold">
                       [{task.projectName}] {task.subject}
-                      {task.assignedByName && <div className="mt-1 text-[10px] font-normal text-slate-500">指派者：{task.assignedByName}</div>}
+                      {task.assignedByName && <div className="mt-1 text-[10px] font-normal text-slate-500">建立者/指派者：{task.assignedByName}</div>}
                     </td>
                     <td className="p-3">{task.dueDatetime.slice(0, 10)}</td>
                     <td className="p-3">{task.priority}</td>
@@ -353,6 +360,14 @@ export default function SalesWorkbenchPage() {
             <form onSubmit={handleCreateTask} className="space-y-3 text-sm">
               <label className="block">關聯案場<select required value={newTaskData.projectId} onChange={e=>setNewTaskData({...newTaskData, projectId: e.target.value})} className="w-full border p-1.5"><option value="">選擇</option>{projects.map(p=><option key={p.id} value={p.id}>{p.projectName}</option>)}</select></label>
               <label className="block">主題<input required value={newTaskData.subject} onChange={e=>setNewTaskData({...newTaskData, subject: e.target.value})} className="w-full border p-1.5"/></label>
+              <label className="block">預計完成時間<input required type="datetime-local" value={newTaskData.dueDatetime} onChange={e=>setNewTaskData({...newTaskData, dueDatetime: e.target.value})} className="w-full border p-1.5"/></label>
+              <label className="block">優先度
+                <select value={newTaskData.priority} onChange={e=>setNewTaskData({...newTaskData, priority: e.target.value})} className="w-full border p-1.5">
+                  <option value="HIGH">高</option>
+                  <option value="MEDIUM">中</option>
+                  <option value="LOW">低</option>
+                </select>
+              </label>
               <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowTaskModal(false)} className="px-3 py-1 bg-slate-200 rounded">取消</button><button disabled={creatingTask} className="px-3 py-1 bg-blue-600 text-white rounded">建立</button></div>
             </form>
           </div>

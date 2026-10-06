@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
+  CheckSquare,
   Edit3,
   MapPin,
   X,
@@ -31,6 +32,11 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = 
   OVERDUE:     { label: "已逾期",    bg: "bg-red-100",     text: "text-red-800" },
   PENDING:     { label: "待開始",    bg: "bg-slate-100",   text: "text-slate-600" },
 };
+const PRIORITY_LABELS: Record<NonNullable<ProjectMilestoneItem["priority"]>, string> = {
+  HIGH: "高",
+  MEDIUM: "中",
+  LOW: "低",
+};
 
 const PHASE_ORDER: MilestonePhase[] = ["CONTACT", "DESIGN", "PRODUCTION", "EXTRA"];
 const todayDate = () =>
@@ -49,6 +55,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [projects, setProjects] = useState<ProjectDetail[]>([]);
   const [assignees, setAssignees] = useState<MilestoneAssignee[]>([]);
   const [canManageMilestones, setCanManageMilestones] = useState(false);
+  const [pendingTasks, setPendingTasks] = useState<SalesTaskItem[]>([]);
+  const [pendingTasksError, setPendingTasksError] = useState("");
   const [completedTasks, setCompletedTasks] = useState<SalesTaskItem[]>([]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,9 +123,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     try {
       setLoading(true);
       setLoadError("");
+      setPendingTasksError("");
       setCompletedTasksError("");
-      const [milestonesResult, tasksResult] = await Promise.allSettled([
+      const [milestonesResult, pendingTasksResult, tasksResult] = await Promise.allSettled([
         fetch(`/api/projects/${projectId}/milestones`),
+        fetch(`/api/tasks?projectId=${projectId}&isCompleted=false`),
         fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`),
       ]);
       if (milestonesResult.status === "rejected") throw milestonesResult.reason;
@@ -137,6 +147,30 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         }
       }
       setMilestones(data.milestones);
+
+      if (pendingTasksResult.status === "rejected") {
+        console.error("Failed to load pending project tasks:", pendingTasksResult.reason);
+        setPendingTasks([]);
+        setPendingTasksError(
+          pendingTasksResult.reason instanceof Error ? pendingTasksResult.reason.message : "無法載入待辦事項",
+        );
+      } else {
+        try {
+          const tasksResponse = pendingTasksResult.value;
+          const tasksData = await tasksResponse.json();
+          if (!tasksResponse.ok) {
+            throw new Error(tasksData.error || "無法載入待辦事項");
+          }
+          if (!Array.isArray(tasksData)) {
+            throw new Error("待辦事項資料格式無效");
+          }
+          setPendingTasks(tasksData.filter((task: SalesTaskItem) => !task.isCompleted && !task.milestoneId));
+        } catch (error) {
+          console.error("Failed to load pending project tasks:", error);
+          setPendingTasks([]);
+          setPendingTasksError(error instanceof Error ? error.message : "無法載入待辦事項");
+        }
+      }
 
       if (tasksResult.status === "rejected") {
         console.error("Failed to load completed tasks:", tasksResult.reason);
@@ -494,6 +528,33 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      <section className="overflow-hidden rounded-xl border bg-white">
+        <div className="flex items-center gap-2 border-b px-4 py-3 font-bold">
+          <CheckSquare className="h-5 w-5 text-blue-600" />待辦事項
+        </div>
+        {pendingTasksError ? (
+          <p role="alert" className="px-4 py-6 text-center text-sm text-red-600">{pendingTasksError}</p>
+        ) : pendingTasks.length ? (
+          <div className="divide-y px-4">
+            {pendingTasks.map((task) => (
+              <article key={task.id} className="py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{task.subject}</h3>
+                  <span className="text-xs text-slate-500">
+                    預計完成：{new Date(task.dueDatetime).toLocaleString("zh-TW")}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  負責人：{task.assignedToName || "未指定"}｜優先度：{PRIORITY_LABELS[task.priority] || task.priority}
+                  {task.assignedByName && `｜建立者/指派者：${task.assignedByName}`}
+                </p>
+                {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}
+              </article>
+            ))}
+          </div>
+        ) : <p className="px-4 py-6 text-center text-sm text-slate-500">此案件目前沒有未完成待辦</p>}
+      </section>
+
       <section className="bg-white border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 border-b px-4 py-3 font-bold"><CheckCircle2 className="h-5 w-5 text-emerald-600" />已完成待辦備查</div>
         {completedTasksError ? (
@@ -508,7 +569,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   負責人：{task.assignedToName || "未指定"}｜預定完成：{task.dueDatetime.slice(0, 10)}
-                  {task.assignedByName && `｜指派者：${task.assignedByName}`}
+                  {task.assignedByName && `｜建立者/指派者：${task.assignedByName}`}
                 </p>
                 {task.resultNotes && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{task.resultNotes}</p>}
               </article>

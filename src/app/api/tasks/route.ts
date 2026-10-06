@@ -47,10 +47,21 @@ export async function POST(req: NextRequest) {
     if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();
-    const { projectId, subject, taskType, dueDatetime, priority, assignedToId, assignedToName } = body;
+    const { projectId, subject, taskType, dueDatetime, priority, assignedToId } = body;
 
     if (!projectId || !subject || !dueDatetime) {
       return NextResponse.json({ error: "請填寫必要欄位 (案場、主題、到期時間)" }, { status: 400 });
+    }
+    if (
+      typeof projectId !== "string" ||
+      typeof subject !== "string" ||
+      typeof dueDatetime !== "string" ||
+      Number.isNaN(new Date(dueDatetime).getTime())
+    ) {
+      return NextResponse.json({ error: "待辦欄位格式無效" }, { status: 400 });
+    }
+    if (priority !== undefined && !["HIGH", "MEDIUM", "LOW"].includes(priority)) {
+      return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
     }
 
     const newTask = await DataService.addTask({
@@ -61,6 +72,7 @@ export async function POST(req: NextRequest) {
       priority: priority || "MEDIUM",
       isCompleted: false,
       assignedToId: assignedToId || sessionUserId,
+      assignedById: sessionUserId,
     });
 
     return NextResponse.json(newTask, { status: 201 });
