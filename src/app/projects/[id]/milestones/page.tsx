@@ -343,10 +343,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           {PHASE_ORDER.map((phase) => {
             const prog = phaseProgress(phase);
             const active = activePhase === phase;
+            const showProgress = !(phase === "EXTRA" && project?.currentStage === "LOST");
             return (
               <button key={phase} onClick={() => setActivePhase(phase)} className={`flex-1 p-3 text-xs text-left border-b-2 ${active ? "border-blue-600 bg-blue-50" : "border-transparent hover:bg-slate-50"}`}>
                 <div className="font-bold">{PHASE_LABELS[phase].split("：")[0]}</div>
-                <div className="w-full h-1 bg-slate-200 mt-1"><div style={{ width: `${prog}%` }} className="h-full bg-blue-500" /></div>
+                {showProgress && <div className="w-full h-1 bg-slate-200 mt-1"><div style={{ width: `${prog}%` }} className="h-full bg-blue-500" /></div>}
               </button>
             );
           })}
@@ -355,17 +356,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         <div className="p-4 space-y-2">
           {workflowError && <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{workflowError}</p>}
           {activePhase === "EXTRA" && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-red-100 bg-red-50 p-3">
-              <span className="mr-auto text-sm font-bold text-red-900">額外階段操作</span>
+            <div className="mb-3 space-y-2">
               <button
                 type="button"
                 onClick={() => {
                   setSpecialAdvanceError("");
                   setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
                 }}
-                className="rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+                className="w-full rounded-xl border bg-amber-50 p-3 text-left text-sm font-bold text-amber-800 hover:bg-amber-100"
               >
-                推進至收尾
+                收尾
               </button>
               <button
                 type="button"
@@ -373,19 +373,21 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   setSpecialAdvanceError("");
                   setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
                 }}
-                className="rounded bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+                className="w-full rounded-xl border bg-slate-50 p-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-100"
               >
-                推進至流標
+                流標
               </button>
               {project?.currentStage === "WRAP_UP" && (
-                <button
-                  type="button"
-                  onClick={handleReturnToProduction}
-                  disabled={advancing}
-                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {advancing ? "處理中..." : "返回第三階段"}
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleReturnToProduction}
+                    disabled={advancing}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {advancing ? "處理中..." : "返回第三階段"}
+                  </button>
+                </div>
               )}
             </div>
           )}
