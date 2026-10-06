@@ -121,7 +121,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
       const tasksRes = await fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`);
       const tasksData = await tasksRes.json();
-      if (Array.isArray(tasksData)) setCompletedTasks(tasksData);
+      if (Array.isArray(tasksData)) {
+        setCompletedTasks(tasksData.filter((task: SalesTaskItem) => !task.milestoneId));
+      }
     } catch (err) {
       console.error(err);
     } finally {

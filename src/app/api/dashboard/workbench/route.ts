@@ -22,19 +22,30 @@ export async function GET(req: NextRequest) {
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
+    const allProjectIds = allProjects.map((p) => p.id);
+    const [allMilestonesByProject, assignedTasks] = await Promise.all([
+      DataService.getMilestonesByProjectIds(allProjectIds),
+      DataService.getTasks({ assignedToId: currentUser.id }),
+    ]);
+    const assignedProjectIds = new Set(assignedTasks.map((task) => task.projectId));
+    for (const milestones of Object.values(allMilestonesByProject)) {
+      for (const milestone of milestones) {
+        if (milestone.assignedToId === currentUser.id) assignedProjectIds.add(milestone.projectId);
+      }
+    }
+
     const myProjects = allProjects.filter(
       (p) =>
         p.salesRepId === currentUser.id ||
         p.customerSalesRepId === currentUser.id ||
-        p.salesAssistantId === currentUser.id
+        p.salesAssistantId === currentUser.id ||
+        assignedProjectIds.has(p.id)
     );
 
     const projectIds = myProjects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
-      DataService.getMilestonesByProjectIds(projectIds),
-      DataService.getLatestQuotesByProjectIds(projectIds),
-      DataService.getTasks({ assignedToId: currentUser.id }),
-    ]);
+    const milestonesByProject = allMilestonesByProject;
+    const latestQuotesByProject = await DataService.getLatestQuotesByProjectIds(projectIds);
+    const tasks = assignedTasks;
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
     const projectsWithDetails = await Promise.all(

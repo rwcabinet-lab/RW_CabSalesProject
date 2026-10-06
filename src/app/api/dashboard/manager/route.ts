@@ -214,8 +214,8 @@ export async function POST(req: NextRequest) {
     if (!assignee) {
       return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
     }
-    if (assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
-      return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
+    if (assignee.role !== "SALES_MANAGER" && assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
+      return NextResponse.json({ error: "指派對象必須是業務主管、業務或業助" }, { status: 400 });
     }
     if (priority && !["HIGH", "MEDIUM", "LOW"].includes(priority)) {
       return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
@@ -263,8 +263,8 @@ export async function PATCH(req: NextRequest) {
     if (!assignee) {
       return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
     }
-    if (assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
-      return NextResponse.json({ error: "指派對象必須是業務或業助" }, { status: 400 });
+    if (assignee.role !== "SALES_MANAGER" && assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
+      return NextResponse.json({ error: "指派對象必須是業務主管、業務或業助" }, { status: 400 });
     }
 
     const task = await DataService.updateTask(taskId, {

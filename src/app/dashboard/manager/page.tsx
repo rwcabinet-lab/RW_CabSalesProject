@@ -16,7 +16,7 @@ interface ManagerDashboardData {
 interface AssignableUser {
   id: string;
   name: string;
-  role: "SALES" | "ASSISTANT";
+  role: "SALES_MANAGER" | "SALES" | "ASSISTANT";
 }
 
 const todayDate = () =>
@@ -50,7 +50,7 @@ export default function ManagerDashboardPage() {
       })
       .then((users: { id: string; name: string; role: string }[]) => {
         setAssignableUsers(users.filter((user): user is AssignableUser =>
-          user.role === "SALES" || user.role === "ASSISTANT"
+          user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"
         ));
       })
       .catch((err) => {
@@ -272,7 +272,7 @@ export default function ManagerDashboardPage() {
                   <option value="">選擇人員</option>
                   {assignableUsers.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {user.name} ({user.role === "SALES" ? "業務" : "業助"})
+                      {user.name} ({user.role === "SALES_MANAGER" ? "業務主管" : user.role === "SALES" ? "業務" : "業助"})
                     </option>
                   ))}
                 </select>
