@@ -73,6 +73,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     fetchData();
+  }, [projectId]);
+
+  useEffect(() => {
     fetchProjects();
     fetchAssignees();
     fetch("/api/auth/session")
@@ -82,7 +85,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         setCanManageMilestones(role === "ADMIN" || role === "LEVEL_MANAGER" || role === "SALES_MANAGER");
       })
       .catch((error) => console.error("Failed to load current user:", error));
-  }, [projectId]);
+  }, []);
 
   const fetchProjects = async () => {
     try {
@@ -109,8 +112,20 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/projects/${projectId}/milestones`);
-      const data = await res.json();
+      const [milestonesResponse, tasksResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}/milestones`),
+        fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`),
+      ]);
+      const [data, tasksData] = await Promise.all([
+        milestonesResponse.json(),
+        tasksResponse.json(),
+      ]);
+      if (!milestonesResponse.ok) {
+        throw new Error(data.error || "無法載入案件里程碑");
+      }
+      if (!tasksResponse.ok) {
+        throw new Error(tasksData.error || "無法載入已完成待辦");
+      }
       if (data.project) {
         setProject(data.project);
         if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
@@ -118,9 +133,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         }
       }
       if (Array.isArray(data.milestones)) setMilestones(data.milestones);
-
-      const tasksRes = await fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`);
-      const tasksData = await tasksRes.json();
       if (Array.isArray(tasksData)) {
         setCompletedTasks(tasksData.filter((task: SalesTaskItem) => !task.milestoneId));
       }

@@ -15,13 +15,16 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
-    const project = await DataService.getProjectById(projectId);
+    const [projectRecord, milestones] = await Promise.all([
+      DataService.getProjectById(projectId, { evaluateSchedule: false }),
+      DataService.getMilestonesByProjectId(projectId),
+    ]);
 
-    if (!project) {
+    if (!projectRecord) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
-
-    const milestones = await DataService.getMilestonesByProjectId(projectId);
+    const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+    const project = { ...projectRecord, isDelayed: projectRecord.isDelayed || isDelayed };
 
     // 附帶計算各里程碑的燈號 (紅黃綠)
     const milestonesWithTrafficLights = milestones.map((m) => ({

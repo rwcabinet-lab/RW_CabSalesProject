@@ -91,7 +91,10 @@ export const DataService = {
     }));
   },
 
-  async getProjectById(id: string): Promise<ProjectDetail | undefined> {
+  async getProjectById(
+    id: string,
+    options?: { evaluateSchedule?: boolean }
+  ): Promise<ProjectDetail | undefined> {
     const p = await prisma.project.findUnique({
       where: { id },
       relationLoadStrategy: "join",
@@ -111,6 +114,7 @@ export const DataService = {
       estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : undefined,
       unitCount: p.unitCount || undefined, cost: p.cost ? Number(p.cost) : undefined, quoteAmount: p.quoteAmount ? Number(p.quoteAmount) : undefined
     };
+    if (options?.evaluateSchedule === false) return project;
     const milestones = await this.getMilestonesByProjectId(id);
     const evaluated = ScheduleEngine.evaluateMilestones(milestones);
     return { ...project, isDelayed: project.isDelayed || evaluated.isDelayed };
