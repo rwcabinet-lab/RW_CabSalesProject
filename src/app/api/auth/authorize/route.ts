@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
   if (!pathname || !pathname.startsWith("/") || pathname.startsWith("//")) {
     return NextResponse.json({ error: "無效的頁面路徑" }, { status: 400 });
   }
+  const method = request.nextUrl.searchParams.get("method") || undefined;
 
   try {
-    const allowed = await canUserAccessPath(userId, pathname);
+    const allowed = await canUserAccessPath(userId, pathname, method);
     if (!allowed) return NextResponse.json({ error: "沒有權限存取此頁面" }, { status: 403 });
     return NextResponse.json({ allowed: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

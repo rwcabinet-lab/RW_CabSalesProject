@@ -367,9 +367,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
             <div><dt className="text-xs text-slate-500">客戶</dt><dd className="font-semibold">{project.customerName}（{project.customerType}）</dd></div>
-            <div><dt className="text-xs text-slate-500">案件業務</dt><dd className="font-semibold">{project.salesRepName}</dd></div>
+            <div><dt className="text-xs text-slate-500">負責業務</dt><dd className="font-semibold">{project.customerSalesRepName || project.salesRepName}</dd></div>
             <div><dt className="text-xs text-slate-500">案件業助</dt><dd className="font-semibold">{project.salesAssistantName || "未指定"}</dd></div>
-            <div><dt className="text-xs text-slate-500">預計日期</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">預計完工日</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">戶數</dt><dd className="font-semibold">{project.unitCount ?? "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="font-semibold">{project.quoteAmount ?? project.estimatedBudget ?? "未設定"}</dd></div>
             <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition || "未填寫"}</dd></div>

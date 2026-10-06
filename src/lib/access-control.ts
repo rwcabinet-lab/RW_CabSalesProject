@@ -43,14 +43,22 @@ export async function getRolePages(role: Role | AppRole): Promise<PageAccessKey[
     : DEFAULT_ROLE_PAGES[role as AppRole];
 }
 
-export async function canAccessPath(role: Role | AppRole, pathname: string): Promise<boolean> {
-  const pageKey = getPageAccessKey(pathname);
+export async function canAccessPath(
+  role: Role | AppRole,
+  pathname: string,
+  method?: string,
+): Promise<boolean> {
+  const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return role === "ADMIN";
   const pages = await getRolePages(role);
   return pages.includes(pageKey);
 }
 
-export async function canUserAccessPath(userId: string, pathname: string): Promise<boolean> {
+export async function canUserAccessPath(
+  userId: string,
+  pathname: string,
+  method?: string,
+): Promise<boolean> {
   let cached = accessProfileCache.get(userId);
   if (cached && cached.expiresAt <= Date.now()) {
     accessProfileCache.delete(userId);
@@ -82,7 +90,7 @@ export async function canUserAccessPath(userId: string, pathname: string): Promi
   }
 
   if (profile.email.startsWith("preview-")) return false;
-  const pageKey = getPageAccessKey(pathname);
+  const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return profile.role === "ADMIN";
   return profile.pages.includes(pageKey);
 }

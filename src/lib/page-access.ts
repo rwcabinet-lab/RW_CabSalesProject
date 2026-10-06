@@ -57,12 +57,24 @@ const PAGE_PATHS: Array<{ prefix: string; key: PageAccessKey }> = [
   { prefix: "/api/catalog", key: "projects" },
 ];
 
-export function getPageAccessKey(pathname: string): PageAccessKey {
-  if (pathname === "/" || pathname === "/api") return "home";
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
+export function getPageAccessKey(pathname: string, method?: string): PageAccessKey {
+  const url = new URL(pathname, "http://localhost");
+  const routePath = url.pathname;
+
+  if (
+    routePath === "/api/tasks" &&
+    method === "GET" &&
+    url.searchParams.has("projectId") &&
+    url.searchParams.get("isCompleted") === "true"
+  ) {
+    return "projects";
+  }
+
+  if (routePath === "/" || routePath === "/api") return "home";
+  if (routePath === "/admin" || routePath.startsWith("/admin/")) return "admin";
 
   const match = PAGE_PATHS.find(
-    ({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    ({ prefix }) => routePath === prefix || routePath.startsWith(`${prefix}/`),
   );
   return match?.key ?? "home";
 }

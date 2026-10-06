@@ -21,8 +21,12 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();
 
   try {
+    const accessTarget = `${pathname}${request.nextUrl.search}`;
     const authorization = await fetch(
-      new URL(`/api/auth/authorize?path=${encodeURIComponent(pathname)}`, request.url),
+      new URL(
+        `/api/auth/authorize?path=${encodeURIComponent(accessTarget)}&method=${encodeURIComponent(request.method)}`,
+        request.url,
+      ),
       {
         headers: { cookie: request.headers.get("cookie") || "" },
         cache: "no-store",
