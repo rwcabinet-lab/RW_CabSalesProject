@@ -13,12 +13,12 @@ import {
 import {
   ProjectMilestoneItem,
   MilestonePhase,
-  MilestoneStageCode,
   MILESTONE_STAGE_LABELS,
   PHASE_LABELS,
   PROJECT_STAGE_LABELS,
   ProjectDetail,
   SalesTaskItem,
+  STAGE_CODE_TO_PHASE,
 } from "@/lib/mock-data";
 
 interface MilestoneWithLight extends ProjectMilestoneItem {
@@ -52,6 +52,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [completedTasks, setCompletedTasks] = useState<SalesTaskItem[]>([]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [completedTasksError, setCompletedTasksError] = useState("");
   const [activePhase, setActivePhase] = useState<MilestonePhase>("CONTACT");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,19 +114,21 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [milestonesResponse, tasksResponse] = await Promise.all([
+      setLoadError("");
+      setCompletedTasksError("");
+      const [milestonesResult, tasksResult] = await Promise.allSettled([
         fetch(`/api/projects/${projectId}/milestones`),
         fetch(`/api/tasks?projectId=${projectId}&isCompleted=true`),
       ]);
-      const [data, tasksData] = await Promise.all([
-        milestonesResponse.json(),
-        tasksResponse.json(),
-      ]);
+      if (milestonesResult.status === "rejected") throw milestonesResult.reason;
+
+      const milestonesResponse = milestonesResult.value;
+      const data = await milestonesResponse.json();
       if (!milestonesResponse.ok) {
         throw new Error(data.error || "無法載入案件里程碑");
       }
-      if (!tasksResponse.ok) {
-        throw new Error(tasksData.error || "無法載入已完成待辦");
+      if (!Array.isArray(data.milestones)) {
+        throw new Error("案件里程碑資料格式無效");
       }
       if (data.project) {
         setProject(data.project);
@@ -132,12 +136,34 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           setActivePhase("EXTRA");
         }
       }
-      if (Array.isArray(data.milestones)) setMilestones(data.milestones);
-      if (Array.isArray(tasksData)) {
-        setCompletedTasks(tasksData.filter((task: SalesTaskItem) => !task.milestoneId));
+      setMilestones(data.milestones);
+
+      if (tasksResult.status === "rejected") {
+        console.error("Failed to load completed tasks:", tasksResult.reason);
+        setCompletedTasks([]);
+        setCompletedTasksError(
+          tasksResult.reason instanceof Error ? tasksResult.reason.message : "無法載入已完成待辦",
+        );
+      } else {
+        try {
+          const tasksResponse = tasksResult.value;
+          const tasksData = await tasksResponse.json();
+          if (!tasksResponse.ok) {
+            throw new Error(tasksData.error || "無法載入已完成待辦");
+          }
+          if (!Array.isArray(tasksData)) {
+            throw new Error("已完成待辦資料格式無效");
+          }
+          setCompletedTasks(tasksData.filter((task: SalesTaskItem) => !task.milestoneId));
+        } catch (error) {
+          console.error("Failed to load completed tasks:", error);
+          setCompletedTasks([]);
+          setCompletedTasksError(error instanceof Error ? error.message : "無法載入已完成待辦");
+        }
       }
     } catch (err) {
       console.error(err);
+      setLoadError(err instanceof Error ? err.message : "無法載入案件里程碑");
     } finally {
       setLoading(false);
     }
@@ -287,7 +313,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const phaseGroups: Record<MilestonePhase, MilestoneWithLight[]> = { CONTACT: [], DESIGN: [], PRODUCTION: [], EXTRA: [] };
   milestones.forEach((milestone) => {
-    if (milestone.stageCode !== "X-2") phaseGroups[milestone.phase]?.push(milestone);
+    const phase = STAGE_CODE_TO_PHASE[milestone.stageCode];
+    if (phase && milestone.stageCode !== "X-2") phaseGroups[phase].push(milestone);
   });
 
   const phaseProgress = (phase: MilestonePhase) => {
@@ -349,6 +376,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           </dl>
         </section>
       )}
+
+      {loadError && <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{loadError}</p>}
 
       <div className="bg-white rounded-2xl border overflow-hidden">
         <div className="flex border-b">
@@ -467,7 +496,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
       <section className="bg-white border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 border-b px-4 py-3 font-bold"><CheckCircle2 className="h-5 w-5 text-emerald-600" />已完成待辦備查</div>
-        {completedTasks.length ? (
+        {completedTasksError ? (
+          <p role="alert" className="px-4 py-6 text-center text-sm text-red-600">{completedTasksError}</p>
+        ) : completedTasks.length ? (
           <div className="divide-y px-4">
             {completedTasks.map((task) => (
               <article key={task.id} className="py-3">
