@@ -18,6 +18,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { ProjectDetail } from "@/lib/mock-data";
+import { formatTenThousands } from "@/lib/currency";
 
 interface KanbanProps {
   projects: any[];
@@ -192,7 +193,7 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
 
                               {project.estimatedBudget && (
                                 <div className="mt-2 text-xs font-mono font-bold text-slate-800">
-                                  預算: NT$ {project.estimatedBudget.toLocaleString("zh-TW")}
+                                  預算: {formatTenThousands(project.estimatedBudget)}
                                 </div>
                               )}
 

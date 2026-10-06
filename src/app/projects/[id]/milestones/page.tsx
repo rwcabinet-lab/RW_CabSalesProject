@@ -21,6 +21,7 @@ import {
   SalesTaskItem,
   STAGE_CODE_TO_PHASE,
 } from "@/lib/mock-data";
+import { formatTenThousands } from "@/lib/currency";
 
 interface MilestoneWithLight extends ProjectMilestoneItem {
   trafficLight: { color: string; label: string; daysDiff: number };
@@ -357,6 +358,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     return Math.round((ms.filter((m) => m.status === "COMPLETED").length / ms.length) * 100);
   };
   const lastCompletedMilestone = [...milestones].reverse().find((item) => item.status === "COMPLETED");
+  const isProjectLost = project?.currentStage === "LOST";
 
   return (
     <div className="space-y-6 pb-16">
@@ -394,9 +396,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   目前階段：{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}
                 </span>
               )}
-              <span className={`rounded px-2 py-1 text-xs font-bold ${project.isDelayed ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
-                {project.isDelayed ? "案件逾期" : "時程正常"}
-              </span>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
@@ -405,7 +404,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><dt className="text-xs text-slate-500">案件業助</dt><dd className="font-semibold">{project.salesAssistantName || "未指定"}</dd></div>
             <div><dt className="text-xs text-slate-500">預計完工日</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">戶數</dt><dd className="font-semibold">{project.unitCount ?? "未設定"}</dd></div>
-            <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="font-semibold">{project.quoteAmount ?? project.estimatedBudget ?? "未設定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="font-semibold">{(project.quoteAmount ?? project.estimatedBudget) != null ? formatTenThousands(project.quoteAmount ?? project.estimatedBudget ?? 0) : "未設定"}</dd></div>
             <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition || "未填寫"}</dd></div>
           </dl>
         </section>
@@ -444,16 +443,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   收尾
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSpecialAdvanceError("");
-                  setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
-                }}
-                className="w-full rounded-xl border bg-slate-50 p-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-100"
-              >
-                流標
-              </button>
+              {!isProjectLost && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpecialAdvanceError("");
+                    setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
+                  }}
+                  className="w-full rounded-xl border bg-slate-50 p-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-100"
+                >
+                  流標
+                </button>
+              )}
               {project?.currentStage === "WRAP_UP" && (
                 <div className="flex justify-end">
                   <button
@@ -469,8 +470,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             </div>
           )}
           {phaseGroups[activePhase].map((m) => (
-            <div key={m.id} className={`border p-3 rounded-xl ${m.status === "OVERDUE" ? "bg-red-50" : m.status === "IN_PROGRESS" ? "bg-blue-50" : "bg-white"}`}>
-              {editingId === m.id ? (
+            <div key={m.id} className={`border p-3 rounded-xl ${isProjectLost ? "border-slate-300 bg-slate-100 opacity-60 grayscale" : m.status === "OVERDUE" ? "bg-red-50" : m.status === "IN_PROGRESS" ? "bg-blue-50" : "bg-white"}`}>
+              {editingId === m.id && !isProjectLost ? (
                 <div className="space-y-2">
                   <div className="flex justify-between font-bold text-sm">編輯 {MILESTONE_STAGE_LABELS[m.stageCode]}<button onClick={() => setEditingId(null)}><X className="w-4 h-4" /></button></div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -516,10 +517,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], actualDueDate: todayDate(), notes: "" });
                       }} className="bg-blue-600 text-white px-2 py-1 text-xs rounded">完成</button>
                     )}
-                    {canManageMilestones && !m.stageCode.startsWith("X-") && m.status === "COMPLETED" && m.id === lastCompletedMilestone?.id && (
+                    {canManageMilestones && !isProjectLost && !m.stageCode.startsWith("X-") && m.status === "COMPLETED" && m.id === lastCompletedMilestone?.id && (
                       <button onClick={() => handleRollback(m.id)} disabled={advancing} className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 disabled:opacity-50">回退</button>
                     )}
-                    {canManageMilestones && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
+                    {canManageMilestones && !isProjectLost && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
                   </div>
                 </div>
               )}

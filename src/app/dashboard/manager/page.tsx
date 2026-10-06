@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
+import { formatTenThousands } from "@/lib/currency";
 
 interface ManagerDashboardData {
   kpi: { totalProjects: number; signedTotal: number; conversionRate: number; delayedCount: number; };
@@ -136,7 +137,7 @@ export default function ManagerDashboardPage() {
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">已簽約/生產預估總額</div>
-          <div className="text-3xl font-black">NT$ {data.kpi.signedTotal.toLocaleString()}</div>
+          <div className="text-3xl font-black">{formatTenThousands(data.kpi.signedTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">成交推進率</div>

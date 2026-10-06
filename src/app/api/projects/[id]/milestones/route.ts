@@ -57,6 +57,13 @@ export async function PUT(
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
+    const project = await DataService.getProjectById(projectId, { evaluateSchedule: false });
+    if (!project) {
+      return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
+    }
+    if (project.currentStage === "LOST") {
+      return NextResponse.json({ error: "此案件已流標，階段項目不可編輯或推進" }, { status: 409 });
+    }
     const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
 
     if (action === "returnToProduction") {

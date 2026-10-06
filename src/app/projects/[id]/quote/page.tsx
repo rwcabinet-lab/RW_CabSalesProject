@@ -11,6 +11,7 @@ import {
   Save,
 } from "lucide-react";
 import { ProjectDetail, QuotationData } from "@/lib/mock-data";
+import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 
 type QuoteStatus = QuotationData["status"];
 
@@ -53,7 +54,7 @@ export default function QuotationEditorPage() {
         setVersions(data.versions || []);
         if (data.latestVersion) {
           setForm({
-            totalAmount: String(data.latestVersion.totalAmount),
+            totalAmount: toTenThousands(data.latestVersion.totalAmount).toFixed(1),
             externalQuoteNo: data.latestVersion.externalQuoteNo || "",
             quoteFileUrl: data.latestVersion.quoteFileUrl || "",
             notes: data.latestVersion.notes || "",
@@ -81,7 +82,7 @@ export default function QuotationEditorPage() {
 
     const totalAmount = Number(form.totalAmount);
     if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
-      setError("請輸入大於 0 的含稅報價總額。");
+      setError("請輸入大於 0 的含稅報價總額（萬）。");
       return;
     }
 
@@ -90,7 +91,7 @@ export default function QuotationEditorPage() {
       const response = await fetch(`/api/projects/${projectId}/quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, totalAmount }),
+        body: JSON.stringify({ ...form, totalAmount: fromTenThousands(totalAmount) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "儲存報價資料失敗");
@@ -99,7 +100,7 @@ export default function QuotationEditorPage() {
       setLatestQuote(savedQuote);
       setVersions((current) => [savedQuote, ...current]);
       setForm({
-        totalAmount: String(savedQuote.totalAmount),
+        totalAmount: toTenThousands(savedQuote.totalAmount).toFixed(1),
         externalQuoteNo: savedQuote.externalQuoteNo || "",
         quoteFileUrl: savedQuote.quoteFileUrl || "",
         notes: savedQuote.notes || "",
@@ -158,15 +159,15 @@ export default function QuotationEditorPage() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-sm font-semibold text-slate-700">含稅報價總額（NT$）<em className="ml-1 text-red-500">*</em></span>
+            <span className="text-sm font-semibold text-slate-700">含稅報價總額（萬）<em className="ml-1 text-red-500">*</em></span>
             <input
               required
               type="number"
               min="0.01"
-              step="0.01"
+              step="0.1"
               value={form.totalAmount}
               onChange={(event) => updateForm("totalAmount", event.target.value)}
-              placeholder="輸入外部系統的最終金額"
+              placeholder="例如 35.0 代表新台幣 35 萬"
               className="w-full rounded-lg border border-blue-300 px-3 py-2.5 text-lg font-bold text-blue-700 outline-none focus:ring-2 focus:ring-blue-100"
             />
           </label>
@@ -233,7 +234,7 @@ export default function QuotationEditorPage() {
                 <p className="mt-1 text-sm text-slate-500">{version.notes || "無備註"}</p>
               </div>
               <div className="flex shrink-0 items-center gap-4">
-                <strong className="text-lg text-slate-900">NT$ {version.totalAmount.toLocaleString("zh-TW")}</strong>
+                <strong className="text-lg text-slate-900">{formatTenThousands(version.totalAmount)}</strong>
                 {version.quoteFileUrl ? (
                   /^https?:\/\//.test(version.quoteFileUrl) ? (
                     <a href={version.quoteFileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">

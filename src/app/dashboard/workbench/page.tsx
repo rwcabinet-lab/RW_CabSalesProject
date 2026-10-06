@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { CustomerItem, SalesTaskItem, PROJECT_STAGE_LABELS } from "@/lib/mock-data";
+import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 
 const getDefaultTaskDueDatetime = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -172,8 +173,8 @@ export default function SalesWorkbenchPage() {
       const payload = {
         ...newProjectData,
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
-        cost: newProjectData.cost ? Number(newProjectData.cost) : undefined,
-        quoteAmount: newProjectData.quoteAmount ? Number(newProjectData.quoteAmount) : undefined,
+        cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
+        quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
       };
       await fetch("/api/projects", {
         method: editingProjectId ? "PATCH" : "POST",
@@ -197,7 +198,9 @@ export default function SalesWorkbenchPage() {
     setNewProjectData({
       projectName: p.projectName, customerId: p.customerId, siteAddress: p.siteAddress, siteCondition: p.siteCondition,
       expectedDate: p.expectedDate ? p.expectedDate.slice(0,10) : "",
-      unitCount: p.unitCount?.toString() || "", cost: p.cost?.toString() || "", quoteAmount: p.quoteAmount?.toString() || ""
+      unitCount: p.unitCount?.toString() || "",
+      cost: p.cost != null ? toTenThousands(p.cost).toFixed(1) : "",
+      quoteAmount: p.quoteAmount != null ? toTenThousands(p.quoteAmount).toFixed(1) : "",
     });
     setIsProjectPanelOpen(true);
   };
@@ -308,8 +311,8 @@ export default function SalesWorkbenchPage() {
               </label>
               <label>施工地址 *<input required value={newProjectData.siteAddress} onChange={(e) => setNewProjectData({...newProjectData, siteAddress: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <label>戶數<input type="number" value={newProjectData.unitCount} onChange={(e) => setNewProjectData({...newProjectData, unitCount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
-              <label>成本金額<input type="number" value={newProjectData.cost} onChange={(e) => setNewProjectData({...newProjectData, cost: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
-              <label>報價金額<input type="number" value={newProjectData.quoteAmount} onChange={(e) => setNewProjectData({...newProjectData, quoteAmount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>成本金額（萬）<input type="number" step="0.1" value={newProjectData.cost} onChange={(e) => setNewProjectData({...newProjectData, cost: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
+              <label>報價金額（萬）<input type="number" step="0.1" value={newProjectData.quoteAmount} onChange={(e) => setNewProjectData({...newProjectData, quoteAmount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <label>預計完工日<input type="date" value={newProjectData.expectedDate} onChange={(e) => setNewProjectData({...newProjectData, expectedDate: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <div className="flex items-end"><button disabled={savingProject || !newProjectData.projectName} className="w-full bg-emerald-600 text-white rounded p-1.5 font-bold">{savingProject ? "儲存中" : "儲存案場"}</button></div>
             </div>
@@ -339,7 +342,7 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3"><span className={`px-2 py-1 rounded-full font-bold ${p.trafficLight.color==="RED"?"bg-red-100 text-red-700":p.trafficLight.color==="YELLOW"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>● {p.trafficLight.label}</span></td>
                 <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
-                <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
+                <td className="p-3">{formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
                 <td className="p-3 font-bold text-slate-700">{PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}</td>
                 <td className="p-3 font-bold">{p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}</td>
                 <td className="p-3">{(p.activeMilestone?.plannedDueDate || p.expectedDate)?.slice(0, 10)}</td>

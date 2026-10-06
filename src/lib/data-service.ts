@@ -20,7 +20,19 @@ const projectInclude = {
   salesRep: true,
   salesAssistant: true,
 } as const;
-const milestoneInclude = { assignedTo: true } as const;
+const milestoneInclude = {
+  assignedTo: true,
+  project: {
+    select: {
+      customer: {
+        select: {
+          salesRepId: true,
+          salesRep: { select: { name: true } },
+        },
+      },
+    },
+  },
+} as const;
 const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
 const customerTypeForDatabase = (type: string): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
 
@@ -206,7 +218,9 @@ export const DataService = {
         id: m.id, projectId: m.projectId, stageCode: m.stageCode as MilestoneStageCode, phase: m.phase as any, stageOrder: m.stageOrder,
         plannedDueDate: dateOnlyValue(m.plannedDueDate), actualDueDate: dateOnlyValue(m.actualDueDate), status: m.status,
         priority: m.priority,
-        assignedToId: m.assignedToId, assignedToName: m.assignedTo?.name, attachments: m.attachments, notes: m.notes,
+        assignedToId: m.assignedToId || m.project.customer.salesRepId,
+        assignedToName: m.assignedTo?.name || m.project.customer.salesRep.name,
+        attachments: m.attachments, notes: m.notes,
       });
       result[m.projectId] = list;
     }
@@ -363,6 +377,12 @@ export const DataService = {
     const isWrapUp = stageCode === "X-1";
 
     await prisma.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { customer: { select: { salesRepId: true } } },
+      });
+      if (!project) throw new Error("查無此案場資料");
+
       const existingMilestone = await tx.projectMilestone.findFirst({
         where: { projectId, stageCode },
       });
@@ -381,6 +401,7 @@ export const DataService = {
             plannedDueDate: isWrapUp ? plannedDueDate : undefined,
             actualDueDate: isWrapUp ? null : actualDueDate,
             notes: reason,
+            assignedToId: existingMilestone.assignedToId || project.customer.salesRepId,
           },
         });
       } else {
@@ -394,6 +415,7 @@ export const DataService = {
             plannedDueDate: isWrapUp ? plannedDueDate : null,
             actualDueDate: isWrapUp ? null : actualDueDate,
             notes: reason,
+            assignedToId: project.customer.salesRepId,
           },
         });
       }
