@@ -369,16 +369,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           {workflowError && <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{workflowError}</p>}
           {activePhase === "EXTRA" && (
             <div className="mb-3 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSpecialAdvanceError("");
-                  setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
-                }}
-                className="w-full rounded-xl border bg-amber-50 p-3 text-left text-sm font-bold text-amber-800 hover:bg-amber-100"
-              >
-                收尾
-              </button>
+              {project?.currentStage !== "WRAP_UP" && project?.currentStage !== "LOST" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpecialAdvanceError("");
+                    setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
+                  }}
+                  className="w-full rounded-xl border bg-amber-50 p-3 text-left text-sm font-bold text-amber-800 hover:bg-amber-100"
+                >
+                  收尾
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -423,7 +425,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         <option value="LOW">低</option>
                       </select>
                     </label>
-                    <label>{m.stageCode.startsWith("X-") ? "推進原因 *" : "備註"} <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
+                    <label>{m.stageCode === "X-2" ? "推進原因 *" : m.stageCode === "X-1" ? "備註 *" : "備註"} <input type="text" value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} className="border w-full p-1"/></label>
                   </div>
                   {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
                   <button onClick={() => handleSaveEdit(m.id)} disabled={saving || (m.stageCode.startsWith("X-") && !editForm.notes.trim())} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">儲存</button>

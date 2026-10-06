@@ -410,6 +410,34 @@ export const DataService = {
     return this.getMilestonesByProjectId(projectId);
   },
 
+  async activateLegacyWrapUpMilestone(projectId: string) {
+    await prisma.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { currentStage: true },
+      });
+      if (project?.currentStage !== ProjectStage.WRAP_UP) return;
+
+      const milestone = await tx.projectMilestone.findFirst({
+        where: { projectId, stageCode: "X-1", status: MilestoneStatus.COMPLETED, plannedDueDate: null },
+      });
+      if (!milestone) return;
+
+      const plannedDueDate = new Date();
+      plannedDueDate.setDate(plannedDueDate.getDate() + MILESTONE_DEFAULT_DAYS["X-1"]);
+      await tx.projectMilestone.update({
+        where: { id: milestone.id },
+        data: {
+          status: MilestoneStatus.IN_PROGRESS,
+          plannedDueDate,
+          actualDueDate: null,
+        },
+      });
+    });
+
+    return this.getMilestonesByProjectId(projectId);
+  },
+
   async completeWrapUpMilestone(
     projectId: string,
     milestoneId: string,

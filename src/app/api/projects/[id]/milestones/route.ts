@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
-    const [projectRecord, milestones] = await Promise.all([
+    const [projectRecord, initialMilestones] = await Promise.all([
       DataService.getProjectById(projectId, { evaluateSchedule: false }),
       DataService.getMilestonesByProjectId(projectId),
     ]);
@@ -23,6 +23,9 @@ export async function GET(
     if (!projectRecord) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
+    const milestones = projectRecord.currentStage === "WRAP_UP"
+      ? await DataService.activateLegacyWrapUpMilestone(projectId)
+      : initialMilestones;
     const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
     const project = { ...projectRecord, isDelayed: projectRecord.isDelayed || isDelayed };
 
