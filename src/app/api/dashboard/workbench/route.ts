@@ -52,13 +52,15 @@ export async function GET(req: NextRequest) {
       myProjects.map(async (p) => {
         const milestones = milestonesByProject[p.id] || [];
 
-        const specialStageCode = p.currentStage === "WRAP_UP" ? "X-1" : p.currentStage === "LOST" ? "X-2" : null;
-        const activeMilestone = specialStageCode
-          ? milestones.find((m) => m.stageCode === specialStageCode)
-          : milestones.find((m) => m.status === "OVERDUE") ||
-            milestones.find((m) => m.status === "IN_PROGRESS") ||
-            milestones.find((m) => m.status === "PENDING") ||
-            milestones[milestones.length - 1];
+        const specialStageCode = p.currentStage === "WRAP_UP" ? "X-1" : null;
+        const activeMilestone = p.currentStage === "LOST"
+          ? null
+          : specialStageCode
+            ? milestones.find((m) => m.stageCode === specialStageCode)
+            : milestones.find((m) => m.status === "OVERDUE") ||
+              milestones.find((m) => m.status === "IN_PROGRESS") ||
+              milestones.find((m) => m.status === "PENDING") ||
+              milestones[milestones.length - 1];
 
         // 月份篩選：若指定月份，比對 activeMilestone.plannedDueDate
         if (monthFilter && activeMilestone?.plannedDueDate) {

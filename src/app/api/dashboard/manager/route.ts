@@ -100,9 +100,10 @@ export async function GET(req: NextRequest) {
     const filteredProjects = monthFilter
       ? projects.filter((p) => {
           const milestones = milestonesByProject[p.id] || [];
-          const activeMilestone =
-            milestones.find((m) => m.status === "IN_PROGRESS") ||
-            milestones.find((m) => m.status === "OVERDUE");
+          const activeMilestone = p.currentStage === "LOST"
+            ? null
+            : milestones.find((m) => m.status === "IN_PROGRESS") ||
+              milestones.find((m) => m.status === "OVERDUE");
           const dateToCheck = activeMilestone?.plannedDueDate || p.expectedDate || "";
           return dateToCheck.startsWith(monthFilter);
         })
@@ -110,9 +111,10 @@ export async function GET(req: NextRequest) {
 
     const allProjectsOverview = filteredProjects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
-      const activeMilestone =
-        milestones.find((m) => m.status === "OVERDUE") ||
-        milestones.find((m) => m.status === "IN_PROGRESS");
+      const activeMilestone = p.currentStage === "LOST"
+        ? null
+        : milestones.find((m) => m.status === "OVERDUE") ||
+          milestones.find((m) => m.status === "IN_PROGRESS");
       const trafficLight = activeMilestone
         ? ScheduleEngine.getTrafficLight(activeMilestone)
         : { color: "GRAY" as const, label: "無進行中項目", daysDiff: 0 };
@@ -134,7 +136,7 @@ export async function GET(req: NextRequest) {
         unitCount: p.unitCount,
         totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
         activeMilestoneName: p.currentStage === "LOST"
-          ? "流標"
+          ? null
           : activeMilestone
           ? MILESTONE_STAGE_LABELS[activeMilestone.stageCode]
           : "完結",

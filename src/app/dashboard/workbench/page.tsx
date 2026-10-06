@@ -323,7 +323,7 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
                 <td className="p-3">NT$ {p.totalAmount || p.quoteAmount || 0}<br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
                 <td className="p-3 font-bold text-slate-700">{PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}</td>
-                <td className="p-3 font-bold">{p.currentStage === "LOST" ? "流標" : p.activeMilestone?.stageName || "完結"}</td>
+                <td className="p-3 font-bold">{p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}</td>
                 <td className="p-3">{(p.activeMilestone?.plannedDueDate || p.expectedDate)?.slice(0, 10)}</td>
                 <td className="p-3 flex gap-2 justify-center">
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>

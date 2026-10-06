@@ -231,7 +231,7 @@ export default function ManagerDashboardPage() {
                 <td className="p-3 font-bold">{p.projectName}</td>
                 <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
                 <td className="p-3 font-bold text-slate-700">
-                  {p.currentStageLabel} - {p.activeMilestoneName}
+                  {p.currentStage === "LOST" ? p.currentStageLabel : `${p.currentStageLabel} - ${p.activeMilestoneName}`}
                   {p.unassignedNextMilestoneName && (
                     <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-black text-red-700">
                       <AlertCircle className="h-3.5 w-3.5" />

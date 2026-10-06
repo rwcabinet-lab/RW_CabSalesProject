@@ -274,7 +274,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   if (loading) return <div className="p-16 text-center">載入詳細資料中...</div>;
 
   const phaseGroups: Record<MilestonePhase, MilestoneWithLight[]> = { CONTACT: [], DESIGN: [], PRODUCTION: [], EXTRA: [] };
-  milestones.forEach(m => phaseGroups[m.phase]?.push(m));
+  milestones.forEach((milestone) => {
+    if (milestone.stageCode !== "X-2") phaseGroups[milestone.phase]?.push(milestone);
+  });
 
   const phaseProgress = (phase: MilestonePhase) => {
     const ms = phaseGroups[phase];
