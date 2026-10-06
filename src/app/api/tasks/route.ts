@@ -5,12 +5,26 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") || undefined;
-    const assignedToId = searchParams.get("assignedToId") || undefined;
+    let assignedToId = searchParams.get("assignedToId") || undefined;
     const isCompletedParam = searchParams.get("isCompleted");
 
     let isCompleted: boolean | undefined = undefined;
     if (isCompletedParam === "true") isCompleted = true;
     if (isCompletedParam === "false") isCompleted = false;
+
+    if (isCompleted) {
+      const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+      if (!sessionUserId) {
+        return NextResponse.json({ error: "請先登入" }, { status: 401 });
+      }
+
+      const user = await DataService.getUserById(sessionUserId);
+      if (!user) {
+        return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
+      }
+
+      assignedToId = user.id;
+    }
 
     const tasks = await DataService.getTasks({
       projectId,
