@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Clock, ShieldAlert, CheckCircle2, ChevronRight, Calendar, ArrowRight } from "lucide-react";
+import type { ProjectWithMilestonesDTO } from "@/types/dto";
 
 interface GanttProps {
-  projects: any[];
+  projects: ProjectWithMilestonesDTO[];
 }
 
 export function GanttChart({ projects }: GanttProps) {
@@ -99,7 +100,7 @@ export function GanttChart({ projects }: GanttProps) {
 
                 {/* 五大里程碑甘特長條 */}
                 <div className="space-y-2 pl-2">
-                  {project.milestones.map((m: any) => {
+                  {project.milestones.map((m) => {
                     const plannedLeft = getOffsetPercent(m.plannedStart);
                     const plannedWidth = getWidthPercent(m.plannedStart, m.plannedEnd);
 

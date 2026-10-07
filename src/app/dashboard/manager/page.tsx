@@ -5,27 +5,14 @@ import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, TrendingUp, Sparkl
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
-
-interface ManagerDashboardData {
-  kpi: { totalProjects: number; signedTotal: number; conversionRate: number; delayedCount: number; };
-  alertList: any[];
-  salesWorkload: any[];
-  stageBottlenecks: any[];
-  allProjectsOverview: any[];
-}
-
-interface AssignableUser {
-  id: string;
-  name: string;
-  role: "SALES_MANAGER" | "SALES" | "ASSISTANT";
-}
+import type { AssignableUserDTO, ManagerDashboardDTO } from "@/types/dto";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 export default function ManagerDashboardPage() {
-  const [data, setData] = useState<ManagerDashboardData | null>(null);
-  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [data, setData] = useState<ManagerDashboardDTO | null>(null);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUserDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -49,8 +36,8 @@ export default function ManagerDashboardPage() {
         if (!res.ok) throw new Error("無法載入指派人員");
         return res.json();
       })
-      .then((users: { id: string; name: string; role: string }[]) => {
-        setAssignableUsers(users.filter((user): user is AssignableUser =>
+      .then((users: AssignableUserDTO[]) => {
+        setAssignableUsers(users.filter((user): user is AssignableUserDTO =>
           user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"
         ));
       })

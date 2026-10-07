@@ -1,4 +1,4 @@
-import { PrismaClient, MilestoneStatus, TaskPriority, TaskType } from "@prisma/client";
+import { PrismaClient, CustomerType, MilestoneStatus, PaymentTerms, ProjectStage, QuoteStatus, TaskPriority, TaskType } from "@prisma/client";
 import { 
   INITIAL_CUSTOMERS, INITIAL_PROJECTS, INITIAL_QUOTES, INITIAL_TASKS, INITIAL_MILESTONES 
 } from "./mock-data";
@@ -26,12 +26,12 @@ async function seedData() {
       data: {
         id: c.id,
         name: c.name,
-        customerType: c.customerType === "PR" ? "CONTRACTOR" : c.customerType as any,
+        customerType: c.customerType === "PR" ? "CONTRACTOR" : c.customerType as CustomerType,
         taxId: c.taxId,
         phone: c.phone,
         address: c.address,
         defaultDiscount: c.defaultDiscount,
-        paymentTerms: c.paymentTerms as any,
+        paymentTerms: c.paymentTerms as PaymentTerms,
         salesRepId: "u3",
       }
     });
@@ -48,7 +48,7 @@ async function seedData() {
         siteCondition: p.siteCondition,
         salesRepId: p.salesRepId,
         salesAssistantId: p.salesAssistantId,
-        currentStage: p.currentStage as any,
+        currentStage: p.currentStage as ProjectStage,
         isDelayed: p.isDelayed,
         expectedDate: p.expectedDate ? new Date(p.expectedDate) : null,
         estimatedBudget: p.estimatedBudget,
@@ -71,7 +71,7 @@ async function seedData() {
           quoteFileUrl: q.quoteFileUrl,
           notes: q.notes,
           totalAmount: q.totalAmount,
-          status: q.status as any,
+          status: q.status as QuoteStatus,
         }
       });
     }

@@ -1,8 +1,20 @@
-import { CustomerType, MilestoneStatus, Prisma, ProjectStage, Role, TaskPriority, TaskType } from "@prisma/client";
+import { CustomerType, MilestoneStatus, PaymentTerms, Prisma, ProjectStage, Role, TaskPriority, TaskType } from "@prisma/client";
 import { prisma } from "./prisma";
+import type {
+  CustomerCreateDTO,
+  CustomerDTO as CustomerItem,
+  CustomerTypeDTO,
+  CustomerUpdateDTO,
+  MilestoneDTO as ProjectMilestoneItem,
+  MilestonePhaseDTO,
+  MilestoneStageCodeDTO as MilestoneStageCode,
+  ProjectDTO as ProjectDetail,
+  QuoteVersionCreateDTO,
+  TaskDTO as SalesTaskItem,
+} from "@/types/dto";
 import {
-  CustomerItem, MasterBoardItem, MasterHardwareItem, MasterProcessingItem, ProjectDetail,
-  ProjectMilestoneItem, QuotationData, SalesTaskItem, MilestoneStageCode, MILESTONE_STAGE_LABELS, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
+  MasterBoardItem, MasterHardwareItem, MasterProcessingItem, QuotationData,
+  MILESTONE_STAGE_LABELS, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
 } from "./mock-data";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
 
@@ -34,7 +46,7 @@ const milestoneInclude = {
   },
 } as const;
 const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
-const customerTypeForDatabase = (type: string): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
+const customerTypeForDatabase = (type: CustomerTypeDTO): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
 
 export const DataService = {
   async getCatalog(): Promise<{ boards: MasterBoardItem[]; hardware: MasterHardwareItem[]; processing: MasterProcessingItem[] }> {
@@ -215,7 +227,7 @@ export const DataService = {
     for (const m of ms) {
       const list = result[m.projectId] || [];
       list.push({
-        id: m.id, projectId: m.projectId, stageCode: m.stageCode as MilestoneStageCode, phase: m.phase as any, stageOrder: m.stageOrder,
+        id: m.id, projectId: m.projectId, stageCode: m.stageCode as MilestoneStageCode, phase: m.phase as MilestonePhaseDTO, stageOrder: m.stageOrder,
         plannedDueDate: dateOnlyValue(m.plannedDueDate), actualDueDate: dateOnlyValue(m.actualDueDate), status: m.status,
         priority: m.priority,
         assignedToId: m.assignedToId || m.project.customer.salesRepId,
@@ -617,27 +629,24 @@ export const DataService = {
     };
   },
 
-  async addCustomer(data: any) {
+  async addCustomer(data: CustomerCreateDTO) {
     const c = await prisma.customer.create({ data: { ...data, paymentTerms: data.paymentTerms || "MONTHLY_30", customerType: customerTypeForDatabase(data.customerType || "DESIGNER") } });
     return this.getCustomerById(c.id);
   },
 
-  async updateCustomer(id: string, data: {
-    name: string; customerType: string; taxId?: string; phone: string; address?: string;
-    defaultDiscount: number; paymentTerms: string; salesRepId: string;
-  }) {
+  async updateCustomer(id: string, data: CustomerUpdateDTO) {
     await prisma.customer.update({
       where: { id },
       data: {
         name: data.name, customerType: customerTypeForDatabase(data.customerType), taxId: data.taxId || null,
         phone: data.phone, address: data.address || null, defaultDiscount: data.defaultDiscount,
-        paymentTerms: data.paymentTerms as any, salesRepId: data.salesRepId,
+        paymentTerms: data.paymentTerms as PaymentTerms, salesRepId: data.salesRepId,
       },
     });
     return this.getCustomerById(id);
   },
 
-  async addQuoteVersion(projectId: string, data: any) {
+  async addQuoteVersion(projectId: string, data: QuoteVersionCreateDTO) {
     return prisma.quotation.create({ data: { projectId, ...data } });
   },
 

@@ -17,11 +17,11 @@ import {
   ArrowRight,
   GripVertical,
 } from "lucide-react";
-import { ProjectDetail } from "@/lib/mock-data";
+import type { ProjectWithMilestonesDTO } from "@/types/dto";
 import { formatTenThousands } from "@/lib/currency";
 
 interface KanbanProps {
-  projects: any[];
+  projects: ProjectWithMilestonesDTO[];
   onProjectStageChange: (projectId: string, newStage: string, reason?: string) => Promise<boolean>;
 }
 

@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, MapPin, User } from "lucide-react";
-import { SalesTaskItem } from "@/lib/mock-data";
+import type { CalendarEventDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 
 interface CalendarProps {
-  projects: any[];
-  tasks: SalesTaskItem[];
+  projects: ProjectWithMilestonesDTO[];
+  tasks: TaskDTO[];
 }
 
 export function CalendarView({ projects, tasks }: CalendarProps) {
   const [selectedMonth, setSelectedMonth] = useState("2026 年 09 月");
-  const [activeEvent, setActiveEvent] = useState<any | null>(null);
+  const [activeEvent, setActiveEvent] = useState<CalendarEventDTO | null>(null);
 
   // 整理 2026 年 9 月的日期陣列 (9/1 是週二，前面補 2 天空檔，共 30 天)
   const daysInMonth = Array.from({ length: 30 }, (_, i) => i + 1);
@@ -25,7 +25,7 @@ export function CalendarView({ projects, tasks }: CalendarProps) {
     const dayTasks = tasks.filter((t) => t.dueDatetime.startsWith(dateStr));
 
     // 2. 里程碑完成日事件
-    const dayMilestones: any[] = [];
+    const dayMilestones: CalendarEventDTO[] = [];
     for (const p of projects) {
       for (const m of p.milestones) {
         if (m.plannedEnd === dateStr) {
@@ -211,7 +211,7 @@ export function CalendarView({ projects, tasks }: CalendarProps) {
                 <div>
                   <span className="text-slate-400 font-semibold block">時間:</span>
                   <span className="font-medium text-slate-800">
-                    {activeEvent.plannedEnd || new Date(activeEvent.dueDatetime).toLocaleString("zh-TW")}
+                    {activeEvent.plannedEnd || new Date(activeEvent.dueDatetime as string).toLocaleString("zh-TW")}
                   </span>
                 </div>
                 <div>

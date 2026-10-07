@@ -5,11 +5,12 @@ import { Kanban, BarChart3, Calendar, RefreshCw, Sparkles, Layers, ShieldAlert }
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
+import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 
 export default function VisualViewsPage() {
   const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
-  const [projects, setProjects] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectWithMilestonesDTO[]>([]);
+  const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

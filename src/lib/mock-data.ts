@@ -1,3 +1,21 @@
+import type {
+  CustomerDTO as CustomerItem,
+  MilestonePhaseDTO as MilestonePhase,
+  MilestoneStageCodeDTO as MilestoneStageCode,
+  MilestoneDTO as ProjectMilestoneItem,
+  ProjectDTO as ProjectDetail,
+  TaskDTO as SalesTaskItem,
+} from "@/types/dto";
+
+export type {
+  CustomerDTO as CustomerItem,
+  MilestonePhaseDTO as MilestonePhase,
+  MilestoneStageCodeDTO as MilestoneStageCode,
+  MilestoneDTO as ProjectMilestoneItem,
+  ProjectDTO as ProjectDetail,
+  TaskDTO as SalesTaskItem,
+} from "@/types/dto";
+
 export interface MasterBoardItem {
   id: string;
   brand: string;
@@ -23,30 +41,6 @@ export interface MasterProcessingItem {
   retailPrice: number;
 }
 
-export interface CustomerItem {
-  id: string;
-  customerType:
-    | "LONGMEI_STORE"
-    | "CABINET_FACTORY"
-    | "DESIGN_COMPANY"
-    | "DEALER_COMPANY"
-    | "CONSTRUCTION"
-    | "LABOR_MATERIAL"
-    | "INDIVIDUAL"
-    | "DESIGNER"
-    | "PR"
-    | "DEALER"
-    | "HOMEOWNER";
-  name: string;
-  taxId?: string;
-  phone: string;
-  address?: string;
-  defaultDiscount: number; // 如 0.85
-  paymentTerms: "CASH" | "MONTHLY_30" | "DEPOSIT_BALANCE";
-  salesRepId: string;
-  salesRepName?: string;
-}
-
 /** 簡易報價版本紀錄 — 計算已在外部系統完成，本系統僅登記結果 */
 export interface QuotationData {
   id: string;
@@ -65,43 +59,6 @@ export interface QuotationData {
   createdAt: string;
   updatedAt: string;
 }
-
-export interface ProjectDetail {
-  id: string;
-  projectName: string;
-  customerId: string;
-  customerName: string;
-  customerType: string;
-  defaultDiscount: number;
-  siteAddress: string;
-  siteCondition?: string;
-  salesRepId: string;
-  salesRepName: string;
-  customerSalesRepId?: string;
-  customerSalesRepName?: string;
-  salesAssistantId?: string;
-  salesAssistantName?: string;
-  currentStage: string;
-  isDelayed: boolean;
-  expectedDate?: string;
-  estimatedBudget?: number;
-  /** 戶數（例如：1戶、2戶） */
-  unitCount?: number;
-  /** 成本金額 (NT$) */
-  cost?: number;
-  /** 業務報價金額 (NT$)，與 estimatedBudget 同步 */
-  quoteAmount?: number;
-}
-
-/** 里程碑所屬大階段 */
-export type MilestonePhase = "CONTACT" | "DESIGN" | "PRODUCTION" | "EXTRA";
-
-/** 所有子進度代碼 */
-export type MilestoneStageCode =
-  | "1-1" | "1-2" | "1-3" | "1-4" | "1-5"
-  | "2-1" | "2-2" | "2-3" | "2-4"
-  | "3-1" | "3-2" | "3-3" | "3-4" | "3-5"
-  | "X-1" | "X-2";
 
 /** 各子進度的顯示名稱 */
 export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
@@ -161,44 +118,6 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "3-1": "PRODUCTION", "3-2": "PRODUCTION", "3-3": "PRODUCTION", "3-4": "PRODUCTION", "3-5": "PRODUCTION",
   "X-1": "EXTRA", "X-2": "EXTRA",
 };
-
-export interface ProjectMilestoneItem {
-  id: string;
-  projectId: string;
-  /** 子進度代碼，例如 "1-1"、"3-2" */
-  stageCode: MilestoneStageCode;
-  /** 所屬大階段 */
-  phase: MilestonePhase;
-  /** 全局排序順序 */
-  stageOrder: number;
-  /** 預定完成日 */
-  plannedDueDate?: string | null;
-  /** 實際完成日 */
-  actualDueDate?: string | null;
-  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
-  priority?: "HIGH" | "MEDIUM" | "LOW";
-  assignedToId?: string | null;
-  assignedToName?: string | null;
-  attachments?: string | null;
-  notes?: string | null;
-}
-
-export interface SalesTaskItem {
-  id: string;
-  projectId: string;
-  projectName?: string;
-  assignedToId: string;
-  assignedToName?: string;
-  assignedByName?: string | null;
-  milestoneId?: string | null;
-  taskType: "SITE_VISIT" | "DRAWING" | "QUOTE_FOLLOWUP" | "PAYMENT_REMINDER";
-  subject: string;
-  dueDatetime: string;
-  priority: "HIGH" | "MEDIUM" | "LOW";
-  isCompleted: boolean;
-  resultNotes?: string | null;
-  completedAt?: string | null;
-}
 
 // ----------------------------------------------------------------
 // 初始種子資料

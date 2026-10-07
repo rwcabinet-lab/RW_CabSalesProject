@@ -21,10 +21,11 @@ import {
   SalesTaskItem,
   STAGE_CODE_TO_PHASE,
 } from "@/lib/mock-data";
+import type { TrafficLightDTO } from "@/types/dto";
 import { formatTenThousands } from "@/lib/currency";
 
 interface MilestoneWithLight extends ProjectMilestoneItem {
-  trafficLight: { color: string; label: string; daysDiff: number };
+  trafficLight: TrafficLightDTO;
 }
 
 const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
