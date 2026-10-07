@@ -11,48 +11,25 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react";
-import { CustomerItem, SalesTaskItem, PROJECT_STAGE_LABELS } from "@/lib/mock-data";
+import { PROJECT_STAGE_LABELS } from "@/lib/mock-data";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
+import type {
+  ApiResponse,
+  CustomerDTO,
+  TaskDTO,
+  WorkbenchDashboardDTO,
+  WorkbenchProjectDTO,
+} from "@/types/dto";
 
 const getDefaultTaskDueDatetime = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
-interface WorkbenchProject {
-  id: string;
-  projectName: string;
-  customerId: string;
-  customerName: string;
-  customerType: string;
-  defaultDiscount: number;
-  siteCondition: string;
-  expectedDate: string;
-  currentStage: string;
-  siteAddress: string;
-  isDelayed: boolean;
-  totalAmount: number | null;
-  unitCount?: number;
-  cost?: number;
-  quoteAmount?: number;
-  activeMilestone: {
-    id: string;
-    phase: "CONTACT" | "DESIGN" | "PRODUCTION" | "EXTRA";
-    stageName: string;
-    plannedDueDate: string;
-    status: string;
-  } | null;
-  trafficLight: {
-    color: "RED" | "YELLOW" | "GREEN" | "GRAY";
-    label: string;
-    daysDiff: number;
-  };
-}
-
 export default function SalesWorkbenchPage() {
-  const [projects, setProjects] = useState<WorkbenchProject[]>([]);
-  const [tasks, setTasks] = useState<SalesTaskItem[]>([]);
+  const [projects, setProjects] = useState<WorkbenchProjectDTO[]>([]);
+  const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [currentUser, setCurrentUser] = useState({ id: "", name: "使用者", role: "SALES" });
   const [loading, setLoading] = useState(true);
-  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
 
   // 篩選條件
   const [monthFilter, setMonthFilter] = useState("");
@@ -71,7 +48,7 @@ export default function SalesWorkbenchPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [newTaskData, setNewTaskData] = useState({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: getDefaultTaskDueDatetime(), priority: "HIGH" });
   const [creatingTask, setCreatingTask] = useState(false);
-  const [taskToComplete, setTaskToComplete] = useState<SalesTaskItem | null>(null);
+  const [taskToComplete, setTaskToComplete] = useState<TaskDTO | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [completionDate, setCompletionDate] = useState(
     new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
@@ -87,7 +64,7 @@ export default function SalesWorkbenchPage() {
   const fetchCustomers = async () => {
     try {
       const res = await fetch("/api/customers");
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<CustomerDTO[]>;
       if (Array.isArray(data)) setCustomers(data);
     } catch (err) {
       console.error(err);
@@ -98,7 +75,7 @@ export default function SalesWorkbenchPage() {
     try {
       setLoading(true);
       const res = await fetch("/api/dashboard/workbench");
-      const json = await res.json();
+      const json = await res.json() as ApiResponse<WorkbenchDashboardDTO>;
       if (json.currentUser) setCurrentUser(json.currentUser);
       if (Array.isArray(json.myProjects)) setProjects(json.myProjects);
       if (Array.isArray(json.tasks)) setTasks(json.tasks);
@@ -126,7 +103,7 @@ export default function SalesWorkbenchPage() {
           completedAt: completionDate,
         }),
       });
-      const result = await res.json();
+      const result = await res.json() as ApiResponse<{ success: boolean; task: TaskDTO }>;
       if (!res.ok) {
         setCompletionError(result.error || "完成待辦失敗，請稍後再試");
         return;
@@ -193,7 +170,7 @@ export default function SalesWorkbenchPage() {
     setIsProjectPanelOpen(true);
   };
 
-  const openEditProject = (p: WorkbenchProject) => {
+  const openEditProject = (p: WorkbenchProjectDTO) => {
     setEditingProjectId(p.id);
     setNewProjectData({
       projectName: p.projectName, customerId: p.customerId, siteAddress: p.siteAddress, siteCondition: p.siteCondition,

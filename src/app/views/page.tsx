@@ -5,7 +5,7 @@ import { Kanban, BarChart3, Calendar } from "lucide-react";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
-import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
+import type { ApiResponse, ProjectWithMilestonesDTO, TaskDTO, ViewsDataDTO } from "@/types/dto";
 
 export default function VisualViewsPage() {
   const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
@@ -23,7 +23,7 @@ export default function VisualViewsPage() {
       setLoading(true);
       setLoadError("");
       const res = await fetch("/api/views/data", { cache: "no-store" });
-      const json = await res.json();
+      const json = await res.json() as ApiResponse<ViewsDataDTO>;
       if (!res.ok) {
         throw new Error(json.error || "無法取得可視化資料");
       }

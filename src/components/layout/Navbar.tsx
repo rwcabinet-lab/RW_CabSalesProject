@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings } from "lucide-react";
 import { PageAccessKey } from "@/lib/page-access";
+import type { ApiResponse } from "@/types/dto";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "業務工作台", icon: LayoutDashboard },
@@ -26,7 +27,16 @@ export function Navbar() {
 
   useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
+      .then((response) => response.ok
+        ? response.json() as Promise<ApiResponse<{
+            user: {
+              id: string;
+              name: string;
+              role: string;
+              accessiblePages: PageAccessKey[];
+            } | null;
+          }>>
+        : null)
       .then((data) => setUser(data?.user || null))
       .catch(() => setUser(null));
   }, []);

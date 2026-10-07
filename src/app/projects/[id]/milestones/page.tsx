@@ -12,19 +12,24 @@ import {
   X,
 } from "lucide-react";
 import {
-  ProjectMilestoneItem,
-  MilestonePhase,
   MILESTONE_STAGE_LABELS,
   PHASE_LABELS,
   PROJECT_STAGE_LABELS,
-  ProjectDetail,
-  SalesTaskItem,
   STAGE_CODE_TO_PHASE,
 } from "@/lib/mock-data";
-import type { TrafficLightDTO } from "@/types/dto";
+import type {
+  ApiResponse,
+  MilestoneDTO,
+  MilestoneDetailsDTO,
+  MilestonePhaseDTO,
+  ProjectDTO,
+  TaskDTO,
+  TrafficLightDTO,
+  UserDTO,
+} from "@/types/dto";
 import { formatTenThousands } from "@/lib/currency";
 
-interface MilestoneWithLight extends ProjectMilestoneItem {
+interface MilestoneWithLight extends MilestoneDTO {
   trafficLight: TrafficLightDTO;
 }
 
@@ -34,37 +39,31 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = 
   OVERDUE:     { label: "已逾期",    bg: "bg-red-100",     text: "text-red-800" },
   PENDING:     { label: "待開始",    bg: "bg-slate-100",   text: "text-slate-600" },
 };
-const PRIORITY_LABELS: Record<NonNullable<ProjectMilestoneItem["priority"]>, string> = {
+const PRIORITY_LABELS: Record<NonNullable<MilestoneDTO["priority"]>, string> = {
   HIGH: "高",
   MEDIUM: "中",
   LOW: "低",
 };
 
-const PHASE_ORDER: MilestonePhase[] = ["CONTACT", "DESIGN", "PRODUCTION", "EXTRA"];
+const PHASE_ORDER: MilestonePhaseDTO[] = ["CONTACT", "DESIGN", "PRODUCTION", "EXTRA"];
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-
-interface MilestoneAssignee {
-  id: string;
-  name: string;
-  role: string;
-}
 
 export default function MilestonesPage({ params }: { params: { id: string } }) {
   const projectId = params.id;
   const router = useRouter();
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [projects, setProjects] = useState<ProjectDetail[]>([]);
-  const [assignees, setAssignees] = useState<MilestoneAssignee[]>([]);
+  const [project, setProject] = useState<ProjectDTO | null>(null);
+  const [projects, setProjects] = useState<ProjectDTO[]>([]);
+  const [assignees, setAssignees] = useState<UserDTO[]>([]);
   const [canManageMilestones, setCanManageMilestones] = useState(false);
-  const [pendingTasks, setPendingTasks] = useState<SalesTaskItem[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<TaskDTO[]>([]);
   const [pendingTasksError, setPendingTasksError] = useState("");
-  const [completedTasks, setCompletedTasks] = useState<SalesTaskItem[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<TaskDTO[]>([]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [completedTasksError, setCompletedTasksError] = useState("");
-  const [activePhase, setActivePhase] = useState<MilestonePhase>("CONTACT");
+  const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("CONTACT");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -91,7 +90,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     fetchProjects();
     fetchAssignees();
     fetch("/api/auth/session")
-      .then((response) => response.json())
+      .then((response) => response.json() as Promise<ApiResponse<{ user: { role?: string } | null }>>)
       .then((data) => {
         const role = data.user?.role;
         setCanManageMilestones(role === "ADMIN" || role === "LEVEL_MANAGER" || role === "SALES_MANAGER");
@@ -102,7 +101,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const fetchProjects = async () => {
     try {
       const res = await fetch("/api/projects");
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<ProjectDTO[]>;
       if (Array.isArray(data)) setProjects(data);
     } catch (err) {
       console.error(err);
@@ -112,7 +111,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const fetchAssignees = async () => {
     try {
       const res = await fetch("/api/auth/users");
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<UserDTO[]>;
       if (Array.isArray(data)) {
         setAssignees(data.filter((user) => user.role === "SALES" || user.role === "ASSISTANT"));
       }
@@ -135,7 +134,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (milestonesResult.status === "rejected") throw milestonesResult.reason;
 
       const milestonesResponse = milestonesResult.value;
-      const data = await milestonesResponse.json();
+      const data = await milestonesResponse.json() as ApiResponse<MilestoneDetailsDTO>;
       if (!milestonesResponse.ok) {
         throw new Error(data.error || "無法載入案件里程碑");
       }
@@ -159,14 +158,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         try {
           const tasksResponse = pendingTasksResult.value;
-          const tasksData = await tasksResponse.json();
+          const tasksData = await tasksResponse.json() as ApiResponse<TaskDTO[]>;
           if (!tasksResponse.ok) {
             throw new Error(tasksData.error || "無法載入待辦事項");
           }
           if (!Array.isArray(tasksData)) {
             throw new Error("待辦事項資料格式無效");
           }
-          setPendingTasks(tasksData.filter((task: SalesTaskItem) => !task.isCompleted && !task.milestoneId));
+          setPendingTasks(tasksData.filter((task) => !task.isCompleted && !task.milestoneId));
         } catch (error) {
           console.error("Failed to load pending project tasks:", error);
           setPendingTasks([]);
@@ -183,14 +182,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         try {
           const tasksResponse = tasksResult.value;
-          const tasksData = await tasksResponse.json();
+          const tasksData = await tasksResponse.json() as ApiResponse<TaskDTO[]>;
           if (!tasksResponse.ok) {
             throw new Error(tasksData.error || "無法載入已完成待辦");
           }
           if (!Array.isArray(tasksData)) {
             throw new Error("已完成待辦資料格式無效");
           }
-          setCompletedTasks(tasksData.filter((task: SalesTaskItem) => !task.milestoneId));
+          setCompletedTasks(tasksData.filter((task) => !task.milestoneId));
         } catch (error) {
           console.error("Failed to load completed tasks:", error);
           setCompletedTasks([]);
@@ -232,7 +231,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           },
         }),
       });
-      const result = await response.json();
+      const result = await response.json() as ApiResponse<{ success?: boolean }>;
       if (!response.ok) throw new Error(result.error || "儲存里程碑失敗");
       setEditingId(null);
       await fetchData();
@@ -259,7 +258,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           actualDueDate: advanceModal.actualDueDate,
         }),
       });
-      const result = await response.json();
+      const result = await response.json() as ApiResponse<{ success?: boolean }>;
       if (!response.ok) throw new Error(result.error || "完成里程碑失敗");
       setAdvanceModal({ open: false, milestoneId: "", milestoneName: "", actualDueDate: todayDate(), notes: "" });
       await fetchData();
@@ -278,7 +277,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "rollback", milestoneId }),
       });
-      const result = await response.json();
+      const result = await response.json() as ApiResponse<{ success?: boolean }>;
       if (!response.ok) throw new Error(result.error || "回退里程碑失敗");
       await fetchData();
     } catch (error) {
@@ -305,7 +304,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           reason: specialAdvanceModal.reason.trim(),
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<{ success?: boolean }>;
       if (!res.ok) {
         setSpecialAdvanceError(data.error || "推進失敗，請稍後再試");
         return;
@@ -329,7 +328,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "returnToProduction" }),
       });
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<{ success?: boolean; project?: ProjectDTO; milestones?: MilestoneDTO[] }>;
       if (!res.ok) {
         setSpecialAdvanceError(data.error || "返回第三階段失敗，請稍後再試");
         return;
@@ -347,13 +346,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   if (loading) return <div className="p-16 text-center">載入詳細資料中...</div>;
 
-  const phaseGroups: Record<MilestonePhase, MilestoneWithLight[]> = { CONTACT: [], DESIGN: [], PRODUCTION: [], EXTRA: [] };
+  const phaseGroups: Record<MilestonePhaseDTO, MilestoneWithLight[]> = { CONTACT: [], DESIGN: [], PRODUCTION: [], EXTRA: [] };
   milestones.forEach((milestone) => {
     const phase = STAGE_CODE_TO_PHASE[milestone.stageCode];
     if (phase && milestone.stageCode !== "X-2") phaseGroups[phase].push(milestone);
   });
 
-  const phaseProgress = (phase: MilestonePhase) => {
+  const phaseProgress = (phase: MilestonePhaseDTO) => {
     const ms = phaseGroups[phase];
     if (!ms.length) return 0;
     return Math.round((ms.filter((m) => m.status === "COMPLETED").length / ms.length) * 100);

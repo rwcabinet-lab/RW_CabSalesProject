@@ -5,7 +5,7 @@ import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, TrendingUp, Sparkl
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
-import type { AssignableUserDTO, ManagerDashboardDTO } from "@/types/dto";
+import type { ApiResponse, AssignableUserDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -34,7 +34,7 @@ export default function ManagerDashboardPage() {
     fetch("/api/auth/users")
       .then(async (res) => {
         if (!res.ok) throw new Error("無法載入指派人員");
-        return res.json();
+        return res.json() as Promise<ApiResponse<AssignableUserDTO[]>>;
       })
       .then((users: AssignableUserDTO[]) => {
         setAssignableUsers(users.filter((user): user is AssignableUserDTO =>
@@ -51,7 +51,7 @@ export default function ManagerDashboardPage() {
     try {
       setLoading(true);
       const res = await fetch(`/api/dashboard/manager${monthFilter ? `?month=${monthFilter}` : ""}`);
-      const json = await res.json();
+      const json = await res.json() as ApiResponse<ManagerDashboardDTO>;
       if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview)) {
         throw new Error(json.error || "無法取得主管看板資料");
       }
@@ -86,7 +86,7 @@ export default function ManagerDashboardPage() {
           dueDatetime: `${assignModal.dueDate}T00:00:00.000Z`,
         }),
       });
-      const result = await res.json();
+      const result = await res.json() as ApiResponse<{ task: TaskDTO }>;
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
       setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
       await fetchDashboardData();

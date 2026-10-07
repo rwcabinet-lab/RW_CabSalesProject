@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Building2, KeyRound, LogIn } from "lucide-react";
+import type { ApiResponse, UserDTO } from "@/types/dto";
 
-type LoginUser = { id: string; name: string; role: string };
+type LoginUser = UserDTO;
 
 export default function LoginPage() {
   const [users, setUsers] = useState<LoginUser[]>([]);
@@ -17,7 +18,7 @@ export default function LoginPage() {
     async function loadUsers() {
       try {
         const response = await fetch("/api/auth/users");
-        const data = await response.json();
+        const data = await response.json() as ApiResponse<LoginUser[]>;
         if (!response.ok) throw new Error(data.error || "無法載入使用者");
         setUsers(data);
         if (data.length > 0) setUserId(data[0].id);
@@ -40,7 +41,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, password }),
       });
-      const data = await response.json();
+      const data = await response.json() as ApiResponse<{ redirectTo?: string }>;
       if (!response.ok) throw new Error(data.error || "登入失敗");
       window.location.replace(data.redirectTo || "/forbidden");
     } catch (loginError) {

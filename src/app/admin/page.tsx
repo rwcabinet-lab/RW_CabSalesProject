@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Check, Pencil, Plus, Save, ShieldCheck, UserRound, X } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
+import type { ApiResponse } from "@/types/dto";
 
 type ManagedUser = { id: string; name: string; email: string; role: AppRole };
 type RolePermission = { role: AppRole; label: string; pages: PageAccessKey[] };
@@ -13,7 +14,7 @@ function roleLabel(role: string) {
 
 async function responseError(response: Response, fallback: string) {
   if (response.ok) return "";
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => ({} as ApiResponse<{ error?: string }>));
   return data.error || fallback;
 }
 
@@ -42,8 +43,8 @@ export default function AdminPage() {
       if (usersError) throw new Error(usersError);
       if (permissionsError) throw new Error(permissionsError);
       const [usersData, permissionsData] = await Promise.all([
-        usersResponse.json(),
-        permissionsResponse.json(),
+        usersResponse.json() as Promise<ApiResponse<ManagedUser[]>>,
+        permissionsResponse.json() as Promise<ApiResponse<{ roles: RolePermission[] }>>,
       ]);
       setUsers(usersData);
       setPermissions(permissionsData.roles);

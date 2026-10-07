@@ -39,6 +39,14 @@ export type TaskPriorityDTO = "HIGH" | "MEDIUM" | "LOW";
 export type TaskTypeDTO = "SITE_VISIT" | "DRAWING" | "QUOTE_FOLLOWUP" | "PAYMENT_REMINDER";
 export type QuoteStatusDTO = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
 
+export type ApiResponse<T> = T & { error?: string };
+
+export interface UserDTO {
+  id: string;
+  name: string;
+  role: string;
+}
+
 export interface CustomerDTO {
   id: string;
   customerType: CustomerTypeDTO;
@@ -89,6 +97,34 @@ export interface ProjectDTO {
   unitCount?: number;
   cost?: number;
   quoteAmount?: number;
+  totalAmount?: number | null;
+}
+
+export interface WorkbenchProjectDTO {
+  id: string;
+  projectName: string;
+  customerId: string;
+  customerName: string;
+  customerType: string;
+  defaultDiscount: number;
+  siteCondition: string;
+  expectedDate: string;
+  currentStage: string;
+  siteAddress: string;
+  isDelayed: boolean;
+  totalAmount: number | null;
+  unitCount?: number;
+  cost?: number;
+  quoteAmount?: number;
+  activeMilestone: {
+    id: string;
+    stageCode: MilestoneStageCodeDTO;
+    phase: MilestonePhaseDTO;
+    stageName: string;
+    plannedDueDate: string;
+    status: MilestoneStatusDTO;
+  } | null;
+  trafficLight: TrafficLightDTO;
 }
 
 export interface MilestoneDTO {
@@ -115,6 +151,11 @@ export interface ProjectWithMilestonesDTO extends ProjectDTO {
   milestones: MilestoneDTO[];
 }
 
+export interface MilestoneDetailsDTO {
+  project: ProjectDTO;
+  milestones: (MilestoneDTO & { trafficLight: TrafficLightDTO })[];
+}
+
 export interface TaskDTO {
   id: string;
   projectId: string;
@@ -130,6 +171,21 @@ export interface TaskDTO {
   isCompleted: boolean;
   resultNotes?: string | null;
   completedAt?: string | null;
+}
+
+export interface WorkbenchDashboardDTO {
+  currentUser: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  myProjects: WorkbenchProjectDTO[];
+  tasks: TaskDTO[];
+}
+
+export interface ViewsDataDTO {
+  projects: ProjectWithMilestonesDTO[];
+  tasks: TaskDTO[];
 }
 
 export interface QuoteVersionCreateDTO {

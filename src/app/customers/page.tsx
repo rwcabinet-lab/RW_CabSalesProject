@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil } from "lucide-react";
-import { CustomerItem } from "@/lib/mock-data";
+import type { ApiResponse, CustomerDTO, UserDTO } from "@/types/dto";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -34,9 +34,9 @@ export default function CustomersPage() {
   const fetchSalesReps = async () => {
     try {
       const res = await fetch("/api/auth/users");
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<UserDTO[]>;
       if (res.ok) {
-        setSalesReps(data.filter((user: { role: string }) =>
+        setSalesReps(data.filter((user) =>
           user.role === "SALES_MANAGER" || user.role === "SALES"
         ));
       }
@@ -49,7 +49,7 @@ export default function CustomersPage() {
     try {
       setLoading(true);
       const res = await fetch("/api/customers");
-      const data = await res.json();
+      const data = await res.json() as ApiResponse<CustomerDTO[]>;
       if (!res.ok || !Array.isArray(data)) throw new Error(data.error || "無法取得客戶資料");
       setCustomers(data);
       setLoadError("");
@@ -78,7 +78,7 @@ export default function CustomersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingCustomerId ? { id: editingCustomerId, ...formData } : formData),
       });
-      const result = await res.json();
+      const result = await res.json() as ApiResponse<CustomerDTO>;
       if (res.ok) {
         setShowModal(false);
         setFormData({
@@ -111,7 +111,7 @@ export default function CustomersPage() {
     setShowModal(true);
   };
 
-  const openEditModal = (customer: CustomerItem) => {
+  const openEditModal = (customer: CustomerDTO) => {
     setEditingCustomerId(customer.id);
     setFormData({
       name: customer.name, customerType: customer.customerType, taxId: customer.taxId || "", phone: customer.phone,

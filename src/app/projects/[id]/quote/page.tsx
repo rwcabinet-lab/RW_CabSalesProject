@@ -10,7 +10,8 @@ import {
   Printer,
   Save,
 } from "lucide-react";
-import { ProjectDetail, QuotationData } from "@/lib/mock-data";
+import type { QuotationData } from "@/lib/mock-data";
+import type { ApiResponse, ProjectDTO } from "@/types/dto";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 
 type QuoteStatus = QuotationData["status"];
@@ -33,7 +34,7 @@ const emptyForm = {
 export default function QuotationEditorPage() {
   const params = useParams();
   const projectId = (params?.id as string) || "p2";
-  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [project, setProject] = useState<ProjectDTO | null>(null);
   const [latestQuote, setLatestQuote] = useState<QuotationData | null>(null);
   const [versions, setVersions] = useState<QuotationData[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -46,7 +47,11 @@ export default function QuotationEditorPage() {
     async function loadQuote() {
       try {
         const response = await fetch(`/api/projects/${projectId}/quote`);
-        const data = await response.json();
+        const data = await response.json() as ApiResponse<{
+          project: ProjectDTO;
+          latestVersion: QuotationData | null;
+          versions: QuotationData[];
+        }>;
         if (!response.ok) throw new Error(data.error || "載入報價資料失敗");
 
         setProject(data.project);
@@ -93,10 +98,10 @@ export default function QuotationEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, totalAmount: fromTenThousands(totalAmount) }),
       });
-      const data = await response.json();
+      const data = await response.json() as ApiResponse<{ version: QuotationData }>;
       if (!response.ok) throw new Error(data.error || "儲存報價資料失敗");
 
-      const savedQuote = data.version as QuotationData;
+      const savedQuote = data.version;
       setLatestQuote(savedQuote);
       setVersions((current) => [savedQuote, ...current]);
       setForm({
