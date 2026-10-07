@@ -1,177 +1,238 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Clock, ShieldAlert, CheckCircle2, ChevronRight, Calendar, ArrowRight } from "lucide-react";
-import type { ProjectWithMilestonesDTO } from "@/types/dto";
+import { Calendar, CheckCircle2, Clock } from "lucide-react";
+import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
+import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
 
 interface GanttProps {
   projects: ProjectWithMilestonesDTO[];
+  tasks: TaskDTO[];
 }
 
-export function GanttChart({ projects }: GanttProps) {
-  // 時間軸參考基準區間：2026-09-01 至 2026-10-31 (共 61 天)
-  const baseStartDate = new Date("2026-09-01").getTime();
-  const totalDays = 60; // 9/1 到 10/31 約 60 天
+type TimelineRow = {
+  id: string;
+  label: string;
+  kind: "MILESTONE" | "TASK" | "PROJECT";
+  dateKey: string | null;
+  actualDateKey?: string | null;
+  status?: string;
+  assignedToName?: string | null;
+  projectId: string;
+};
 
-  // 計算特定日期在時間軸上的百分比位置
-  const getOffsetPercent = (dateStr?: string | null) => {
-    if (!dateStr) return 0;
-    const target = new Date(dateStr).getTime();
-    const diffDays = (target - baseStartDate) / (1000 * 60 * 60 * 24);
-    return Math.max(0, Math.min(100, (diffDays / totalDays) * 100));
-  };
+function getDateKey(value?: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
-  const getWidthPercent = (startStr?: string | null, endStr?: string | null) => {
-    if (!startStr || !endStr) return 4;
-    const start = new Date(startStr).getTime();
-    const end = new Date(endStr).getTime();
-    const durationDays = Math.max(1, (end - start) / (1000 * 60 * 60 * 24));
-    return Math.max(3, Math.min(100, (durationDays / totalDays) * 100));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dateFromKey(key: string): Date {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function utcFromKey(key: string): number {
+  const [year, month, day] = key.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function formatDate(key: string): string {
+  return dateFromKey(key).toLocaleDateString("zh-TW", { month: "2-digit", day: "2-digit" });
+}
+
+function addDays(key: string, days: number): string {
+  const date = new Date(utcFromKey(key) + days * 24 * 60 * 60 * 1000);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+export function GanttChart({ projects, tasks }: GanttProps) {
+  const todayKey = getDateKey(new Date().toISOString())!;
+  const taskByProject = new Map<string, TaskDTO[]>();
+  for (const task of tasks) {
+    const projectTasks = taskByProject.get(task.projectId) || [];
+    projectTasks.push(task);
+    taskByProject.set(task.projectId, projectTasks);
+  }
+
+  const projectRows = projects.map((project) => {
+    const rows: TimelineRow[] = project.milestones.map((milestone) => ({
+      id: `milestone-${milestone.id}`,
+      label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
+      kind: "MILESTONE",
+      dateKey: getDateKey(milestone.plannedDueDate),
+      actualDateKey: getDateKey(milestone.actualDueDate),
+      status: milestone.status,
+      assignedToName: milestone.assignedToName,
+      projectId: project.id,
+    }));
+
+    const projectTasks = taskByProject.get(project.id) || [];
+    for (const task of projectTasks) {
+      rows.push({
+        id: `task-${task.id}`,
+        label: task.subject,
+        kind: "TASK",
+        dateKey: getDateKey(task.dueDatetime),
+        actualDateKey: getDateKey(task.completedAt),
+        status: task.isCompleted ? "COMPLETED" : undefined,
+        assignedToName: task.assignedToName,
+        projectId: project.id,
+      });
+    }
+
+    const expectedDate = getDateKey(project.expectedDate);
+    if (expectedDate) {
+      rows.push({
+        id: `expected-${project.id}`,
+        label: "預計完工",
+        kind: "PROJECT",
+        dateKey: expectedDate,
+        projectId: project.id,
+      });
+    }
+
+    return { project, rows };
+  });
+
+  const dateKeys = [
+    todayKey,
+    ...projectRows.flatMap(({ rows }) =>
+      rows.flatMap((row) => [row.dateKey, row.actualDateKey].filter((key): key is string => Boolean(key)))
+    ),
+  ];
+  const earliest = Math.min(...dateKeys.map(utcFromKey));
+  const latest = Math.max(...dateKeys.map(utcFromKey));
+  const startKey = addDays(new Date(earliest).toISOString().slice(0, 10), -7);
+  const endKey = addDays(new Date(latest).toISOString().slice(0, 10), 7);
+  const startTime = utcFromKey(startKey);
+  const range = utcFromKey(endKey) - startTime;
+  const positionOf = (key: string) => Math.max(0, Math.min(100, ((utcFromKey(key) - startTime) / range) * 100));
+  const ticks = Array.from({ length: 7 }, (_, index) => {
+    const key = addDays(startKey, Math.round((range / (24 * 60 * 60 * 1000) / 6) * index));
+    return { key, position: (index / 6) * 100 };
+  });
+
+  const markerColor = (row: TimelineRow) => {
+    if (row.kind === "PROJECT") return "bg-violet-500";
+    if (row.status === "OVERDUE" || (row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED")) return "bg-red-500";
+    if (row.status === "COMPLETED") return "bg-emerald-500";
+    if (row.kind === "TASK") return "bg-amber-500";
+    if (row.status === "IN_PROGRESS") return "bg-blue-500";
+    return "bg-slate-400";
   };
 
   return (
-    <div className="space-y-6">
-      {/* 圖例說明 */}
-      <div className="flex flex-wrap items-center justify-between text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 gap-3">
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="font-bold text-slate-700">甘特圖圖例：</span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3.5 h-2.5 rounded bg-blue-500 inline-block" /> 預計排程 (Planned)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3.5 h-2.5 rounded bg-emerald-500 inline-block" /> 實際完工 (Completed)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3.5 h-2.5 rounded bg-amber-400 inline-block" /> 進行中 (In Progress)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3.5 h-2.5 rounded bg-red-500 inline-block animate-pulse" /> 逾期卡關 (Overdue)
-          </span>
-        </div>
-
-        <div className="text-slate-400 font-mono text-[11px]">
-          時間軸範圍: 2026/09/01 ~ 2026/10/31
-        </div>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+        <span className="font-bold text-slate-800">時間軸標記：</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />里程碑期限</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />待辦期限</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />已完成／實際日期</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />預計完工日</span>
+        <span className="ml-auto text-slate-500">時間範圍：{formatDate(startKey)} – {formatDate(endKey)}</span>
       </div>
 
-      {/* 甘特圖本體 */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-        <div className="min-w-[900px] p-6 space-y-6">
-          {/* 時間軸標尺刻度 */}
-          <div className="grid grid-cols-6 border-b border-slate-200 pb-2 text-[11px] font-bold text-slate-400 font-mono">
-            <div>09/01 - 09/10</div>
-            <div>09/11 - 09/20</div>
-            <div className="text-blue-600 font-extrabold bg-blue-50/50 px-1 rounded">
-              09/21 (今日基準線)
+      {projects.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+          目前沒有可顯示的案場時程。
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="min-w-[1050px] p-5">
+            <div className="mb-3 grid grid-cols-[270px_minmax(0,1fr)_130px] items-end gap-3 border-b border-slate-200 pb-2">
+              <div className="text-xs font-bold text-slate-500">案場 / 時程項目</div>
+              <div className="relative h-7 text-[11px] font-semibold text-slate-500">
+                {ticks.map((tick, index) => (
+                  <span
+                    key={`${tick.key}-${index}`}
+                    className="absolute bottom-0 -translate-x-1/2 whitespace-nowrap"
+                    style={{ left: `${tick.position}%` }}
+                  >
+                    {formatDate(tick.key)}
+                  </span>
+                ))}
+              </div>
+              <div className="text-right text-xs font-bold text-slate-500">期限 / 負責人</div>
             </div>
-            <div>10/01 - 10/10</div>
-            <div>10/11 - 10/20</div>
-            <div>10/21 - 10/31</div>
-          </div>
 
-          {/* 各案場里程碑時間條清單 */}
-          <div className="space-y-8 divide-y divide-slate-100">
-            {projects.map((project) => (
-              <div key={project.id} className="pt-6 first:pt-0 space-y-3">
-                {/* 案場抬頭 */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-slate-900">
-                      {project.projectName}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                      階段: {project.currentStage}
-                    </span>
-                    {project.isDelayed && (
-                      <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
-                        🔴 時程逾期
-                      </span>
-                    )}
+            <div className="space-y-5">
+              {projectRows.map(({ project, rows }) => (
+                <section key={project.id} className="space-y-1">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2 pt-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-black text-slate-900">{project.projectName}</span>
+                      <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{project.currentStage}</span>
+                      {project.isDelayed && <span className="shrink-0 text-[10px] font-bold text-red-700">時程逾期</span>}
+                    </div>
+                    <Link
+                      href={`/projects/${project.id}/milestones`}
+                      className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      查看案場時程
+                    </Link>
                   </div>
 
-                  <Link
-                    href={`/projects/${project.id}/milestones`}
-                    className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
-                  >
-                    進入時程推進 <ArrowRight className="w-3 h-3" />
-                  </Link>
-                </div>
-
-                {/* 五大里程碑甘特長條 */}
-                <div className="space-y-2 pl-2">
-                  {project.milestones.map((m) => {
-                    const plannedLeft = getOffsetPercent(m.plannedStart);
-                    const plannedWidth = getWidthPercent(m.plannedStart, m.plannedEnd);
-
-                    const isCompleted = m.status === "COMPLETED";
-                    const isOverdue = m.status === "OVERDUE";
-                    const isInProgress = m.status === "IN_PROGRESS";
-
+                  {rows.length === 0 ? (
+                    <p className="py-3 text-xs text-slate-400">尚無里程碑或待辦時程。</p>
+                  ) : rows.map((row) => {
+                    const overdue = Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
+                    const color = markerColor(row);
                     return (
-                      <div key={m.id} className="flex items-center text-xs py-1">
-                        {/* 里程碑名稱與負責人 */}
-                        <div className="w-36 shrink-0 flex items-center justify-between pr-3">
-                          <span className="font-semibold text-slate-800 truncate">{m.stageName}</span>
-                          <span className="text-[10px] text-slate-400">{m.assignedToName}</span>
+                      <div key={row.id} className="grid grid-cols-[270px_minmax(0,1fr)_130px] items-center gap-3 py-1.5">
+                        <div className="flex min-w-0 items-center gap-2 pl-2">
+                          {row.kind === "PROJECT" ? <Calendar className="h-3.5 w-3.5 shrink-0 text-violet-500" /> : row.status === "COMPLETED" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+                          <span className={`truncate text-xs ${row.kind === "PROJECT" ? "font-bold text-violet-700" : "font-medium text-slate-700"}`}>{row.label}</span>
+                          {row.kind === "TASK" && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">待辦</span>}
                         </div>
 
-                        {/* 條狀圖軌道 */}
-                        <div className="flex-1 relative h-6 bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
-                          {/* 預計排程長條 (Planned Bar) */}
+                        <div
+                          className="relative h-7 rounded bg-slate-50"
+                          style={{
+                            backgroundImage: "linear-gradient(to right, #e2e8f0 1px, transparent 1px)",
+                            backgroundSize: `${100 / 6}% 100%`,
+                          }}
+                        >
                           <div
-                            style={{
-                              left: `${plannedLeft}%`,
-                              width: `${plannedWidth}%`,
-                            }}
-                            title={`預計: ${m.plannedStart || ""} ~ ${m.plannedEnd || ""}`}
-                            className="absolute top-1 h-2 rounded bg-blue-300 opacity-70"
+                            className="absolute bottom-0 top-0 z-10 w-px bg-sky-400/80"
+                            style={{ left: `${positionOf(todayKey)}%` }}
+                            title="今日"
                           />
-
-                          {/* 實際排程/進度長條 (Actual / Status Bar) */}
-                          <div
-                            style={{
-                              left: `${plannedLeft}%`,
-                              width: isCompleted ? `${plannedWidth}%` : `${Math.max(5, plannedWidth * 0.6)}%`,
-                            }}
-                            title={`狀態: ${m.status}`}
-                            className={`absolute bottom-1 h-2 rounded ${
-                              isOverdue
-                                ? "bg-red-500 shadow-xs"
-                                : isCompleted
-                                ? "bg-emerald-500"
-                                : isInProgress
-                                ? "bg-amber-400"
-                                : "bg-slate-300"
-                            }`}
-                          />
+                          {row.dateKey && (
+                            <span
+                              className={`absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${color}`}
+                              style={{ left: `${positionOf(row.dateKey)}%` }}
+                              title={`期限：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
+                            />
+                          )}
+                          {row.actualDateKey && row.actualDateKey !== row.dateKey && (
+                            <span
+                              className="absolute top-1/2 z-20 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500"
+                              style={{ left: `${positionOf(row.actualDateKey)}%` }}
+                              title={`實際完成：${row.actualDateKey}`}
+                            />
+                          )}
                         </div>
 
-                        {/* 狀態標籤 */}
-                        <div className="w-24 shrink-0 text-right pl-3">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isOverdue
-                                ? "bg-red-100 text-red-700"
-                                : isCompleted
-                                ? "bg-emerald-100 text-emerald-700"
-                                : isInProgress
-                                ? "bg-amber-100 text-amber-800"
-                                : "text-slate-400"
-                            }`}
-                          >
-                            {isOverdue ? "逾期" : isCompleted ? "已完成" : isInProgress ? "進行中" : "待啟動"}
-                          </span>
+                        <div className="text-right text-[10px]">
+                          <div className={overdue ? "font-bold text-red-600" : "font-semibold text-slate-600"}>
+                            {row.dateKey ? formatDate(row.dateKey) : "未排定"}
+                            {overdue && "・逾期"}
+                          </div>
+                          <div className="truncate text-slate-400">{row.assignedToName || (row.kind === "PROJECT" ? "案場" : "未指定")}</div>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            ))}
+                </section>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

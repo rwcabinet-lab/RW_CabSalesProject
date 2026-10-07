@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const projects = await DataService.getProjects();

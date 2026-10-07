@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   DragDropContext,
@@ -26,13 +26,18 @@ interface KanbanProps {
 }
 
 const STAGES = [
-  { id: "INQUIRY", label: "洽談諮詢", color: "bg-slate-100 text-slate-700" },
-  { id: "MEASUREMENT", label: "現場丈量", color: "bg-blue-100 text-blue-800" },
-  { id: "QUOTE", label: "初報細報", color: "bg-indigo-100 text-indigo-800" },
-  { id: "CONTRACT", label: "複丈簽約", color: "bg-purple-100 text-purple-800" },
-  { id: "CAD_DRAWING", label: "圖面定稿拆單", color: "bg-amber-100 text-amber-800" },
-  { id: "HANDOFF", label: "下單交廠", color: "bg-cyan-100 text-cyan-800" },
-  { id: "DONE", label: "結案完工", color: "bg-emerald-100 text-emerald-800" },
+  { id: "INQUIRY", label: "舊流程：洽談諮詢", color: "bg-slate-100 text-slate-700" },
+  { id: "MEASUREMENT", label: "舊流程：現場丈量", color: "bg-blue-100 text-blue-800" },
+  { id: "QUOTE", label: "舊流程：初報細報", color: "bg-indigo-100 text-indigo-800" },
+  { id: "CONTRACT", label: "舊流程：複丈簽約", color: "bg-purple-100 text-purple-800" },
+  { id: "CAD_DRAWING", label: "舊流程：圖面定稿拆單", color: "bg-amber-100 text-amber-800" },
+  { id: "HANDOFF", label: "舊流程：下單交廠", color: "bg-cyan-100 text-cyan-800" },
+  { id: "DONE", label: "舊流程：結案完工", color: "bg-emerald-100 text-emerald-800" },
+  { id: "CONTACT", label: "接洽階段", color: "bg-blue-100 text-blue-800" },
+  { id: "DESIGN", label: "設計確認階段", color: "bg-indigo-100 text-indigo-800" },
+  { id: "PRODUCTION", label: "生產施工階段", color: "bg-amber-100 text-amber-800" },
+  { id: "CLOSED", label: "已結案", color: "bg-emerald-100 text-emerald-800" },
+  { id: "BILLED", label: "已立帳", color: "bg-cyan-100 text-cyan-800" },
   { id: "WRAP_UP", label: "收尾", color: "bg-amber-100 text-amber-800" },
   { id: "LOST", label: "流標", color: "bg-slate-200 text-slate-800" },
 ];
@@ -42,6 +47,10 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
   const [specialAdvance, setSpecialAdvance] = useState<{ projectId: string; projectName: string; stage: string } | null>(null);
   const [specialReason, setSpecialReason] = useState("");
   const [stageError, setStageError] = useState("");
+
+  useEffect(() => {
+    setItems(projects);
+  }, [projects]);
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -100,7 +109,7 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
         <span>💡 提示：按住卡片即可自由拖曳至其他階段欄位；推進至收尾或流標時須填寫原因。</span>
-        <span className="font-semibold">共 {STAGES.length} 大階段推進漏斗</span>
+        <span className="font-semibold">共 {projects.length} 個案場｜依目前階段分類</span>
       </div>
       {stageError && <p role="alert" className="text-sm text-red-600">{stageError}</p>}
 

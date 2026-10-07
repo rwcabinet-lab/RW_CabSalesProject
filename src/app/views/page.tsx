@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Kanban, BarChart3, Calendar, RefreshCw, Sparkles, Layers, ShieldAlert } from "lucide-react";
+import { Kanban, BarChart3, Calendar } from "lucide-react";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
@@ -12,6 +12,7 @@ export default function VisualViewsPage() {
   const [projects, setProjects] = useState<ProjectWithMilestonesDTO[]>([]);
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -20,12 +21,17 @@ export default function VisualViewsPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/views/data");
+      setLoadError("");
+      const res = await fetch("/api/views/data", { cache: "no-store" });
       const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "無法取得可視化資料");
+      }
       if (Array.isArray(json.projects)) setProjects(json.projects);
       if (Array.isArray(json.tasks)) setTasks(json.tasks);
     } catch (err) {
       console.error(err);
+      setLoadError(err instanceof Error ? err.message : "載入可視化資料失敗，請稍後再試。");
     } finally {
       setLoading(false);
     }
@@ -56,6 +62,20 @@ export default function VisualViewsPage() {
       <div className="p-16 text-center space-y-3">
         <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto" />
         <p className="text-slate-500 font-medium text-sm">正在載入多元可視化視圖數據...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-16 text-center space-y-4">
+        <p role="alert" className="text-red-600 font-medium">{loadError}</p>
+        <button
+          onClick={fetchData}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+        >
+          重新載入
+        </button>
       </div>
     );
   }
@@ -124,7 +144,7 @@ export default function VisualViewsPage() {
         />
       )}
 
-      {activeTab === "gantt" && <GanttChart projects={projects} />}
+      {activeTab === "gantt" && <GanttChart projects={projects} tasks={tasks} />}
 
       {activeTab === "calendar" && (
         <CalendarView projects={projects} tasks={tasks} />
