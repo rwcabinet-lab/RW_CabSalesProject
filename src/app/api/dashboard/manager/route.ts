@@ -22,13 +22,11 @@ export async function GET(req: NextRequest) {
 
     const projects = await DataService.getProjects();
     const projectIds = projects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject, latestTasksByProject, users] = await Promise.all([
+    const [milestonesByProject, latestQuotesByProject, latestTasksByProject] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
       DataService.getLatestTasksByProjectIds(projectIds),
-      DataService.getLoginUsers(),
     ]);
-    const usersById = new Map(users.map((user) => [user.id, user]));
 
     // 1. KPI 計算
     const totalProjects = projects.length;
@@ -72,7 +70,21 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // 3. 目前負責人員的進行中案件與階段
+    // 3. 業務負載分佈
+    const workloadMap: Record<string, { total: number; delayed: number }> = {};
+    for (const p of projects) {
+      const rep = p.salesRepName || "其他業務";
+      if (!workloadMap[rep]) workloadMap[rep] = { total: 0, delayed: 0 };
+      workloadMap[rep].total++;
+      if (p.isDelayed) workloadMap[rep].delayed++;
+    }
+    const salesWorkload = Object.entries(workloadMap).map(([name, stat]) => ({
+      salesRepName: name,
+      totalProjects: stat.total,
+      delayedProjects: stat.delayed,
+    }));
+
+    // 4. 所有案件狀態總覽 (含月份過濾)
     const stageLabels: Record<string, string> = {
       CONTACT:    "接洽期",
       DESIGN:     "設計確認期",
@@ -83,66 +95,7 @@ export async function GET(req: NextRequest) {
       LOST:       "流標",
       DONE:       "完成",
     };
-    const excludedWorkloadStages = new Set(["CLOSED", "LOST", "DONE"]);
-    const workloadByPerson = new Map<string, {
-      userId: string;
-      name: string;
-      role: "SALES" | "SALES_MANAGER" | "ASSISTANT";
-      projects: Array<{ id: string; projectName: string; stage: string; milestoneName: string }>;
-    }>();
 
-    for (const project of projects) {
-      if (excludedWorkloadStages.has(project.currentStage)) continue;
-      const milestones = milestonesByProject[project.id] || [];
-      const activeMilestone = project.currentStage === "WRAP_UP"
-        ? milestones.find((milestone) => milestone.stageCode === "X-1")
-        : milestones.find((milestone) => milestone.status === "OVERDUE") ||
-          milestones.find((milestone) => milestone.status === "IN_PROGRESS") ||
-          milestones.find((milestone) => milestone.status === "PENDING") ||
-          milestones[milestones.length - 1];
-      const projectStage = stageLabels[project.currentStage] || project.currentStage;
-      const projectLoad = {
-        id: project.id,
-        projectName: project.projectName,
-        stage: projectStage,
-        milestoneName: activeMilestone
-          ? MILESTONE_STAGE_LABELS[activeMilestone.stageCode]
-          : "尚無階段項目",
-      };
-
-      const addProjectLoad = (userId: string | undefined, fallbackName: string, role: "SALES" | "SALES_MANAGER" | "ASSISTANT") => {
-        if (!userId) return;
-        const user = usersById.get(userId);
-        const personRole = user?.role === "ASSISTANT" ? "ASSISTANT" : user?.role === "SALES_MANAGER" ? "SALES_MANAGER" : role;
-        const key = `${personRole}:${userId}`;
-        const person = workloadByPerson.get(key) || {
-          userId,
-          name: user?.name || fallbackName,
-          role: personRole,
-          projects: [],
-        };
-        if (!person.projects.some((item) => item.id === projectLoad.id)) {
-          person.projects.push(projectLoad);
-        }
-        workloadByPerson.set(key, person);
-      };
-
-      addProjectLoad(project.customerSalesRepId || project.salesRepId, project.customerSalesRepName || project.salesRepName, "SALES");
-      addProjectLoad(project.salesAssistantId, project.salesAssistantName || "未命名業助", "ASSISTANT");
-
-      if (activeMilestone?.assignedToId && usersById.get(activeMilestone.assignedToId)?.role === "ASSISTANT") {
-        addProjectLoad(activeMilestone.assignedToId, activeMilestone.assignedToName || "未命名業助", "ASSISTANT");
-      }
-    }
-
-    const peopleWorkload = [...workloadByPerson.values()]
-      .map((person) => ({
-        ...person,
-        projects: person.projects.sort((a, b) => a.projectName.localeCompare(b.projectName, "zh-TW")),
-      }))
-      .sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name, "zh-TW"));
-
-    // 4. 所有案件狀態總覽 (含月份過濾)
     // 依月份過濾（使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
     const filteredProjects = monthFilter
       ? projects.filter((p) => {
@@ -244,7 +197,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       kpi: { totalProjects, signedTotal, conversionRate, delayedCount },
       alertList,
-      peopleWorkload,
+      salesWorkload,
       stageBottlenecks,
       allProjectsOverview,
     });

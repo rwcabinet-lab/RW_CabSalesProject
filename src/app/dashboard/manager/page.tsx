@@ -9,12 +9,7 @@ import { formatTenThousands } from "@/lib/currency";
 interface ManagerDashboardData {
   kpi: { totalProjects: number; signedTotal: number; conversionRate: number; delayedCount: number; };
   alertList: any[];
-  peopleWorkload: Array<{
-    userId: string;
-    name: string;
-    role: "SALES" | "SALES_MANAGER" | "ASSISTANT";
-    projects: Array<{ id: string; projectName: string; stage: string; milestoneName: string }>;
-  }>;
+  salesWorkload: any[];
   stageBottlenecks: any[];
   allProjectsOverview: any[];
 }
@@ -158,36 +153,20 @@ export default function ManagerDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 人員案場負載與異常分佈 */}
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-4">
+          <h3 className="text-base font-bold flex items-center gap-2 mb-6">
             <Users className="w-5 h-5 text-blue-600" />
-            人員案場負載
+            人員案場負載與異常分佈
           </h3>
-          <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
-            {data.peopleWorkload.length ? data.peopleWorkload.map((person) => (
-              <section key={`${person.role}:${person.userId}`} className="rounded-lg border border-slate-200">
-                <div className="flex items-center justify-between border-b bg-slate-50 px-3 py-2">
-                  <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${person.role === "ASSISTANT" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}`}>
-                      {person.role === "ASSISTANT" ? "業助" : person.role === "SALES_MANAGER" ? "業務主管" : "業務"}
-                    </span>
-                    {person.name}
-                  </div>
-                  <span className="text-xs font-semibold text-slate-500">{person.projects.length} 件</span>
-                </div>
-                <ul className="divide-y divide-slate-100 px-3">
-                  {person.projects.map((project) => (
-                    <li key={project.id} className="py-2 text-xs">
-                      <Link href={`/projects/${project.id}/milestones`} className="font-semibold text-blue-700 hover:underline">
-                        {project.projectName}
-                      </Link>
-                      <div className="mt-0.5 text-slate-500">{project.stage}｜{project.milestoneName}</div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )) : (
-              <p className="py-10 text-center text-sm text-slate-500">目前沒有進行中的負責案件</p>
-            )}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="salesRepName" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                <Bar dataKey="totalProjects" name="總案場數" fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
+                <Bar dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
