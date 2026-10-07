@@ -137,7 +137,7 @@ export default function ManagerDashboardPage() {
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">已簽約/生產預估總額</div>
-          <div className="text-3xl font-black">{formatTenThousands(data.kpi.signedTotal)}</div>
+          <div className="text-right text-3xl font-black tabular-nums">{formatTenThousands(data.kpi.signedTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">成交推進率</div>
@@ -233,6 +233,13 @@ export default function ManagerDashboardPage() {
                 <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
                 <td className="p-3 font-bold text-slate-700">
                   {p.currentStage === "LOST" ? p.currentStageLabel : `${p.currentStageLabel} - ${p.activeMilestoneName}`}
+                  {p.recentlyCompletedMilestoneName && (
+                    <div className="mt-2 inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-800 shadow-sm">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      階段項目已完成：{p.recentlyCompletedMilestoneName}
+                      {p.recentlyCompletedMilestoneDate && `（${p.recentlyCompletedMilestoneDate}）`}
+                    </div>
+                  )}
                   {p.unassignedNextMilestoneName && (
                     <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-black text-red-700">
                       <AlertCircle className="h-3.5 w-3.5" />

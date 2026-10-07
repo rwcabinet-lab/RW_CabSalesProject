@@ -168,7 +168,7 @@ export default function QuotationEditorPage() {
               value={form.totalAmount}
               onChange={(event) => updateForm("totalAmount", event.target.value)}
               placeholder="例如 35.0 代表新台幣 35 萬"
-              className="w-full rounded-lg border border-blue-300 px-3 py-2.5 text-lg font-bold text-blue-700 outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-blue-300 px-3 py-2.5 text-right text-lg font-bold tabular-nums text-blue-700 outline-none focus:ring-2 focus:ring-blue-100"
             />
           </label>
 
@@ -234,7 +234,7 @@ export default function QuotationEditorPage() {
                 <p className="mt-1 text-sm text-slate-500">{version.notes || "無備註"}</p>
               </div>
               <div className="flex shrink-0 items-center gap-4">
-                <strong className="text-lg text-slate-900">{formatTenThousands(version.totalAmount)}</strong>
+                <strong className="text-right text-lg tabular-nums text-slate-900">{formatTenThousands(version.totalAmount)}</strong>
                 {version.quoteFileUrl ? (
                   /^https?:\/\//.test(version.quoteFileUrl) ? (
                     <a href={version.quoteFileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">

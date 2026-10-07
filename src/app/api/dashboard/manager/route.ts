@@ -111,6 +111,12 @@ export async function GET(req: NextRequest) {
 
     const allProjectsOverview = filteredProjects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
+      const recentlyCompletedMilestone = milestones
+        .filter((milestone) => milestone.status === "COMPLETED")
+        .sort((a, b) =>
+          (b.actualDueDate || "").localeCompare(a.actualDueDate || "") ||
+          b.stageOrder - a.stageOrder
+        )[0];
       const activeMilestone = p.currentStage === "LOST"
         ? null
         : milestones.find((m) => m.status === "OVERDUE") ||
@@ -135,6 +141,10 @@ export async function GET(req: NextRequest) {
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,
         totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
+        recentlyCompletedMilestoneName: recentlyCompletedMilestone
+          ? MILESTONE_STAGE_LABELS[recentlyCompletedMilestone.stageCode]
+          : null,
+        recentlyCompletedMilestoneDate: recentlyCompletedMilestone?.actualDueDate || null,
         activeMilestoneName: p.currentStage === "LOST"
           ? null
           : activeMilestone

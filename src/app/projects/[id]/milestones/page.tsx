@@ -404,7 +404,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><dt className="text-xs text-slate-500">案件業助</dt><dd className="font-semibold">{project.salesAssistantName || "未指定"}</dd></div>
             <div><dt className="text-xs text-slate-500">預計完工日</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">戶數</dt><dd className="font-semibold">{project.unitCount ?? "未設定"}</dd></div>
-            <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="font-semibold">{(project.quoteAmount ?? project.estimatedBudget) != null ? formatTenThousands(project.quoteAmount ?? project.estimatedBudget ?? 0) : "未設定"}</dd></div>
+            <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="text-right font-semibold tabular-nums">{(project.quoteAmount ?? project.estimatedBudget) != null ? formatTenThousands(project.quoteAmount ?? project.estimatedBudget ?? 0) : "未設定"}</dd></div>
             <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition || "未填寫"}</dd></div>
           </dl>
         </section>
