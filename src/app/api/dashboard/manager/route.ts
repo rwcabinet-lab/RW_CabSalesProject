@@ -22,10 +22,10 @@ export async function GET(req: NextRequest) {
 
     const projects = await DataService.getProjects();
     const projectIds = projects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject, latestTasksByProject] = await Promise.all([
+    const [milestonesByProject, latestQuotesByProject, openTasksByProject] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
-      DataService.getLatestTasksByProjectIds(projectIds),
+      DataService.getOpenTasksByProjectIds(projectIds),
     ]);
 
     // 1. KPI 計算
@@ -161,15 +161,14 @@ export async function GET(req: NextRequest) {
             ? MILESTONE_STAGE_LABELS[milestones[nextIndex].stageCode]
             : null;
         })(),
-        assignmentTask: latestTasksByProject[p.id]
-          ? {
-              id: latestTasksByProject[p.id].id,
-              assignedToId: latestTasksByProject[p.id].assignedToId,
-              subject: latestTasksByProject[p.id].subject,
-              priority: latestTasksByProject[p.id].priority,
-              dueDatetime: latestTasksByProject[p.id].dueDatetime,
-            }
-          : null,
+        assignmentTasks: (openTasksByProject[p.id] || []).map((task) => ({
+          id: task.id,
+          assignedToId: task.assignedToId,
+          assignedToName: task.assignedToName || "",
+          subject: task.subject,
+          priority: task.priority,
+          dueDatetime: task.dueDatetime,
+        })),
       };
     });
 

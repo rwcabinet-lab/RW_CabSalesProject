@@ -205,7 +205,7 @@ export default function ManagerDashboardPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th><th className="p-3 text-center">案件細節</th><th className="p-3 text-center">指派任務</th>
+              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th><th className="p-3 text-center">案件細節</th><th className="p-3">指派任務</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -238,17 +238,47 @@ export default function ManagerDashboardPage() {
                 <td className="p-3 text-center">
                   <Link href={`/projects/${p.id}/milestones`} className="inline-flex h-8 w-24 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
                 </td>
-                <td className="p-3 text-center">
-                  <button onClick={() => setAssignModal({
-                    open: true,
-                    projectId: p.id,
-                    projectName: p.projectName,
-                    taskId: p.assignmentTask?.id || "",
-                    userId: p.assignmentTask?.assignedToId || "",
-                    subject: p.assignmentTask?.subject || "",
-                    priority: p.assignmentTask?.priority || "MEDIUM",
-                    dueDate: p.assignmentTask?.dueDatetime?.slice(0, 10) || todayDate(),
-                  })} className="inline-flex h-8 w-24 items-center justify-center rounded bg-blue-600 px-2 text-xs font-bold text-white shadow hover:bg-blue-700">{p.assignmentTask ? "變更" : "指派任務"}</button>
+                <td className="p-3">
+                  <div className="min-w-48 space-y-2">
+                    {p.assignmentTasks.map((task) => (
+                      <div key={task.id} className="flex items-start justify-between gap-2 rounded border border-slate-200 bg-slate-50 p-2">
+                        <div className="min-w-0">
+                          <div className="break-words font-semibold text-slate-800">{task.subject}</div>
+                          <div className="mt-1 text-[10px] text-slate-500">{task.assignedToName} · 到期 {task.dueDatetime.slice(0, 10)}</div>
+                        </div>
+                        <button
+                          onClick={() => setAssignModal({
+                            open: true,
+                            projectId: p.id,
+                            projectName: p.projectName,
+                            taskId: task.id,
+                            userId: task.assignedToId,
+                            subject: task.subject,
+                            priority: task.priority,
+                            dueDate: task.dueDatetime.slice(0, 10),
+                          })}
+                          className="shrink-0 rounded bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800 hover:bg-amber-200"
+                        >
+                          編輯
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setAssignModal({
+                        open: true,
+                        projectId: p.id,
+                        projectName: p.projectName,
+                        taskId: "",
+                        userId: "",
+                        subject: "",
+                        priority: "MEDIUM",
+                        dueDate: todayDate(),
+                      })}
+                      className="inline-flex h-8 items-center justify-center rounded bg-blue-600 px-3 text-xs font-bold text-white shadow hover:bg-blue-700"
+                    >
+                      + 新增指派
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

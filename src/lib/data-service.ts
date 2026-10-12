@@ -570,7 +570,7 @@ export const DataService = {
     }));
   },
 
-  async getLatestTasksByProjectIds(projectIds: string[]): Promise<Record<string, SalesTaskItem>> {
+  async getOpenTasksByProjectIds(projectIds: string[]): Promise<Record<string, SalesTaskItem[]>> {
     if (projectIds.length === 0) return {};
     const tasks = await prisma.salesTask.findMany({
       where: { projectId: { in: projectIds }, milestoneId: null, isCompleted: false },
@@ -578,18 +578,18 @@ export const DataService = {
       include: { project: true, assignedTo: true, assignedBy: true },
       orderBy: { createdAt: "desc" },
     });
-    const result: Record<string, SalesTaskItem> = {};
+    const result: Record<string, SalesTaskItem[]> = {};
     for (const task of tasks) {
-      if (!result[task.projectId]) {
-        result[task.projectId] = {
-          id: task.id, projectId: task.projectId, projectName: task.project.projectName,
-          assignedToId: task.assignedToId, assignedToName: task.assignedTo.name,
-          assignedByName: task.assignedBy?.name || null, milestoneId: task.milestoneId,
-          taskType: task.taskType, subject: task.subject, dueDatetime: task.dueDatetime.toISOString(),
-          priority: task.priority, isCompleted: task.isCompleted, resultNotes: task.resultNotes,
-          completedAt: dateValue(task.completedAt) || null,
-        };
-      }
+      const projectTasks = result[task.projectId] || [];
+      projectTasks.push({
+        id: task.id, projectId: task.projectId, projectName: task.project.projectName,
+        assignedToId: task.assignedToId, assignedToName: task.assignedTo.name,
+        assignedByName: task.assignedBy?.name || null, milestoneId: task.milestoneId,
+        taskType: task.taskType, subject: task.subject, dueDatetime: task.dueDatetime.toISOString(),
+        priority: task.priority, isCompleted: task.isCompleted, resultNotes: task.resultNotes,
+        completedAt: dateValue(task.completedAt) || null,
+      });
+      result[task.projectId] = projectTasks;
     }
     return result;
   },
