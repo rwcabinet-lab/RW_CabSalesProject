@@ -1,8 +1,14 @@
 import Link from "next/link";
-import { Users, LayoutDashboard, Kanban, ArrowRight, CheckCircle2, ShieldAlert, Sparkles, Building2 } from "lucide-react";
-import { INITIAL_PROJECTS, INITIAL_CUSTOMERS } from "@/lib/mock-data";
+import { Users, ArrowRight, Sparkles, Building2 } from "lucide-react";
+import { DataService } from "@/lib/data-service";
+import { PROJECT_STAGE_LABELS } from "@/lib/mock-data";
 
-export default function HomePage() {
+const COMPLETED_STAGES = new Set(["DONE", "CLOSED", "BILLED", "LOST"]);
+
+export default async function HomePage() {
+  const projects = await DataService.getProjects();
+  const activeProjects = projects.filter((project) => !COMPLETED_STAGES.has(project.currentStage));
+
   return (
     <div className="space-y-8 py-2">
       {/* 歡迎 Banner */}
@@ -69,20 +75,22 @@ export default function HomePage() {
               案場快速導覽
             </h3>
             <div className="mt-3 space-y-2">
-              {INITIAL_PROJECTS.map((p) => (
+              {activeProjects.length > 0 ? activeProjects.map((p) => (
                 <div key={p.id} className="flex items-center justify-between text-xs p-2 rounded bg-slate-50 border border-slate-100">
                   <div className="truncate max-w-[180px] font-medium text-slate-800">{p.projectName}</div>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                     p.isDelayed ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
                   }`}>
-                    {p.currentStage}
+                    {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
                   </span>
                 </div>
-              ))}
+              )) : (
+                <p className="py-3 text-xs text-slate-500">目前沒有進行中的案場</p>
+              )}
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
-            <span>共有 {INITIAL_PROJECTS.length} 個進行中案場</span>
+            <span>共有 {activeProjects.length} 個進行中案場</span>
             <Link href="/dashboard/workbench" className="text-blue-600 font-semibold hover:underline">
               開啟業務工作台
             </Link>
