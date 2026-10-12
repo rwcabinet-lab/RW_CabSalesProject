@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     const projectIds = myProjects.map((p) => p.id);
     const milestonesByProject = allMilestonesByProject;
     const latestQuotesByProject = await DataService.getLatestQuotesByProjectIds(projectIds);
-    const tasks = assignedTasks;
+    const tasks = user.role === "ADMIN" ? await DataService.getTasks() : assignedTasks;
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
     const projectsWithDetails = await Promise.all(

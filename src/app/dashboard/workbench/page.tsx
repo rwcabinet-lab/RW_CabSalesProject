@@ -10,6 +10,7 @@ import {
   Edit3,
   CheckCircle2,
   X,
+  Trash2,
 } from "lucide-react";
 import { PROJECT_STAGE_LABELS } from "@/lib/mock-data";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
@@ -195,6 +196,48 @@ export default function SalesWorkbenchPage() {
     return match;
   });
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
+  const isAdmin = currentUser.role === "ADMIN";
+  const visibleTasks = isAdmin ? tasks : pendingTasks;
+
+  const handleDeleteTask = async (task: TaskDTO) => {
+    if (!window.confirm(`確定刪除待辦「${task.subject}」？`)) return;
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: task.id }),
+      });
+      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      if (!res.ok) {
+        window.alert(result.error || "刪除待辦失敗");
+        return;
+      }
+      await fetchWorkbenchData();
+    } catch (err) {
+      console.error("Failed to delete task:", err);
+      window.alert("刪除待辦時發生錯誤，請稍後重試");
+    }
+  };
+
+  const handleDeleteProject = async (project: WorkbenchProjectDTO) => {
+    if (!window.confirm(`確定刪除案件「${project.projectName}」？\n此操作會一併刪除相關里程碑、待辦與報價資料，且無法復原。`)) return;
+    try {
+      const res = await fetch("/api/projects", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: project.id }),
+      });
+      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      if (!res.ok) {
+        window.alert(result.error || "刪除案件失敗");
+        return;
+      }
+      await fetchWorkbenchData();
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      window.alert("刪除案件時發生錯誤，請稍後重試");
+    }
+  };
 
   return (
     <div className="space-y-8 pb-16">
@@ -210,7 +253,7 @@ export default function SalesWorkbenchPage() {
           <h2 className="text-base font-bold flex items-center gap-2"><CheckSquare className="w-5 h-5 text-blue-600" /> 待辦事項</h2>
           <button onClick={() => setShowTaskModal(true)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"><Plus className="w-4 h-4"/> 建立待辦</button>
         </div>
-        {pendingTasks.length > 0 ? (
+        {visibleTasks.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-600">
@@ -219,34 +262,42 @@ export default function SalesWorkbenchPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {pendingTasks.map((task) => (
+                {visibleTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-slate-50">
                     <td className="p-3 font-bold">
                       [{task.projectName}] {task.subject}
+                      {task.isCompleted && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">已完成</span>}
                       {task.assignedByName && <div className="mt-1 text-[10px] font-normal text-slate-500">建立者/指派者：{task.assignedByName}</div>}
                     </td>
                     <td className="p-3">{task.dueDatetime.slice(0, 10)}</td>
                     <td className="p-3">{task.priority}</td>
                     <td className="p-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTaskToComplete(task);
-                          setCompletionNotes("");
-                          setCompletionDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10));
-                          setCompletionError("");
-                        }}
-                        className="mx-auto flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
-                      >
-                        <CheckCircle2 className="h-4 w-4" /> 完成
-                      </button>
+                      {!task.isCompleted && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTaskToComplete(task);
+                            setCompletionNotes("");
+                            setCompletionDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10));
+                            setCompletionError("");
+                          }}
+                          className="mx-auto flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> 完成
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button type="button" onClick={() => handleDeleteTask(task)} className="mx-auto mt-1 flex items-center gap-1 rounded bg-red-100 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-200">
+                          <Trash2 className="h-3.5 w-3.5" /> 刪除
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : <p className="py-6 text-center text-sm text-slate-500">目前沒有待處理事項</p>}
+        ) : <p className="py-6 text-center text-sm text-slate-500">{isAdmin ? "目前沒有待辦事項" : "目前沒有待處理事項"}</p>}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -326,6 +377,9 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3 flex gap-2 justify-center">
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
                   <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">案件細節</Link>
+                  {isAdmin && (
+                    <button onClick={() => handleDeleteProject(p)} className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">刪除</button>
+                  )}
                 </td>
               </tr>
             ))}

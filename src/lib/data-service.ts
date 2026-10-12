@@ -622,6 +622,29 @@ export const DataService = {
     return this.getCustomerById(id);
   },
 
+  async deleteCustomer(id: string): Promise<"DELETED" | "NOT_FOUND" | "HAS_PROJECTS"> {
+    return prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: { id },
+        select: { _count: { select: { projects: true } } },
+      });
+      if (!customer) return "NOT_FOUND";
+      if (customer._count.projects > 0) return "HAS_PROJECTS";
+      await tx.customer.delete({ where: { id } });
+      return "DELETED";
+    });
+  },
+
+  async deleteProject(id: string): Promise<boolean> {
+    const result = await prisma.project.deleteMany({ where: { id } });
+    return result.count > 0;
+  },
+
+  async deleteTask(id: string): Promise<boolean> {
+    const result = await prisma.salesTask.deleteMany({ where: { id } });
+    return result.count > 0;
+  },
+
   async addQuoteVersion(projectId: string, data: QuoteVersionCreateDTO) {
     return prisma.quotation.create({ data: { projectId, ...data } });
   },

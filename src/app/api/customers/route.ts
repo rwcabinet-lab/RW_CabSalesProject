@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
+import { getUserFromRequest } from "@/lib/access-control";
+
+async function requireAdmin(req: NextRequest) {
+  const user = await getUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ error: "僅管理員可刪除客戶" }, { status: 403 });
+  }
+  return null;
+}
 
 export async function GET() {
   try {
@@ -57,5 +67,32 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error("Failed to update customer:", error);
     return NextResponse.json({ error: "更新客戶失敗" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
+  try {
+    const body = await req.json();
+    if (typeof body.id !== "string" || !body.id) {
+      return NextResponse.json({ error: "缺少客戶識別碼" }, { status: 400 });
+    }
+
+    const result = await DataService.deleteCustomer(body.id);
+    if (result === "NOT_FOUND") {
+      return NextResponse.json({ error: "找不到客戶" }, { status: 404 });
+    }
+    if (result === "HAS_PROJECTS") {
+      return NextResponse.json({ error: "此客戶仍有關聯案件，請先刪除或重新指派案件" }, { status: 409 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete customer:", error);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2003") {
+      return NextResponse.json({ error: "此客戶仍有關聯案件，請先刪除或重新指派案件" }, { status: 409 });
+    }
+    return NextResponse.json({ error: "刪除客戶失敗" }, { status: 500 });
   }
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil } from "lucide-react";
+import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import type { ApiResponse, CustomerDTO, UserDTO } from "@/types/dto";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
@@ -29,7 +30,18 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
     fetchSalesReps();
+    fetchCurrentUser();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch("/api/auth/session");
+      const data = await res.json() as ApiResponse<{ user: { role: string } | null }>;
+      setIsAdmin(res.ok && data.user?.role === "ADMIN");
+    } catch (err) {
+      console.error("Failed to load current user:", err);
+    }
+  };
 
   const fetchSalesReps = async () => {
     try {
@@ -120,6 +132,26 @@ export default function CustomersPage() {
     });
     setSubmitError("");
     setShowModal(true);
+  };
+
+  const handleDeleteCustomer = async (customer: CustomerDTO) => {
+    if (!window.confirm(`確定刪除客戶「${customer.name}」？`)) return;
+    try {
+      const res = await fetch("/api/customers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: customer.id }),
+      });
+      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      if (!res.ok) {
+        window.alert(result.error || "刪除客戶失敗");
+        return;
+      }
+      await fetchCustomers();
+    } catch (err) {
+      console.error("Failed to delete customer:", err);
+      window.alert("刪除客戶時發生錯誤，請稍後重試");
+    }
   };
 
   const getTypeBadge = (type: string) => {
@@ -244,6 +276,11 @@ export default function CustomersPage() {
                       <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
                         <Pencil className="h-3.5 w-3.5" /> 編輯
                       </button>
+                      {isAdmin && (
+                        <button type="button" onClick={() => handleDeleteCustomer(c)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                          <Trash2 className="h-3.5 w-3.5" /> 刪除
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

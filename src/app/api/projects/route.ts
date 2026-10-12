@@ -81,3 +81,25 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "修改案場失敗" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    if (user.role !== "ADMIN") {
+      return NextResponse.json({ error: "僅管理員可刪除案件" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    if (typeof body.id !== "string" || !body.id) {
+      return NextResponse.json({ error: "缺少案件識別碼" }, { status: 400 });
+    }
+
+    const deleted = await DataService.deleteProject(body.id);
+    if (!deleted) return NextResponse.json({ error: "找不到案件" }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("刪除案場失敗:", error);
+    return NextResponse.json({ error: "刪除案場失敗" }, { status: 500 });
+  }
+}
