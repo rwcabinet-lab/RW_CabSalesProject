@@ -299,7 +299,7 @@ export default function SalesWorkbenchPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3 text-right">預算/戶數</th><th className="p-3">目前階段</th><th className="p-3">當前進度</th><th className="p-3">預定完成日</th><th className="p-3 text-center">操作</th>
+              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3 text-right">預算/戶數</th><th className="p-3">目前階段</th><th className="p-3">當前進度</th><th className="p-3">預計完工日</th><th className="p-3 text-center">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -322,7 +322,7 @@ export default function SalesWorkbenchPage() {
                 <td className="p-3 text-right"><span className="tabular-nums">{formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}</span><br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
                 <td className="p-3 font-bold text-slate-700">{PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}</td>
                 <td className="p-3 font-bold">{p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}</td>
-                <td className="p-3">{(p.activeMilestone?.plannedDueDate || p.expectedDate)?.slice(0, 10)}</td>
+                <td className="p-3">{p.expectedDate?.slice(0, 10) || "未設定"}</td>
                 <td className="p-3 flex gap-2 justify-center">
                   <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
                   <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">案件細節</Link>

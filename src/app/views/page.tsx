@@ -5,12 +5,13 @@ import { Kanban, BarChart3, Calendar } from "lucide-react";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
-import type { ApiResponse, ProjectWithMilestonesDTO, TaskDTO, ViewsDataDTO } from "@/types/dto";
+import type { ApiResponse, CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO, ViewsDataDTO } from "@/types/dto";
 
 export default function VisualViewsPage() {
   const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
   const [projects, setProjects] = useState<ProjectWithMilestonesDTO[]>([]);
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
+  const [staff, setStaff] = useState<CalendarStaffDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -29,6 +30,7 @@ export default function VisualViewsPage() {
       }
       if (Array.isArray(json.projects)) setProjects(json.projects);
       if (Array.isArray(json.tasks)) setTasks(json.tasks);
+      if (Array.isArray(json.staff)) setStaff(json.staff);
     } catch (err) {
       console.error(err);
       setLoadError(err instanceof Error ? err.message : "載入可視化資料失敗，請稍後再試。");
@@ -147,7 +149,7 @@ export default function VisualViewsPage() {
       {activeTab === "gantt" && <GanttChart projects={projects} tasks={tasks} />}
 
       {activeTab === "calendar" && (
-        <CalendarView projects={projects} tasks={tasks} />
+        <CalendarView projects={projects} tasks={tasks} staff={staff} />
       )}
     </div>
   );

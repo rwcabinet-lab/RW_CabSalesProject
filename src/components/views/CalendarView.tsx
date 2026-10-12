@@ -10,12 +10,13 @@ import {
   MapPin,
   User,
 } from "lucide-react";
-import type { MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
+import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
 
 interface CalendarProps {
   projects: ProjectWithMilestonesDTO[];
   tasks: TaskDTO[];
+  staff: CalendarStaffDTO[];
 }
 
 type CalendarEvent =
@@ -78,12 +79,13 @@ function monthLabel(year: number, month: number): string {
   return `${year} 年 ${String(month + 1).padStart(2, "0")} 月`;
 }
 
-export function CalendarView({ projects, tasks }: CalendarProps) {
+export function CalendarView({ projects, tasks, staff }: CalendarProps) {
   const [month, setMonth] = useState(() => {
     const today = new Date();
     return { year: today.getFullYear(), month: today.getMonth() };
   });
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
+  const [hiddenStaffIds, setHiddenStaffIds] = useState<Set<string>>(() => new Set());
 
   const firstDay = new Date(month.year, month.month, 1);
   const daysInMonth = new Date(month.year, month.month + 1, 0).getDate();
@@ -101,10 +103,12 @@ export function CalendarView({ projects, tasks }: CalendarProps) {
 
   for (const project of projects) {
     for (const milestone of project.milestones) {
+      if (milestone.assignedToId && hiddenStaffIds.has(milestone.assignedToId)) continue;
       addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });
     }
   }
   for (const task of tasks) {
+    if (hiddenStaffIds.has(task.assignedToId)) continue;
     addEvent(toDateKey(task.dueDatetime), { type: "TASK", task });
   }
 
@@ -155,6 +159,31 @@ export function CalendarView({ projects, tasks }: CalendarProps) {
           <span className="ml-2 text-xs text-slate-500">本月共 {currentMonthEvents} 項時程</span>
         </div>
       </div>
+
+      {staff.length > 0 && (
+        <fieldset className="rounded-xl border border-slate-200 bg-white p-4">
+          <legend className="px-1 text-sm font-bold text-slate-800">人員行程</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {staff.map((person) => (
+              <label key={person.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={!hiddenStaffIds.has(person.id)}
+                  onChange={() => setHiddenStaffIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(person.id)) next.delete(person.id);
+                    else next.add(person.id);
+                    return next;
+                  })}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>{person.name}</span>
+                <span className="text-xs text-slate-400">{person.role === "SALES" ? "業務" : "業助"}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="min-w-[800px]">

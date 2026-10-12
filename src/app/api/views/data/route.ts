@@ -6,9 +6,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const projects = await DataService.getProjects();
-    const tasks = await DataService.getTasks();
+    const [projects, tasks, users] = await Promise.all([
+      DataService.getProjects(),
+      DataService.getTasks(),
+      DataService.getLoginUsers(),
+    ]);
     const milestonesByProject = await DataService.getMilestonesByProjectIds(projects.map((project) => project.id));
+    const staff = users
+      .filter((user) => user.role === "SALES" || user.role === "ASSISTANT")
+      .map(({ id, name, role }) => ({ id, name, role }));
 
     const projectsWithMilestones = projects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
@@ -26,6 +32,7 @@ export async function GET() {
     return NextResponse.json({
       projects: projectsWithMilestones,
       tasks,
+      staff,
     });
   } catch (error) {
     console.error("Visual views data error:", error);
