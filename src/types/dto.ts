@@ -263,15 +263,6 @@ export interface StageBottleneckDTO {
   delayedCount: number;
 }
 
-export interface ManagerAssignmentTaskDTO {
-  id: string;
-  assignedToId: string;
-  assignedToName: string;
-  subject: string;
-  priority: TaskPriorityDTO;
-  dueDatetime: string;
-}
-
 export interface ManagerProjectOverviewDTO {
   id: string;
   projectName: string;
@@ -292,7 +283,6 @@ export interface ManagerProjectOverviewDTO {
   activeMilestoneId: string | null;
   activeMilestoneAssignedTo: string | null;
   unassignedNextMilestoneName: string | null;
-  assignmentTasks: ManagerAssignmentTaskDTO[];
 }
 
 export interface AssignableUserDTO {
