@@ -74,6 +74,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [completionModal, setCompletionModal] = useState<{
     milestone: MilestoneWithLight;
     actualDueDate: string;
+    notes: string;
   } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [workflowError, setWorkflowError] = useState("");
@@ -248,7 +249,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const handleToggleCompletion = async (
     milestone: MilestoneWithLight,
     isCompleted: boolean,
-    completedDate?: string
+    completedDate?: string,
+    notes?: string
   ) => {
     const actualDueDate = isCompleted ? completedDate || todayDate() : null;
     setAdvancing(true);
@@ -271,6 +273,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           milestoneId: milestone.id,
           isCompleted,
           actualDueDate,
+          notes,
         }),
       });
       const result = await response.json() as ApiResponse<{ success?: boolean }>;
@@ -496,8 +499,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <div>
                     <div className="flex items-center gap-2 font-bold text-sm">{MILESTONE_STAGE_LABELS[m.stageCode]} <span className={`text-[10px] px-1.5 rounded-full ${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`}>{STATUS_MAP[m.status].label}</span></div>
                     <div className="text-xs text-slate-500 mt-1">
-                      預定完成日：{m.plannedDueDate || "未設定"} | 實際完成日：{m.actualDueDate || "尚未完成"}
-                      {canManageMilestones && ` | 負責人：${m.assignedToName || "未指派"} | 優先度：${m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}`}
+                      負責人：{m.assignedToName || "未指派"} | 預定完成日：{m.plannedDueDate || "未設定"} | 實際完成日：{m.actualDueDate || "尚未完成"}
+                      {canManageMilestones && ` | 優先度：${m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}`}
                     </div>
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">備註：{m.notes}</p>}
                   </div>
@@ -507,7 +510,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         if (m.status === "COMPLETED") {
                           void handleToggleCompletion(m, false);
                         } else {
-                          setCompletionModal({ milestone: m, actualDueDate: todayDate() });
+                          setCompletionModal({ milestone: m, actualDueDate: todayDate(), notes: "" });
                         }
                       }}
                       disabled={advancing || isProjectLost}
@@ -515,7 +518,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     >
                       {m.status === "COMPLETED" ? "未完成" : "完成"}
                     </button>
-                    {canManageMilestones && !isProjectLost && m.status !== "COMPLETED" && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
+                    {canManageMilestones && !isProjectLost && m.status !== "COMPLETED" && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(m)}
+                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-700"
+                      >
+                        <Edit3 className="h-4 w-4" />編輯
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -579,7 +590,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void handleToggleCompletion(completionModal.milestone, true, completionModal.actualDueDate);
+              void handleToggleCompletion(
+                completionModal.milestone,
+                true,
+                completionModal.actualDueDate,
+                completionModal.notes
+              );
             }}
             className="w-full max-w-md rounded-xl bg-white p-6"
           >
@@ -593,6 +609,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 onChange={(event) => setCompletionModal({ ...completionModal, actualDueDate: event.target.value })}
                 disabled={advancing}
                 className="mt-1 w-full border p-2 font-normal disabled:bg-slate-100"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              備註
+              <textarea
+                rows={3}
+                value={completionModal.notes}
+                onChange={(event) => setCompletionModal({ ...completionModal, notes: event.target.value })}
+                disabled={advancing}
+                className="mt-1 w-full border p-2 text-sm font-normal disabled:bg-slate-100"
               />
             </label>
             {workflowError && <p role="alert" className="mt-2 text-sm text-red-600">{workflowError}</p>}

@@ -120,6 +120,9 @@ export async function PUT(
       if (typeof isCompleted !== "boolean") {
         return NextResponse.json({ error: "缺少完成狀態" }, { status: 400 });
       }
+      if (notes !== undefined && typeof notes !== "string") {
+        return NextResponse.json({ error: "完成備註格式無效" }, { status: 400 });
+      }
       if (isCompleted && actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
         return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
       }
@@ -127,7 +130,8 @@ export async function PUT(
         projectId,
         milestoneId,
         isCompleted,
-        isCompleted ? actualDueDate || new Date().toISOString().slice(0, 10) : ""
+        isCompleted ? actualDueDate || new Date().toISOString().slice(0, 10) : "",
+        typeof notes === "string" ? notes : undefined
       );
       const updatedProject = await DataService.getProjectById(projectId);
       return NextResponse.json({ success: true, project: updatedProject, milestones });

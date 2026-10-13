@@ -356,7 +356,8 @@ export const DataService = {
     projectId: string,
     milestoneId: string,
     isCompleted: boolean,
-    completedDate: string
+    completedDate: string,
+    notes?: string
   ) {
     await prisma.$transaction(async (tx) => {
       const milestones = await tx.projectMilestone.findMany({
@@ -376,6 +377,7 @@ export const DataService = {
           data: {
             status: targetStatus,
             actualDueDate: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+            ...(isCompleted && notes?.trim() ? { notes: notes.trim() } : {}),
           },
         });
         await tx.salesTask.updateMany({
@@ -383,6 +385,7 @@ export const DataService = {
           data: {
             isCompleted,
             completedAt: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+            ...(isCompleted && notes?.trim() ? { resultNotes: notes.trim() } : {}),
           },
         });
       }
