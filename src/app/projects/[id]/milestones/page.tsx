@@ -71,7 +71,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
-  const [completionDates, setCompletionDates] = useState<Record<string, string>>({});
+  const [completionModal, setCompletionModal] = useState<{
+    milestone: MilestoneWithLight;
+    actualDueDate: string;
+  } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [workflowError, setWorkflowError] = useState("");
   const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
@@ -242,9 +245,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleToggleCompletion = async (milestone: MilestoneWithLight) => {
-    const isCompleted = milestone.status !== "COMPLETED";
-    const actualDueDate = isCompleted ? completionDates[milestone.id] || todayDate() : null;
+  const handleToggleCompletion = async (
+    milestone: MilestoneWithLight,
+    isCompleted: boolean,
+    completedDate?: string
+  ) => {
+    const actualDueDate = isCompleted ? completedDate || todayDate() : null;
     setAdvancing(true);
     setWorkflowError("");
     setMilestones((current) => current.map((item) =>
@@ -269,13 +275,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const result = await response.json() as ApiResponse<{ success?: boolean }>;
       if (!response.ok) throw new Error(result.error || "完成里程碑失敗");
-      if (!isCompleted) {
-        setCompletionDates((dates) => {
-          const nextDates = { ...dates };
-          delete nextDates[milestone.id];
-          return nextDates;
-        });
-      }
+      if (isCompleted) setCompletionModal(null);
       await fetchData();
     } catch (error) {
       console.error("Failed to toggle milestone completion:", error);
@@ -499,23 +499,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       預定完成日：{m.plannedDueDate || "未設定"} | 實際完成日：{m.actualDueDate || "尚未完成"}
                       {canManageMilestones && ` | 負責人：${m.assignedToName || "未指派"} | 優先度：${m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}`}
                     </div>
-                    {m.status !== "COMPLETED" && (
-                      <label className="mt-2 block text-xs text-slate-600">
-                        實際完成日
-                        <input
-                          type="date"
-                          value={completionDates[m.id] || todayDate()}
-                          onChange={(event) => setCompletionDates({ ...completionDates, [m.id]: event.target.value })}
-                          disabled={advancing || isProjectLost}
-                          className="ml-2 rounded border px-2 py-1 disabled:bg-slate-100"
-                        />
-                      </label>
-                    )}
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleToggleCompletion(m)}
+                      onClick={() => {
+                        if (m.status === "COMPLETED") {
+                          void handleToggleCompletion(m, false);
+                        } else {
+                          setCompletionModal({ milestone: m, actualDueDate: todayDate() });
+                        }
+                      }}
                       disabled={advancing || isProjectLost}
                       className={`rounded px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${m.status === "COMPLETED" ? "bg-amber-100 text-amber-800" : "bg-blue-600 text-white"}`}
                     >
@@ -579,6 +573,45 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           </div>
         ) : <p className="px-4 py-6 text-center text-sm text-slate-500">此案件尚無已完成待辦</p>}
       </section>
+
+      {completionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleToggleCompletion(completionModal.milestone, true, completionModal.actualDueDate);
+            }}
+            className="w-full max-w-md rounded-xl bg-white p-6"
+          >
+            <h3 className="mb-4 font-bold">完成 {MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}</h3>
+            <label className="mb-3 block text-sm font-semibold">
+              實際完成日
+              <input
+                required
+                type="date"
+                value={completionModal.actualDueDate}
+                onChange={(event) => setCompletionModal({ ...completionModal, actualDueDate: event.target.value })}
+                disabled={advancing}
+                className="mt-1 w-full border p-2 font-normal disabled:bg-slate-100"
+              />
+            </label>
+            {workflowError && <p role="alert" className="mt-2 text-sm text-red-600">{workflowError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCompletionModal(null)}
+                disabled={advancing}
+                className="rounded bg-slate-200 px-3 py-1 text-sm disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button type="submit" disabled={advancing} className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50">
+                {advancing ? "處理中..." : "確認完成"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {specialAdvanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
