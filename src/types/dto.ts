@@ -234,6 +234,7 @@ export interface ManagerDashboardDTO {
   salesWorkload: SalesWorkloadDTO[];
   stageBottlenecks: StageBottleneckDTO[];
   allProjectsOverview: ManagerProjectOverviewDTO[];
+  assignedTasks: TaskDTO[];
 }
 
 export interface ManagerAlertDTO {

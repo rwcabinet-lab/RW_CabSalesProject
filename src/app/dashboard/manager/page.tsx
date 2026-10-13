@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
@@ -18,7 +18,9 @@ export default function ManagerDashboardPage() {
 
   // 過濾條件
   const [monthFilter, setMonthFilter] = useState("");
-  const [timeStandard, setTimeStandard] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
+  const [businessFilter, setBusinessFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // 任務指派
   const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
@@ -52,7 +54,7 @@ export default function ManagerDashboardPage() {
       setLoading(true);
       const res = await fetch(`/api/dashboard/manager${monthFilter ? `?month=${monthFilter}` : ""}`);
       const json = await res.json() as ApiResponse<ManagerDashboardDTO>;
-      if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview)) {
+      if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview) || !Array.isArray(json.assignedTasks)) {
         throw new Error(json.error || "無法取得主管看板資料");
       }
       setData(json);
@@ -104,9 +106,13 @@ export default function ManagerDashboardPage() {
 
   // 案場總覽前端二次過濾 (大階段過濾)
   const filteredOverview = data.allProjectsOverview.filter(p => {
-    if (timeStandard && p.currentStage !== timeStandard) return false;
+    if (stageFilter && p.currentStage !== stageFilter) return false;
+    if (businessFilter && p.salesRepName !== businessFilter) return false;
+    const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
+    if (statusFilter && projectStatus !== statusFilter) return false;
     return true;
   });
+  const businessOptions = Array.from(new Set(data.allProjectsOverview.map((project) => project.salesRepName))).sort();
 
   return (
     <div className="space-y-8 pb-16">
@@ -127,7 +133,7 @@ export default function ManagerDashboardPage() {
           <div className="text-right text-3xl font-black tabular-nums">{formatTenThousands(data.kpi.signedTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
-          <div className="text-slate-500 text-xs font-bold mb-1">成交推進率</div>
+          <div className="text-slate-500 text-xs font-bold mb-1">成交率</div>
           <div className="text-3xl font-black">{data.kpi.conversionRate}%</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center border-l-4 border-l-red-500">
@@ -135,6 +141,31 @@ export default function ManagerDashboardPage() {
           <div className="text-3xl font-black text-red-600">{data.kpi.delayedCount}</div>
         </div>
       </div>
+
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b px-6 py-4 font-bold">
+          <CheckSquare className="h-5 w-5 text-blue-600" />登入者指派任務
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">{data.assignedTasks.length}</span>
+        </div>
+        {data.assignedTasks.length ? (
+          <div className="divide-y px-6">
+            {data.assignedTasks.map((task) => (
+              <article key={task.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <div>
+                  <h3 className="font-semibold">{task.subject}</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {task.projectName || "未命名案場"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span>預定完成：{task.dueDatetime.slice(0, 10)}</span>
+                  <Link href={`/projects/${task.projectId}/milestones`} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有指派給登入者的任務</p>}
+      </section>
 
       {/* 恢復：圖表區塊 (人員負載與階段瓶頸) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -184,20 +215,46 @@ export default function ManagerDashboardPage() {
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 所有案件狀態總覽</h2>
-          <div className="flex items-center gap-4 text-sm font-semibold">
+          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
             <label className="flex items-center gap-2">
               月份：<input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="border rounded px-2 py-1" />
             </label>
             <label className="flex items-center gap-2">
-              階段標準：
-              <select value={timeStandard} onChange={(e) => setTimeStandard(e.target.value)} className="border rounded px-2 py-1">
+              狀態：
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
                 <option value="">全部</option>
+                <option value="RED">逾期</option>
+                <option value="YELLOW">即將到期</option>
+                <option value="GREEN">正常</option>
+                <option value="GRAY">未排定/已完成</option>
+                <option value="LOST">流標</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              業務：
+              <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">全部</option>
+                {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              階段：
+              <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">全部</option>
+                <option value="INQUIRY">舊制：詢價</option>
+                <option value="MEASUREMENT">舊制：丈量</option>
+                <option value="QUOTE">舊制：報價</option>
+                <option value="CONTRACT">舊制：簽約</option>
+                <option value="CAD_DRAWING">舊制：繪圖</option>
+                <option value="HANDOFF">舊制：交接</option>
                 <option value="CONTACT">接洽期</option>
                 <option value="DESIGN">設計確認期</option>
                 <option value="PRODUCTION">生產施工期</option>
                 <option value="CLOSED">結案</option>
+                <option value="BILLED">已立帳</option>
                 <option value="WRAP_UP">收尾</option>
                 <option value="LOST">流標</option>
+                <option value="DONE">完成</option>
               </select>
             </label>
           </div>

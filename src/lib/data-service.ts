@@ -246,6 +246,17 @@ export const DataService = {
 
   async updateMilestone(projectId: string, milestoneId: string, updates: Partial<ProjectMilestoneItem>) {
     await prisma.$transaction(async (tx) => {
+      const currentMilestone = await tx.projectMilestone.findFirst({
+        where: { id: milestoneId, projectId },
+        select: { status: true },
+      });
+      if (!currentMilestone) {
+        throw new Error("找不到此里程碑");
+      }
+      if (currentMilestone.status === MilestoneStatus.COMPLETED) {
+        throw new Error("已完成的里程碑不可編輯");
+      }
+
       const milestone = await tx.projectMilestone.update({
         where: { id: milestoneId, projectId },
         data: {

@@ -17,14 +17,20 @@ function isValidDueDate(value: unknown): value is string {
 // GET /api/dashboard/manager?month=2026-09&timeStandard=sign
 export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const monthFilter = searchParams.get("month");
 
     const projects = await DataService.getProjects();
     const projectIds = projects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject] = await Promise.all([
+    const [milestonesByProject, latestQuotesByProject, assignedTasks] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
+      DataService.getTasks({ assignedToId: user.id }),
     ]);
 
     // 1. KPI 計算
@@ -70,15 +76,21 @@ export async function GET(req: NextRequest) {
       });
 
     // 3. 業務負載分佈
-    const workloadMap: Record<string, { total: number; delayed: number }> = {};
+    const workloadMap: Record<string, { name: string; total: number; delayed: number }> = {};
+    const addWorkload = (key: string, name: string, isDelayed: boolean) => {
+      if (!workloadMap[key]) workloadMap[key] = { name, total: 0, delayed: 0 };
+      workloadMap[key].total++;
+      if (isDelayed) workloadMap[key].delayed++;
+    };
     for (const p of projects) {
-      const rep = p.salesRepName || "其他業務";
-      if (!workloadMap[rep]) workloadMap[rep] = { total: 0, delayed: 0 };
-      workloadMap[rep].total++;
-      if (p.isDelayed) workloadMap[rep].delayed++;
+      const salesRepName = p.customerSalesRepName || p.salesRepName || "其他業務";
+      addWorkload(`sales:${p.customerSalesRepId || p.salesRepId}`, `${salesRepName}（業務）`, p.isDelayed);
+      if (p.salesAssistantId && p.salesAssistantName) {
+        addWorkload(`assistant:${p.salesAssistantId}`, `${p.salesAssistantName}（業助）`, p.isDelayed);
+      }
     }
-    const salesWorkload = Object.entries(workloadMap).map(([name, stat]) => ({
-      salesRepName: name,
+    const salesWorkload = Object.values(workloadMap).map((stat) => ({
+      salesRepName: stat.name,
       totalProjects: stat.total,
       delayedProjects: stat.delayed,
     }));
@@ -190,6 +202,7 @@ export async function GET(req: NextRequest) {
       salesWorkload,
       stageBottlenecks,
       allProjectsOverview,
+      assignedTasks,
     });
   } catch (error) {
     console.error("主管看板資料錯誤:", error);

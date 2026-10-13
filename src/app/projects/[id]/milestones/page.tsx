@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -73,6 +73,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [editError, setEditError] = useState("");
   const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", actualDueDate: todayDate(), notes: "" });
   const [advancing, setAdvancing] = useState(false);
+  const [advanceCountdown, setAdvanceCountdown] = useState<number | null>(null);
+  const advanceDelayToken = useRef(0);
   const [advanceError, setAdvanceError] = useState("");
   const [workflowError, setWorkflowError] = useState("");
   const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
@@ -246,8 +248,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const handleAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdvancing(true);
+    const delayToken = ++advanceDelayToken.current;
     setAdvanceError("");
     try {
+      for (let seconds = 10; seconds > 0; seconds--) {
+        if (delayToken !== advanceDelayToken.current) return;
+        setAdvanceCountdown(seconds);
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      if (delayToken !== advanceDelayToken.current) return;
+      setAdvanceCountdown(null);
+
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -265,7 +276,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("Failed to complete milestone:", error);
       setAdvanceError(error instanceof Error ? error.message : "完成里程碑失敗");
-    } finally { setAdvancing(false); }
+    } finally {
+      setAdvancing(false);
+      setAdvanceCountdown(null);
+    }
   };
 
   const handleRollback = async (milestoneId: string) => {
@@ -498,29 +512,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2 font-bold text-sm">{MILESTONE_STAGE_LABELS[m.stageCode]} <span className={`text-[10px] px-1.5 rounded-full ${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`}>{STATUS_MAP[m.status].label}</span></div>
-                    {canManageMilestones ? (
-                      <div className="text-xs text-slate-500 mt-1">
-                        預定完成日：{m.plannedDueDate || "未設定"} | 負責人：{m.assignedToName || "未指派"} | 優先度：{m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-500 mt-1">實際完成日：{m.actualDueDate || "尚未完成"}</div>
-                    )}
+                    <div className="text-xs text-slate-500 mt-1">
+                      預定完成日：{m.plannedDueDate || "未設定"} | 實際完成日：{m.actualDueDate || "尚未完成"}
+                      {canManageMilestones && ` | 負責人：${m.assignedToName || "未指派"} | 優先度：${m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}`}
+                    </div>
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {(project?.currentStage === "WRAP_UP"
-                      ? m.stageCode === "X-1"
-                      : project?.currentStage !== "LOST") &&
-                      (m.status === "IN_PROGRESS" || m.status === "OVERDUE") && (
+                    {m.status === "COMPLETED" ? (
+                      <button onClick={() => handleRollback(m.id)} disabled={!canManageMilestones || isProjectLost || advancing || m.id !== lastCompletedMilestone?.id} className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 disabled:cursor-not-allowed disabled:opacity-50">回退</button>
+                    ) : (
                       <button onClick={() => {
                         setAdvanceError("");
                         setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], actualDueDate: todayDate(), notes: "" });
-                      }} className="bg-blue-600 text-white px-2 py-1 text-xs rounded">完成</button>
+                      }} disabled={advancing || !project || isProjectLost || !["IN_PROGRESS", "OVERDUE"].includes(m.status) || (project.currentStage === "WRAP_UP" && m.stageCode !== "X-1")} className="bg-blue-600 text-white px-2 py-1 text-xs rounded disabled:cursor-not-allowed disabled:opacity-50">完成</button>
                     )}
-                    {canManageMilestones && !isProjectLost && !m.stageCode.startsWith("X-") && m.status === "COMPLETED" && m.id === lastCompletedMilestone?.id && (
-                      <button onClick={() => handleRollback(m.id)} disabled={advancing} className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 disabled:opacity-50">回退</button>
-                    )}
-                    {canManageMilestones && !isProjectLost && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
+                    {canManageMilestones && !isProjectLost && m.status !== "COMPLETED" && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
                   </div>
                 </div>
               )}
@@ -585,16 +592,21 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <h3 className="font-bold mb-4">完成 {advanceModal.milestoneName}</h3>
             <label className="mb-3 block text-sm font-semibold">
               實際完成日
-              <input required type="date" value={advanceModal.actualDueDate} onChange={(e) => setAdvanceModal({...advanceModal, actualDueDate: e.target.value})} className="mt-1 w-full border p-2 font-normal"/>
+              <input required type="date" disabled={advancing} value={advanceModal.actualDueDate} onChange={(e) => setAdvanceModal({...advanceModal, actualDueDate: e.target.value})} className="mt-1 w-full border p-2 font-normal disabled:bg-slate-100"/>
             </label>
             <label className="block text-sm font-semibold">
               備註
-              <textarea className="mt-1 w-full border p-2 text-sm font-normal" value={advanceModal.notes} onChange={(e) => setAdvanceModal({...advanceModal, notes: e.target.value})} />
+              <textarea disabled={advancing} className="mt-1 w-full border p-2 text-sm font-normal disabled:bg-slate-100" value={advanceModal.notes} onChange={(e) => setAdvanceModal({...advanceModal, notes: e.target.value})} />
             </label>
             {advanceError && <p role="alert" className="mt-2 text-sm text-red-600">{advanceError}</p>}
             <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setAdvanceModal({...advanceModal, open: false})} className="px-3 py-1 text-sm bg-slate-200 rounded">取消</button>
-              <button type="submit" disabled={advancing} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">完成</button>
+              <button type="button" onClick={() => {
+                advanceDelayToken.current++;
+                setAdvanceModal({...advanceModal, open: false});
+              }} disabled={advancing && advanceCountdown === null} className="px-3 py-1 text-sm bg-slate-200 rounded disabled:opacity-50">取消</button>
+              <button type="submit" disabled={advancing} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">
+                {advanceCountdown !== null ? `等待 ${advanceCountdown} 秒後完成` : advancing ? "處理中..." : "完成"}
+              </button>
             </div>
           </form>
         </div>

@@ -213,10 +213,12 @@ export async function PUT(
       error.message === "只能完成目前進行中的里程碑" ||
       error.message === "只能完成目前進行中的收尾項目" ||
       error.message === "案件已離開收尾階段" ||
+      error.message === "已完成的里程碑不可編輯" ||
+      error.message === "找不到此里程碑" ||
       error.message === "找不到已完成的里程碑" ||
       error.message === "請由最後一個已完成的里程碑開始回退"
     )) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
+      return NextResponse.json({ error: error.message }, { status: error.message === "找不到此里程碑" ? 404 : 409 });
     }
     return NextResponse.json({ error: "更新里程碑失敗" }, { status: 500 });
   }
