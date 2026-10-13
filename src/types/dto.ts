@@ -278,8 +278,7 @@ export interface ManagerProjectOverviewDTO {
   expectedDate: string;
   unitCount?: number;
   totalAmount: number | null;
-  recentlyCompletedMilestoneName: string | null;
-  recentlyCompletedMilestoneDate: string | null;
+  lastCompletedMilestoneName: string | null;
   activeMilestoneName: string | null;
   activeMilestoneId: string | null;
   activeMilestoneAssignedTo: string | null;

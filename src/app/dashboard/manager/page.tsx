@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Kanban, LayoutDashboard, Clock, CheckCircle2, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Clock, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
@@ -154,7 +154,7 @@ export default function ManagerDashboardPage() {
                 <div>
                   <h3 className="font-semibold">{task.subject}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {task.projectName || "未命名案場"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -276,14 +276,7 @@ export default function ManagerDashboardPage() {
                 <td className="p-3 font-bold">{p.projectName}</td>
                 <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
                 <td className="p-3 font-bold text-slate-700">
-                  {p.currentStage === "LOST" ? p.currentStageLabel : `${p.currentStageLabel} - ${p.activeMilestoneName}`}
-                  {p.recentlyCompletedMilestoneName && (
-                    <div className="mt-2 inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-800 shadow-sm">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      階段項目已完成：{p.recentlyCompletedMilestoneName}
-                      {p.recentlyCompletedMilestoneDate && `（${p.recentlyCompletedMilestoneDate}）`}
-                    </div>
-                  )}
+                  {p.currentStage === "LOST" ? p.currentStageLabel : `${p.currentStageLabel} - ${p.lastCompletedMilestoneName || p.activeMilestoneName}`}
                   {p.unassignedNextMilestoneName && (
                     <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-black text-red-700">
                       <AlertCircle className="h-3.5 w-3.5" />

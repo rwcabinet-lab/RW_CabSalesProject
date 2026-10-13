@@ -636,11 +636,12 @@ export const DataService = {
     return this.getMilestonesByProjectId(projectId);
   },
 
-  async getTasks(filter?: { projectId?: string; assignedToId?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
+  async getTasks(filter?: { projectId?: string; assignedToId?: string; assignedById?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
     const tasks = await prisma.salesTask.findMany({
       where: {
         ...(filter?.projectId ? { projectId: filter.projectId } : {}),
         ...(filter?.assignedToId ? { assignedToId: filter.assignedToId } : {}),
+        ...(filter?.assignedById ? { assignedById: filter.assignedById } : {}),
         ...(filter?.isCompleted !== undefined ? { isCompleted: filter.isCompleted } : {}),
       },
       relationLoadStrategy: "join",

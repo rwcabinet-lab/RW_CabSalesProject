@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const [milestonesByProject, latestQuotesByProject, assignedTasks] = await Promise.all([
       DataService.getMilestonesByProjectIds(projectIds),
       DataService.getLatestQuotesByProjectIds(projectIds),
-      DataService.getTasks({ assignedToId: user.id }),
+      DataService.getTasks({ assignedById: user.id }),
     ]);
 
     // 1. KPI 計算
@@ -122,12 +122,9 @@ export async function GET(req: NextRequest) {
 
     const allProjectsOverview = filteredProjects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
-      const recentlyCompletedMilestone = milestones
+      const lastCompletedMilestone = milestones
         .filter((milestone) => milestone.status === "COMPLETED")
-        .sort((a, b) =>
-          (b.actualDueDate || "").localeCompare(a.actualDueDate || "") ||
-          b.stageOrder - a.stageOrder
-        )[0];
+        .sort((a, b) => b.stageOrder - a.stageOrder)[0];
       const activeMilestone = p.currentStage === "LOST"
         ? null
         : milestones.find((m) => m.status === "OVERDUE") ||
@@ -152,10 +149,9 @@ export async function GET(req: NextRequest) {
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,
         totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
-        recentlyCompletedMilestoneName: recentlyCompletedMilestone
-          ? MILESTONE_STAGE_LABELS[recentlyCompletedMilestone.stageCode]
+        lastCompletedMilestoneName: lastCompletedMilestone
+          ? MILESTONE_STAGE_LABELS[lastCompletedMilestone.stageCode]
           : null,
-        recentlyCompletedMilestoneDate: recentlyCompletedMilestone?.actualDueDate || null,
         activeMilestoneName: p.currentStage === "LOST"
           ? null
           : activeMilestone
