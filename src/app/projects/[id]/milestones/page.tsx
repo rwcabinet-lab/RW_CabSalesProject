@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -73,8 +73,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [editError, setEditError] = useState("");
   const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", actualDueDate: todayDate(), notes: "" });
   const [advancing, setAdvancing] = useState(false);
-  const [advanceCountdown, setAdvanceCountdown] = useState<number | null>(null);
-  const advanceDelayToken = useRef(0);
   const [advanceError, setAdvanceError] = useState("");
   const [workflowError, setWorkflowError] = useState("");
   const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
@@ -248,17 +246,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const handleAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdvancing(true);
-    const delayToken = ++advanceDelayToken.current;
     setAdvanceError("");
     try {
-      for (let seconds = 10; seconds > 0; seconds--) {
-        if (delayToken !== advanceDelayToken.current) return;
-        setAdvanceCountdown(seconds);
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
-      }
-      if (delayToken !== advanceDelayToken.current) return;
-      setAdvanceCountdown(null);
-
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -278,7 +267,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setAdvanceError(error instanceof Error ? error.message : "完成里程碑失敗");
     } finally {
       setAdvancing(false);
-      setAdvanceCountdown(null);
     }
   };
 
@@ -600,12 +588,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             </label>
             {advanceError && <p role="alert" className="mt-2 text-sm text-red-600">{advanceError}</p>}
             <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => {
-                advanceDelayToken.current++;
-                setAdvanceModal({...advanceModal, open: false});
-              }} disabled={advancing && advanceCountdown === null} className="px-3 py-1 text-sm bg-slate-200 rounded disabled:opacity-50">取消</button>
+              <button type="button" onClick={() => setAdvanceModal({...advanceModal, open: false})} disabled={advancing} className="px-3 py-1 text-sm bg-slate-200 rounded disabled:opacity-50">取消</button>
               <button type="submit" disabled={advancing} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">
-                {advanceCountdown !== null ? `等待 ${advanceCountdown} 秒後完成` : advancing ? "處理中..." : "完成"}
+                {advancing ? "處理中..." : "完成"}
               </button>
             </div>
           </form>
