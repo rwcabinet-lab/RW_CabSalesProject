@@ -352,6 +352,76 @@ export const DataService = {
     return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
   },
 
+  async setMilestoneCompletion(
+    projectId: string,
+    milestoneId: string,
+    isCompleted: boolean,
+    completedDate: string
+  ) {
+    await prisma.$transaction(async (tx) => {
+      const milestones = await tx.projectMilestone.findMany({
+        where: { projectId },
+        orderBy: { stageOrder: "asc" },
+      });
+      const target = milestones.find((milestone) => milestone.id === milestoneId);
+      if (!target) {
+        throw new Error("找不到此里程碑");
+      }
+
+      const targetStatus = isCompleted ? MilestoneStatus.COMPLETED : MilestoneStatus.IN_PROGRESS;
+      const targetChanged = target.status !== targetStatus;
+      if (targetChanged) {
+        await tx.projectMilestone.update({
+          where: { id: milestoneId, projectId },
+          data: {
+            status: targetStatus,
+            actualDueDate: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+          },
+        });
+        await tx.salesTask.updateMany({
+          where: { milestoneId },
+          data: {
+            isCompleted,
+            completedAt: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+          },
+        });
+      }
+
+      const nextMilestones = milestones.map((milestone) => ({
+        id: milestone.id,
+        projectId: milestone.projectId,
+        stageCode: milestone.stageCode as MilestoneStageCode,
+        phase: milestone.phase as MilestonePhaseDTO,
+        stageOrder: milestone.stageOrder,
+        plannedDueDate: dateOnlyValue(milestone.plannedDueDate),
+        actualDueDate: milestone.id === milestoneId
+          ? targetChanged && isCompleted
+            ? completedDate
+            : targetChanged
+              ? null
+              : dateOnlyValue(milestone.actualDueDate)
+          : dateOnlyValue(milestone.actualDueDate),
+        status: milestone.id === milestoneId ? targetStatus : milestone.status,
+        priority: milestone.priority,
+        assignedToId: milestone.assignedToId,
+        attachments: milestone.attachments,
+        notes: milestone.notes,
+      }));
+      const firstIncomplete = nextMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
+      const currentStage = firstIncomplete
+        ? STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode] as ProjectStage
+        : target.stageCode === "X-1" ? ProjectStage.WRAP_UP : ProjectStage.DONE;
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(nextMilestones);
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStage, isDelayed },
+      });
+    });
+
+    return this.getMilestonesByProjectId(projectId);
+  },
+
   async rollbackMilestone(projectId: string, milestoneId: string) {
     const milestones = await this.getMilestonesByProjectId(projectId);
     const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);

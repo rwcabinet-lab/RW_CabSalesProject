@@ -52,7 +52,7 @@ export async function PUT(
   try {
     const projectId = params.id;
     const body = await req.json();
-    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate } = body;
+    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted } = body;
     const user = await getUserFromRequest(req);
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
@@ -116,6 +116,23 @@ export async function PUT(
       return NextResponse.json({ success: true, project: updatedProject, milestones });
     }
 
+    if (action === "toggleCompletion") {
+      if (typeof isCompleted !== "boolean") {
+        return NextResponse.json({ error: "缺少完成狀態" }, { status: 400 });
+      }
+      if (isCompleted && actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
+        return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
+      }
+      const milestones = await DataService.setMilestoneCompletion(
+        projectId,
+        milestoneId,
+        isCompleted,
+        isCompleted ? actualDueDate || new Date().toISOString().slice(0, 10) : ""
+      );
+      const updatedProject = await DataService.getProjectById(projectId);
+      return NextResponse.json({ success: true, project: updatedProject, milestones });
+    }
+
     if (action !== "advance") {
       if (!isManager) {
         return NextResponse.json({ error: "僅理級主管或業務主管可編輯里程碑" }, { status: 403 });
@@ -140,8 +157,8 @@ export async function PUT(
       }
       if (typeof updates.assignedToId === "string" && updates.assignedToId) {
         const assignee = await DataService.getUserById(updates.assignedToId);
-        if (!assignee || (assignee.role !== "SALES" && assignee.role !== "ASSISTANT")) {
-          return NextResponse.json({ error: "負責人必須是有效的業務或業助帳號" }, { status: 400 });
+        if (!assignee || !["SALES_MANAGER", "SALES", "ASSISTANT"].includes(assignee.role)) {
+          return NextResponse.json({ error: "負責人必須是有效的業務主管、業務或業助帳號" }, { status: 400 });
         }
       }
     }

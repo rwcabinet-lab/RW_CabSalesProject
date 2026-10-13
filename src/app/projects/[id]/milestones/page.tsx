@@ -71,9 +71,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
-  const [advanceModal, setAdvanceModal] = useState({ open: false, milestoneId: "", milestoneName: "", actualDueDate: todayDate(), notes: "" });
+  const [completionDates, setCompletionDates] = useState<Record<string, string>>({});
   const [advancing, setAdvancing] = useState(false);
-  const [advanceError, setAdvanceError] = useState("");
   const [workflowError, setWorkflowError] = useState("");
   const [specialAdvanceModal, setSpecialAdvanceModal] = useState<{
     stageCode: "X-1" | "X-2";
@@ -113,7 +112,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const res = await fetch("/api/auth/users");
       const data = await res.json() as ApiResponse<UserDTO[]>;
       if (Array.isArray(data)) {
-        setAssignees(data.filter((user) => user.role === "SALES" || user.role === "ASSISTANT"));
+        setAssignees(data.filter((user) => user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"));
       }
     } catch (err) {
       console.error(err);
@@ -243,48 +242,45 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleAdvance = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleToggleCompletion = async (milestone: MilestoneWithLight) => {
+    const isCompleted = milestone.status !== "COMPLETED";
+    const actualDueDate = isCompleted ? completionDates[milestone.id] || todayDate() : null;
     setAdvancing(true);
-    setAdvanceError("");
+    setWorkflowError("");
+    setMilestones((current) => current.map((item) =>
+      item.id === milestone.id
+        ? {
+            ...item,
+            status: isCompleted ? "COMPLETED" : "IN_PROGRESS",
+            actualDueDate,
+          }
+        : item
+    ));
     try {
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "advance",
-          milestoneId: advanceModal.milestoneId,
-          notes: advanceModal.notes,
-          actualDueDate: advanceModal.actualDueDate,
+          action: "toggleCompletion",
+          milestoneId: milestone.id,
+          isCompleted,
+          actualDueDate,
         }),
       });
       const result = await response.json() as ApiResponse<{ success?: boolean }>;
       if (!response.ok) throw new Error(result.error || "完成里程碑失敗");
-      setAdvanceModal({ open: false, milestoneId: "", milestoneName: "", actualDueDate: todayDate(), notes: "" });
+      if (!isCompleted) {
+        setCompletionDates((dates) => {
+          const nextDates = { ...dates };
+          delete nextDates[milestone.id];
+          return nextDates;
+        });
+      }
       await fetchData();
     } catch (error) {
-      console.error("Failed to complete milestone:", error);
-      setAdvanceError(error instanceof Error ? error.message : "完成里程碑失敗");
-    } finally {
-      setAdvancing(false);
-    }
-  };
-
-  const handleRollback = async (milestoneId: string) => {
-    setAdvancing(true);
-    setWorkflowError("");
-    try {
-      const response = await fetch(`/api/projects/${projectId}/milestones`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "rollback", milestoneId }),
-      });
-      const result = await response.json() as ApiResponse<{ success?: boolean }>;
-      if (!response.ok) throw new Error(result.error || "回退里程碑失敗");
+      console.error("Failed to toggle milestone completion:", error);
       await fetchData();
-    } catch (error) {
-      console.error("Failed to roll back milestone:", error);
-      setWorkflowError(error instanceof Error ? error.message : "回退里程碑失敗");
+      setWorkflowError(error instanceof Error ? error.message : "更新里程碑狀態失敗");
     } finally {
       setAdvancing(false);
     }
@@ -359,7 +355,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     if (!ms.length) return 0;
     return Math.round((ms.filter((m) => m.status === "COMPLETED").length / ms.length) * 100);
   };
-  const lastCompletedMilestone = [...milestones].reverse().find((item) => item.status === "COMPLETED");
   const isProjectLost = project?.currentStage === "LOST";
 
   return (
@@ -481,7 +476,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     <label>負責人
                       <select value={editForm.assignedToId} onChange={(e) => setEditForm({...editForm, assignedToId: e.target.value})} className="border w-full p-1">
                         <option value="">未指定</option>
-                        {assignees.map((user) => <option key={user.id} value={user.id}>{user.role === "SALES" ? "業務" : "業助"}｜{user.name}</option>)}
+                        {assignees.map((user) => <option key={user.id} value={user.id}>{user.role === "SALES_MANAGER" ? "業務主管" : user.role === "SALES" ? "業務" : "業助"}｜{user.name}</option>)}
                       </select>
                     </label>
                     <label>優先度
@@ -504,17 +499,28 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       預定完成日：{m.plannedDueDate || "未設定"} | 實際完成日：{m.actualDueDate || "尚未完成"}
                       {canManageMilestones && ` | 負責人：${m.assignedToName || "未指派"} | 優先度：${m.priority === "HIGH" ? "高" : m.priority === "LOW" ? "低" : "中"}`}
                     </div>
+                    {m.status !== "COMPLETED" && (
+                      <label className="mt-2 block text-xs text-slate-600">
+                        實際完成日
+                        <input
+                          type="date"
+                          value={completionDates[m.id] || todayDate()}
+                          onChange={(event) => setCompletionDates({ ...completionDates, [m.id]: event.target.value })}
+                          disabled={advancing || isProjectLost}
+                          className="ml-2 rounded border px-2 py-1 disabled:bg-slate-100"
+                        />
+                      </label>
+                    )}
                     {m.notes && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">備註：{m.notes}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {m.status === "COMPLETED" ? (
-                      <button onClick={() => handleRollback(m.id)} disabled={!canManageMilestones || isProjectLost || advancing || m.id !== lastCompletedMilestone?.id} className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 disabled:cursor-not-allowed disabled:opacity-50">回退</button>
-                    ) : (
-                      <button onClick={() => {
-                        setAdvanceError("");
-                        setAdvanceModal({ open: true, milestoneId: m.id, milestoneName: MILESTONE_STAGE_LABELS[m.stageCode], actualDueDate: todayDate(), notes: "" });
-                      }} disabled={advancing || !project || isProjectLost || !["IN_PROGRESS", "OVERDUE"].includes(m.status) || (project.currentStage === "WRAP_UP" && m.stageCode !== "X-1")} className="bg-blue-600 text-white px-2 py-1 text-xs rounded disabled:cursor-not-allowed disabled:opacity-50">完成</button>
-                    )}
+                    <button
+                      onClick={() => handleToggleCompletion(m)}
+                      disabled={advancing || isProjectLost}
+                      className={`rounded px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${m.status === "COMPLETED" ? "bg-amber-100 text-amber-800" : "bg-blue-600 text-white"}`}
+                    >
+                      {m.status === "COMPLETED" ? "未完成" : "完成"}
+                    </button>
                     {canManageMilestones && !isProjectLost && m.status !== "COMPLETED" && <button onClick={() => startEdit(m)} className="text-slate-500"><Edit3 className="w-4 h-4"/></button>}
                   </div>
                 </div>
@@ -573,29 +579,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           </div>
         ) : <p className="px-4 py-6 text-center text-sm text-slate-500">此案件尚無已完成待辦</p>}
       </section>
-
-      {advanceModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
-          <form onSubmit={handleAdvance} className="w-full max-w-md rounded-xl bg-white p-6">
-            <h3 className="font-bold mb-4">完成 {advanceModal.milestoneName}</h3>
-            <label className="mb-3 block text-sm font-semibold">
-              實際完成日
-              <input required type="date" disabled={advancing} value={advanceModal.actualDueDate} onChange={(e) => setAdvanceModal({...advanceModal, actualDueDate: e.target.value})} className="mt-1 w-full border p-2 font-normal disabled:bg-slate-100"/>
-            </label>
-            <label className="block text-sm font-semibold">
-              備註
-              <textarea disabled={advancing} className="mt-1 w-full border p-2 text-sm font-normal disabled:bg-slate-100" value={advanceModal.notes} onChange={(e) => setAdvanceModal({...advanceModal, notes: e.target.value})} />
-            </label>
-            {advanceError && <p role="alert" className="mt-2 text-sm text-red-600">{advanceError}</p>}
-            <div className="flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setAdvanceModal({...advanceModal, open: false})} disabled={advancing} className="px-3 py-1 text-sm bg-slate-200 rounded disabled:opacity-50">取消</button>
-              <button type="submit" disabled={advancing} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">
-                {advancing ? "處理中..." : "完成"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {specialAdvanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
