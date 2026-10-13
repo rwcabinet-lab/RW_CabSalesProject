@@ -27,7 +27,7 @@ import type {
   TrafficLightDTO,
   UserDTO,
 } from "@/types/dto";
-import { formatTenThousands } from "@/lib/currency";
+import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 
 interface MilestoneWithLight extends MilestoneDTO {
   trafficLight: TrafficLightDTO;
@@ -84,6 +84,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     reason: string;
   } | null>(null);
   const [specialAdvanceError, setSpecialAdvanceError] = useState("");
+  const [projectEditOpen, setProjectEditOpen] = useState(false);
+  const [projectEditSaving, setProjectEditSaving] = useState(false);
+  const [projectEditError, setProjectEditError] = useState("");
+  const [projectEditForm, setProjectEditForm] = useState({
+    projectName: "",
+    siteAddress: "",
+    siteCondition: "",
+    expectedDate: "",
+    unitCount: "",
+    cost: "",
+    quoteAmount: "",
+  });
 
   useEffect(() => {
     fetchData();
@@ -204,6 +216,52 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoadError(err instanceof Error ? err.message : "無法載入案件里程碑");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openProjectEdit = () => {
+    if (!project) return;
+    setProjectEditForm({
+      projectName: project.projectName,
+      siteAddress: project.siteAddress,
+      siteCondition: project.siteCondition || "",
+      expectedDate: project.expectedDate?.slice(0, 10) || "",
+      unitCount: project.unitCount?.toString() || "",
+      cost: project.cost != null ? toTenThousands(project.cost).toFixed(1) : "",
+      quoteAmount: project.quoteAmount != null ? toTenThousands(project.quoteAmount).toFixed(1) : "",
+    });
+    setProjectEditError("");
+    setProjectEditOpen(true);
+  };
+
+  const handleSaveProjectEdit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!project) return;
+    setProjectEditSaving(true);
+    setProjectEditError("");
+    try {
+      const response = await fetch("/api/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: project.id,
+          ...projectEditForm,
+          siteCondition: projectEditForm.siteCondition.trim(),
+          expectedDate: projectEditForm.expectedDate || "",
+          unitCount: projectEditForm.unitCount ? Number(projectEditForm.unitCount) : null,
+          cost: projectEditForm.cost ? fromTenThousands(Number(projectEditForm.cost)) : null,
+          quoteAmount: projectEditForm.quoteAmount ? fromTenThousands(Number(projectEditForm.quoteAmount)) : null,
+        }),
+      });
+      const result = await response.json() as ApiResponse<{ project?: ProjectDTO }>;
+      if (!response.ok) throw new Error(result.error || "儲存案件資料失敗");
+      setProjectEditOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to save project details:", error);
+      setProjectEditError(error instanceof Error ? error.message : "儲存案件資料失敗");
+    } finally {
+      setProjectEditSaving(false);
     }
   };
 
@@ -396,6 +454,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   目前階段：{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={openProjectEdit}
+                className="inline-flex items-center gap-1 rounded bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-200"
+              >
+                <Edit3 className="h-3.5 w-3.5" />編輯案件資料
+              </button>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 pt-3 text-sm md:grid-cols-4">
@@ -405,7 +470,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><dt className="text-xs text-slate-500">預計完工日</dt><dd className="font-semibold">{project.expectedDate?.slice(0, 10) || "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">戶數</dt><dd className="font-semibold">{project.unitCount ?? "未設定"}</dd></div>
             <div><dt className="text-xs text-slate-500">預算 / 報價</dt><dd className="text-right font-semibold tabular-nums">{(project.quoteAmount ?? project.estimatedBudget) != null ? formatTenThousands(project.quoteAmount ?? project.estimatedBudget ?? 0) : "未設定"}</dd></div>
-            <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition || "未填寫"}</dd></div>
+            {project.siteCondition?.trim() ? (
+              <div className="col-span-2 md:col-span-2"><dt className="text-xs text-slate-500">現場狀況</dt><dd className="font-semibold">{project.siteCondition}</dd></div>
+            ) : null}
           </dl>
         </section>
       )}
@@ -634,6 +701,47 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <button type="submit" disabled={advancing} className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50">
                 {advancing ? "處理中..." : "確認完成"}
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {projectEditOpen && project && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={handleSaveProjectEdit} className="w-full max-w-2xl space-y-4 rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">編輯案件資料</h3>
+              <button type="button" onClick={() => setProjectEditOpen(false)} disabled={projectEditSaving} aria-label="關閉">
+                <X className="h-5 w-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <label className="font-semibold">案場名稱 *
+                <input required value={projectEditForm.projectName} onChange={(event) => setProjectEditForm({ ...projectEditForm, projectName: event.target.value })} className="mt-1 w-full rounded border p-2 font-normal" />
+              </label>
+              <label className="font-semibold">施工地址 *
+                <input required value={projectEditForm.siteAddress} onChange={(event) => setProjectEditForm({ ...projectEditForm, siteAddress: event.target.value })} className="mt-1 w-full rounded border p-2 font-normal" />
+              </label>
+              <label className="font-semibold">現場狀況
+                <input value={projectEditForm.siteCondition} onChange={(event) => setProjectEditForm({ ...projectEditForm, siteCondition: event.target.value })} className="mt-1 w-full rounded border p-2 font-normal" />
+              </label>
+              <label className="font-semibold">預計完工日
+                <input type="date" value={projectEditForm.expectedDate} onChange={(event) => setProjectEditForm({ ...projectEditForm, expectedDate: event.target.value })} className="mt-1 w-full rounded border p-2 font-normal" />
+              </label>
+              <label className="font-semibold">戶數
+                <input type="number" min="0" value={projectEditForm.unitCount} onChange={(event) => setProjectEditForm({ ...projectEditForm, unitCount: event.target.value })} className="mt-1 w-full rounded border p-2 font-normal" />
+              </label>
+              <label className="font-semibold">成本金額（萬）
+                <input type="number" min="0" step="0.1" value={projectEditForm.cost} onChange={(event) => setProjectEditForm({ ...projectEditForm, cost: event.target.value })} className="mt-1 w-full rounded border p-2 text-right font-normal tabular-nums" />
+              </label>
+              <label className="font-semibold">報價金額（萬）
+                <input type="number" min="0" step="0.1" value={projectEditForm.quoteAmount} onChange={(event) => setProjectEditForm({ ...projectEditForm, quoteAmount: event.target.value })} className="mt-1 w-full rounded border p-2 text-right font-normal tabular-nums" />
+              </label>
+            </div>
+            {projectEditError && <p role="alert" className="text-sm text-red-600">{projectEditError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setProjectEditOpen(false)} disabled={projectEditSaving} className="rounded bg-slate-200 px-4 py-2 text-sm disabled:opacity-50">取消</button>
+              <button type="submit" disabled={projectEditSaving} className="rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{projectEditSaving ? "儲存中..." : "儲存案件資料"}</button>
             </div>
           </form>
         </div>

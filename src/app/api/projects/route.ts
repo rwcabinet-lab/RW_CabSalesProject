@@ -70,6 +70,9 @@ export async function POST(req: NextRequest) {
 // PATCH /api/projects — 修改案場資料
 export async function PATCH(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const body = await req.json();
     const { id, ...data } = body;
     if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });

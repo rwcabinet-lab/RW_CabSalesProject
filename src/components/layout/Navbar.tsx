@@ -9,7 +9,7 @@ import type { ApiResponse } from "@/types/dto";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "業務工作台", icon: LayoutDashboard },
-  { key: "manager", href: "/dashboard/manager", label: "主管監控看板", icon: Kanban },
+  { key: "manager", href: "/dashboard/manager", label: "主管監控室", icon: Kanban },
   { key: "views", href: "/views", label: "多元可視化", icon: HardHat },
   { key: "customers", href: "/customers", label: "客戶主檔", icon: Users },
   { key: "admin", href: "/admin", label: "管理者設定", icon: Settings },

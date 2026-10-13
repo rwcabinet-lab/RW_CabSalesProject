@@ -180,7 +180,7 @@ export const DataService = {
 
   async updateProject(id: string, data: {
     projectName?: string; customerId?: string; siteAddress?: string; siteCondition?: string;
-    expectedDate?: string; unitCount?: number; cost?: number; quoteAmount?: number;
+    expectedDate?: string; unitCount?: number | null; cost?: number | null; quoteAmount?: number | null;
   }): Promise<ProjectDetail | undefined> {
     await prisma.project.update({
       where: { id },

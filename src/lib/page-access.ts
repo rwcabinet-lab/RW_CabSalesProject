@@ -1,7 +1,7 @@
 export const PAGE_ACCESS_OPTIONS = [
   { key: "home", label: "首頁", href: "/" },
   { key: "workbench", label: "業務工作台", href: "/dashboard/workbench" },
-  { key: "manager", label: "主管監控看板", href: "/dashboard/manager" },
+  { key: "manager", label: "主管監控室", href: "/dashboard/manager" },
   { key: "views", label: "多元可視化", href: "/views" },
   { key: "customers", label: "客戶主檔", href: "/customers" },
   { key: "projects", label: "案場、里程碑與報價", href: "/projects" },

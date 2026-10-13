@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Kanban, LayoutDashboard, Clock, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar } from "lucide-react";
+import { Users, Kanban, LayoutDashboard, Clock, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
@@ -13,6 +13,8 @@ const todayDate = () =>
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardDTO | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUserDTO[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -47,6 +49,16 @@ export default function ManagerDashboardPage() {
         console.error(err);
         setAssignableUsers([]);
       });
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("無法載入使用者權限");
+        return res.json() as Promise<ApiResponse<{ user: { role?: string } | null }>>;
+      })
+      .then((session) => setIsAdmin(session.user?.role === "ADMIN"))
+      .catch((error) => console.error("Failed to load current user:", error));
   }, []);
 
   const fetchDashboardData = async () => {
@@ -88,6 +100,26 @@ export default function ManagerDashboardPage() {
     } catch (err) {
       console.error("Failed to delete assigned task:", err);
       window.alert("刪除任務時發生錯誤，請稍後重試");
+    }
+  };
+
+  const handleDeleteProject = async (project: ManagerDashboardDTO["allProjectsOverview"][number]) => {
+    if (!window.confirm(`確定刪除案件「${project.projectName}」？\n此操作會一併刪除相關里程碑、待辦與報價資料，且無法復原。`)) return;
+    setDeletingProjectId(project.id);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: project.id }),
+      });
+      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      if (!res.ok) throw new Error(result.error || "刪除案件失敗");
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      window.alert(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
+    } finally {
+      setDeletingProjectId(null);
     }
   };
 
@@ -142,7 +174,7 @@ export default function ManagerDashboardPage() {
     <div className="space-y-8 pb-16">
       <div className="flex justify-between border-b pb-4">
         <div>
-          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控看板</span>
+          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控室</span>
           <h1 className="text-2xl font-black mt-1">營運總覽與瓶頸分析</h1>
         </div>
       </div>
@@ -281,7 +313,7 @@ export default function ManagerDashboardPage() {
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th><th className="p-3 text-center">案件細節</th><th className="p-3">指派任務</th>
+              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th>              <th className="p-3 text-center">案件細節{isAdmin && " / 操作"}</th><th className="p-3">指派任務</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -306,6 +338,17 @@ export default function ManagerDashboardPage() {
                 <td className="p-3">{p.expectedDate?.slice(0, 10) || "-"}</td>
                 <td className="p-3 text-center">
                   <Link href={`/projects/${p.id}/milestones`} className="inline-flex h-8 w-24 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteProject(p)}
+                      disabled={deletingProjectId !== null}
+                      aria-label={`刪除案件 ${p.projectName}`}
+                      className="ml-2 inline-flex h-8 items-center justify-center gap-1 rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />{deletingProjectId === p.id ? "刪除中" : "刪除"}
+                    </button>
+                  )}
                 </td>
                 <td className="p-3 text-center">
                   <button onClick={() => setAssignModal({
