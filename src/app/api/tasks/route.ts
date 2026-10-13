@@ -131,13 +131,18 @@ export async function DELETE(req: NextRequest) {
 
     const user = await DataService.getUserById(sessionUserId);
     if (!user) return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
-    if (user.role !== "ADMIN") {
-      return NextResponse.json({ error: "僅管理員可刪除待辦" }, { status: 403 });
-    }
 
     const body = await req.json();
     if (typeof body.taskId !== "string" || !body.taskId) {
       return NextResponse.json({ error: "缺少待辦識別碼" }, { status: 400 });
+    }
+
+    const task = await DataService.getTaskById(body.taskId);
+    if (!task) return NextResponse.json({ error: "找不到此待辦" }, { status: 404 });
+
+    const canDeleteTask = user.role === "ADMIN" || task.assignedById === user.id || task.assignedToId === user.id;
+    if (!canDeleteTask) {
+      return NextResponse.json({ error: "僅可刪除自己建立或被指派的待辦" }, { status: 403 });
     }
 
     const deleted = await DataService.deleteTask(body.taskId);

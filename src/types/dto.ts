@@ -162,6 +162,7 @@ export interface TaskDTO {
   projectName?: string;
   assignedToId: string;
   assignedToName?: string;
+  assignedById?: string | null;
   assignedByName?: string | null;
   milestoneId?: string | null;
   taskType: TaskTypeDTO;

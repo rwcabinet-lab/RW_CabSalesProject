@@ -67,6 +67,30 @@ export default function ManagerDashboardPage() {
     }
   };
 
+  const handleDeleteAssignedTask = async (task: TaskDTO) => {
+    if (!window.confirm(`確定刪除已指派任務「${task.subject}」？`)) return;
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: task.id }),
+      });
+      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      if (!res.ok) {
+        window.alert(result.error || "刪除任務失敗");
+        return;
+      }
+
+      setData((current) => current ? {
+        ...current,
+        assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
+      } : current);
+    } catch (err) {
+      console.error("Failed to delete assigned task:", err);
+      window.alert("刪除任務時發生錯誤，請稍後重試");
+    }
+  };
+
   const handleAssignTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setAssigning(true);
@@ -137,14 +161,14 @@ export default function ManagerDashboardPage() {
           <div className="text-3xl font-black">{data.kpi.conversionRate}%</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center border-l-4 border-l-red-500">
-          <div className="text-red-600 text-xs font-bold mb-1">嚴重延誤/逾期案場</div>
+          <div className="text-red-600 text-xs font-bold mb-1">逾期案件</div>
           <div className="text-3xl font-black text-red-600">{data.kpi.delayedCount}</div>
         </div>
       </div>
 
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="flex items-center gap-2 border-b px-6 py-4 font-bold">
-          <CheckSquare className="h-5 w-5 text-blue-600" />登入者指派任務
+          <CheckSquare className="h-5 w-5 text-blue-600" />已指派任務
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">{data.assignedTasks.length}</span>
         </div>
         {data.assignedTasks.length ? (
@@ -154,12 +178,13 @@ export default function ManagerDashboardPage() {
                 <div>
                   <h3 className="font-semibold">{task.subject}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "設為未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                   <span>預定完成：{task.dueDatetime.slice(0, 10)}</span>
                   <Link href={`/projects/${task.projectId}/milestones`} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
+                  <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
                 </div>
               </article>
             ))}

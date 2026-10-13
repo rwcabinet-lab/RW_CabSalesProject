@@ -91,8 +91,14 @@ export default function SalesWorkbenchPage() {
     e.preventDefault();
     if (!taskToComplete) return;
 
+    const completedAt = completionDate || new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
     setCompletingTask(true);
     setCompletionError("");
+    setTasks((current) => current.map((task) =>
+      task.id === taskToComplete.id
+        ? { ...task, isCompleted: true, resultNotes: completionNotes.trim(), completedAt }
+        : task
+    ));
     try {
       const res = await fetch("/api/tasks", {
         method: "PATCH",
@@ -101,20 +107,29 @@ export default function SalesWorkbenchPage() {
           taskId: taskToComplete.id,
           isCompleted: true,
           resultNotes: completionNotes.trim(),
-          completedAt: completionDate,
+          completedAt,
         }),
       });
       const result = await res.json() as ApiResponse<{ success: boolean; task: TaskDTO }>;
       if (!res.ok) {
         setCompletionError(result.error || "完成待辦失敗，請稍後再試");
+        setTasks((current) => current.map((task) =>
+          task.id === taskToComplete.id
+            ? { ...task, isCompleted: false, resultNotes: task.resultNotes, completedAt: task.completedAt }
+            : task
+        ));
         return;
       }
 
-      await fetchWorkbenchData();
       setTaskToComplete(null);
       setCompletionNotes("");
     } catch (err) {
       console.error("Failed to complete task:", err);
+      setTasks((current) => current.map((task) =>
+        task.id === taskToComplete.id
+          ? { ...task, isCompleted: false, resultNotes: task.resultNotes, completedAt: task.completedAt }
+          : task
+      ));
       setCompletionError("完成待辦時發生錯誤，請稍後再試");
     } finally {
       setCompletingTask(false);
@@ -198,6 +213,7 @@ export default function SalesWorkbenchPage() {
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
   const isAdmin = currentUser.role === "ADMIN";
   const visibleTasks = isAdmin ? tasks : pendingTasks;
+  const canDeleteTask = (task: TaskDTO) => isAdmin || task.assignedById === currentUser.id || task.assignedToId === currentUser.id;
 
   const handleDeleteTask = async (task: TaskDTO) => {
     if (!window.confirm(`確定刪除待辦「${task.subject}」？`)) return;
@@ -286,7 +302,7 @@ export default function SalesWorkbenchPage() {
                           <CheckCircle2 className="h-4 w-4" /> 完成
                         </button>
                       )}
-                      {isAdmin && (
+                      {canDeleteTask(task) && (
                         <button type="button" onClick={() => handleDeleteTask(task)} className="mx-auto mt-1 flex items-center gap-1 rounded bg-red-100 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-200">
                           <Trash2 className="h-3.5 w-3.5" /> 刪除
                         </button>

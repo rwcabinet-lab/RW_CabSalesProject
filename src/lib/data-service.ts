@@ -636,6 +636,20 @@ export const DataService = {
     return this.getMilestonesByProjectId(projectId);
   },
 
+  async getTaskById(id: string): Promise<SalesTaskItem | null> {
+    const task = await prisma.salesTask.findUnique({
+      where: { id },
+      include: { project: true, assignedTo: true, assignedBy: true },
+    });
+    if (!task) return null;
+    return {
+      id: task.id, projectId: task.projectId, projectName: task.project.projectName, assignedToId: task.assignedToId, assignedToName: task.assignedTo.name,
+      assignedById: task.assignedById, assignedByName: task.assignedBy?.name || null, milestoneId: task.milestoneId,
+      taskType: task.taskType, subject: task.subject, dueDatetime: task.dueDatetime.toISOString(), priority: task.priority,
+      isCompleted: task.isCompleted, resultNotes: task.resultNotes, completedAt: dateValue(task.completedAt) || null,
+    };
+  },
+
   async getTasks(filter?: { projectId?: string; assignedToId?: string; assignedById?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
     const tasks = await prisma.salesTask.findMany({
       where: {
@@ -649,7 +663,7 @@ export const DataService = {
     });
     return tasks.map(t => ({
       id: t.id, projectId: t.projectId, projectName: t.project.projectName, assignedToId: t.assignedToId, assignedToName: t.assignedTo.name,
-      assignedByName: t.assignedBy?.name || null, milestoneId: t.milestoneId,
+      assignedById: t.assignedById, assignedByName: t.assignedBy?.name || null, milestoneId: t.milestoneId,
       taskType: t.taskType, subject: t.subject, dueDatetime: t.dueDatetime.toISOString(), priority: t.priority,
       isCompleted: t.isCompleted, resultNotes: t.resultNotes, completedAt: dateValue(t.completedAt) || null,
     }));

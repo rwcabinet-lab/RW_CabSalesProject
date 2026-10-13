@@ -516,7 +516,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       disabled={advancing || isProjectLost}
                       className={`rounded px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${m.status === "COMPLETED" ? "bg-amber-100 text-amber-800" : "bg-blue-600 text-white"}`}
                     >
-                      {m.status === "COMPLETED" ? "未完成" : "完成"}
+                      {m.status === "COMPLETED" ? "設為未完成" : "完成"}
                     </button>
                     {canManageMilestones && !isProjectLost && m.status !== "COMPLETED" && (
                       <button
