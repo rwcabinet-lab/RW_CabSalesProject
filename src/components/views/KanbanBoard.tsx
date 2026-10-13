@@ -26,13 +26,6 @@ interface KanbanProps {
 }
 
 const STAGES = [
-  { id: "INQUIRY", label: "舊流程：洽談諮詢", color: "bg-slate-100 text-slate-700" },
-  { id: "MEASUREMENT", label: "舊流程：現場丈量", color: "bg-blue-100 text-blue-800" },
-  { id: "QUOTE", label: "舊流程：初報細報", color: "bg-indigo-100 text-indigo-800" },
-  { id: "CONTRACT", label: "舊流程：複丈簽約", color: "bg-purple-100 text-purple-800" },
-  { id: "CAD_DRAWING", label: "舊流程：圖面定稿拆單", color: "bg-amber-100 text-amber-800" },
-  { id: "HANDOFF", label: "舊流程：下單交廠", color: "bg-cyan-100 text-cyan-800" },
-  { id: "DONE", label: "舊流程：結案完工", color: "bg-emerald-100 text-emerald-800" },
   { id: "CONTACT", label: "接洽階段", color: "bg-blue-100 text-blue-800" },
   { id: "DESIGN", label: "設計確認階段", color: "bg-indigo-100 text-indigo-800" },
   { id: "PRODUCTION", label: "生產施工階段", color: "bg-amber-100 text-amber-800" },

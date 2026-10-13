@@ -241,12 +241,6 @@ export default function ManagerDashboardPage() {
               階段：
               <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
                 <option value="">全部</option>
-                <option value="INQUIRY">舊制：詢價</option>
-                <option value="MEASUREMENT">舊制：丈量</option>
-                <option value="QUOTE">舊制：報價</option>
-                <option value="CONTRACT">舊制：簽約</option>
-                <option value="CAD_DRAWING">舊制：繪圖</option>
-                <option value="HANDOFF">舊制：交接</option>
                 <option value="CONTACT">接洽期</option>
                 <option value="DESIGN">設計確認期</option>
                 <option value="PRODUCTION">生產施工期</option>
