@@ -40,11 +40,14 @@ export default function ManagerDashboardPage() {
 
   const fetchColumnConfig = async () => {
     try {
-      const res = await fetch("/api/admin/config?key=columns", { cache: "no-store" });
-      const colData = await res.json();
-      if (Array.isArray(colData.columns)) setColumns(colData.columns);
-    } catch {
-      // 降級使用預設欄位
+      const res = await fetch("/api/projects/config/columns", { cache: "no-store" });
+      const colData = await res.json() as ApiResponse<{ columns: ColumnItemDTO[] }>;
+      if (!res.ok || !Array.isArray(colData.columns)) {
+        throw new Error(colData.error || "無法取得全域案件欄位設定");
+      }
+      setColumns(colData.columns);
+    } catch (error) {
+      console.error("Failed to fetch shared project columns:", error);
     }
   };
 
