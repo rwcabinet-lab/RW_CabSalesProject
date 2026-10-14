@@ -3,13 +3,18 @@ import { DataService } from "@/lib/data-service";
 import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/mock-data";
 import { getUserFromRequest } from "@/lib/access-control";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const key = req.nextUrl.searchParams.get("key");
     if (key === "columns") {
       const savedColumns = await DataService.getAppConfig<unknown>("project_columns", []);
       const columns = normalizeProjectColumns(savedColumns);
-      return NextResponse.json({ columns });
+      return NextResponse.json(
+        { columns },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      );
     }
     if (key === "stageDays") {
       const stageDays = await DataService.getAppConfig("milestone_default_days", MILESTONE_DEFAULT_DAYS);
@@ -33,8 +38,12 @@ export async function POST(req: NextRequest) {
     if (!key || value === undefined) {
       return NextResponse.json({ error: "缺少 key 或 value" }, { status: 400 });
     }
-    await DataService.setAppConfig(key, value);
-    return NextResponse.json({ success: true });
+    const savedValue = key === "project_columns" ? normalizeProjectColumns(value) : value;
+    await DataService.setAppConfig(key, savedValue);
+    return NextResponse.json(
+      { success: true, ...(key === "project_columns" ? { columns: savedValue } : {}) },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
   } catch (err) {
     console.error("Failed to save config:", err);
     return NextResponse.json({ error: "儲存設定失敗" }, { status: 500 });

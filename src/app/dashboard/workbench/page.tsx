@@ -66,7 +66,7 @@ export default function SalesWorkbenchPage() {
 
   const fetchColumnConfig = async () => {
     try {
-      const res = await fetch("/api/admin/config?key=columns");
+      const res = await fetch("/api/admin/config?key=columns", { cache: "no-store" });
       const data = await res.json();
       if (Array.isArray(data.columns)) setColumns(data.columns);
     } catch {

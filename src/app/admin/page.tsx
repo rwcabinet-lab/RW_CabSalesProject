@@ -92,8 +92,8 @@ export default function AdminPage() {
   const loadConfigs = async () => {
     try {
       const [colRes, dayRes] = await Promise.all([
-        fetch("/api/admin/config?key=columns"),
-        fetch("/api/admin/config?key=stageDays"),
+        fetch("/api/admin/config?key=columns", { cache: "no-store" }),
+        fetch("/api/admin/config?key=stageDays", { cache: "no-store" }),
       ]);
       const colData = await colRes.json();
       const dayData = await dayRes.json();
@@ -208,10 +208,13 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/admin/config", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "project_columns", value: columns }),
       });
       if (!res.ok) throw new Error("儲存欄位設定失敗");
+      const result = await res.json() as { columns?: ColumnItemDTO[] };
+      if (Array.isArray(result.columns)) setColumns(result.columns);
       setNotice("案件清單顯示項目與順序已成功儲存至全域設定！");
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存欄位設定失敗");

@@ -40,7 +40,7 @@ export default function ManagerDashboardPage() {
 
   const fetchColumnConfig = async () => {
     try {
-      const res = await fetch("/api/admin/config?key=columns");
+      const res = await fetch("/api/admin/config?key=columns", { cache: "no-store" });
       const colData = await res.json();
       if (Array.isArray(colData.columns)) setColumns(colData.columns);
     } catch {
