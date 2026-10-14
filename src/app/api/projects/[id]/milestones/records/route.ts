@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
+import { QUOTE_STAGE_CODES } from "@/lib/mock-data";
 
 export async function GET(
   req: NextRequest,
@@ -30,13 +31,28 @@ export async function POST(
     }
     const body = await req.json();
     const { milestoneId, plannedDueDate, actualDueDate, amount, notes } = body;
-    if (!milestoneId) {
+    if (typeof milestoneId !== "string" || !milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
+    }
+    const stageCode = await DataService.getMilestoneStageCode(params.id, milestoneId);
+    if (!stageCode) return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
+    if (amount !== undefined && amount !== "" && !QUOTE_STAGE_CODES.has(stageCode)) {
+      return NextResponse.json({ error: "只有報價相關進度可填寫報價金額" }, { status: 400 });
+    }
+    if (amount !== undefined && amount !== "" && (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0)) {
+      return NextResponse.json({ error: "報價金額格式無效" }, { status: 400 });
+    }
+    if (
+      (plannedDueDate !== undefined && plannedDueDate !== "" && typeof plannedDueDate !== "string") ||
+      (actualDueDate !== undefined && actualDueDate !== "" && typeof actualDueDate !== "string") ||
+      (notes !== undefined && typeof notes !== "string")
+    ) {
+      return NextResponse.json({ error: "歷次紀錄欄位格式無效" }, { status: 400 });
     }
     const record = await DataService.addMilestoneRecord(milestoneId, {
       plannedDueDate,
       actualDueDate,
-      amount: amount !== undefined && amount !== "" ? Number(amount) : undefined,
+      amount: amount !== undefined && amount !== "" ? amount : undefined,
       notes,
     });
     return NextResponse.json({ success: true, record });

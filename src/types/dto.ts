@@ -180,6 +180,7 @@ export interface MilestoneDTO {
   assignedToName?: string | null;
   attachments?: string | null;
   notes?: string | null;
+  auditSubmitted?: boolean;
   trafficLight?: TrafficLightDTO;
   plannedStart?: string | null;
   plannedEnd?: string | null;

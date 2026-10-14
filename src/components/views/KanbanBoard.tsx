@@ -195,7 +195,7 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
 
                               {project.estimatedBudget && (
                                 <div className="mt-2 text-right text-xs font-mono font-bold tabular-nums text-slate-800">
-                                  預算: {formatTenThousands(project.estimatedBudget)}
+                                  報價: {formatTenThousands(project.quoteAmount ?? 0)}
                                 </div>
                               )}
 

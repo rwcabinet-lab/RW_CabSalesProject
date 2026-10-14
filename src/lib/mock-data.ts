@@ -116,15 +116,12 @@ export const AUDIT_STAGE_CODES = new Set<string>([
   "3-3", // 提案簡報
   "3-4", // 合約
   "4-3", // 施工圖
-  "4-4", // 施工圖審核(向下相容)
 ]);
 
 /** 哪些進度屬於報價相關 (只有此類項目歷次紀錄才有報價欄位) */
 export const QUOTE_STAGE_CODES = new Set<string>([
   "1-4", // 報價提交
   "3-2", // 報價單
-  "3-3", // 報價單(向下相容)
-  "3-4", // 報價單審核(向下相容)
   "6-5", // 加減帳
   "7-1", // 批價
 ]);
@@ -191,6 +188,16 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "X-1": "EXTRA", "X-2": "EXTRA",
 };
 
+export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
+  "1-1", "1-2", "1-3", "1-4", "1-5",
+  "2-1", "2-2", "2-3", "2-4", "2-5",
+  "3-1", "3-2", "3-3", "3-4", "3-5",
+  "4-1", "4-2", "4-3", "4-4",
+  "5-1", "5-2", "5-3",
+  "6-1", "6-2", "6-3", "6-4", "6-5",
+  "7-1", "7-2", "7-3",
+];
+
 /** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */
 export const DEFAULT_PROJECT_COLUMNS = [
   { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },
@@ -199,10 +206,51 @@ export const DEFAULT_PROJECT_COLUMNS = [
   { key: "salesRep", label: "負責業務/業助", visible: true, order: 3 },
   { key: "stage", label: "目前階段", visible: true, order: 4 },
   { key: "activeMilestone", label: "當前進度", visible: true, order: 5 },
-  { key: "quoteAndUnits", label: "報價/戶數", visible: true, order: 6 },
+  { key: "quoteAndUnits", label: "報價", visible: true, order: 6 },
   { key: "expectedDate", label: "預定完工日", visible: true, order: 7 },
   { key: "actions", label: "操作", visible: true, order: 8 },
 ];
+
+export function normalizeProjectColumns(value: unknown) {
+  if (!Array.isArray(value)) return DEFAULT_PROJECT_COLUMNS;
+
+  const savedColumns = value.filter(
+    (column): column is { key: string; label?: string; visible?: boolean; order?: number } =>
+      typeof column === "object" &&
+      column !== null &&
+      typeof (column as { key?: unknown }).key === "string",
+  );
+  const quoteColumns = savedColumns.filter(({ key }) =>
+    ["quoteAndUnits", "amount", "unitCount", "budget"].includes(key),
+  );
+  const quoteColumn = quoteColumns.length
+    ? {
+        key: "quoteAndUnits",
+        label: "報價",
+        visible: quoteColumns.some((column) => column.visible !== false),
+        order: Math.min(...quoteColumns.map((column) =>
+          typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
+        )),
+      }
+    : undefined;
+
+  const savedByKey = new Map(
+    savedColumns
+      .filter(({ key }) => !["amount", "unitCount", "budget"].includes(key))
+      .map((column) => [column.key, column]),
+  );
+  const normalized = DEFAULT_PROJECT_COLUMNS.map((column) => {
+    if (column.key === "quoteAndUnits" && quoteColumn) return quoteColumn;
+    const saved = savedByKey.get(column.key);
+    return saved
+      ? { ...column, ...saved, label: column.label, visible: saved.visible !== false }
+      : column;
+  });
+
+  return normalized
+    .sort((a, b) => a.order - b.order)
+    .map((column, order) => ({ ...column, order }));
+}
 
 // ----------------------------------------------------------------
 // 初始種子資料

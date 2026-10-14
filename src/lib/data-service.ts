@@ -14,7 +14,8 @@ import type {
 } from "@/types/dto";
 import {
   MasterBoardItem, MasterHardwareItem, MasterProcessingItem, QuotationData,
-  MILESTONE_STAGE_LABELS, STAGE_CODE_TO_PHASE, MILESTONE_DEFAULT_DAYS
+  AUDIT_STAGE_CODES, MILESTONE_DEFAULT_DAYS, MILESTONE_STAGE_LABELS,
+  STANDARD_MILESTONE_STAGE_CODES, STAGE_CODE_TO_PHASE
 } from "./mock-data";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
 
@@ -34,6 +35,7 @@ const projectInclude = {
 } as const;
 const milestoneInclude = {
   assignedTo: true,
+  salesTask: { select: { id: true, subject: true, isCompleted: true } },
   project: {
     select: {
       customer: {
@@ -160,15 +162,7 @@ export const DataService = {
           unitCount: data.unitCount, cost: data.cost, quoteAmount: data.quoteAmount, estimatedBudget: data.quoteAmount || data.cost,
         },
       });
-      const allCodes: MilestoneStageCode[] = [
-        "1-1","1-2",
-        "2-1","2-2","2-3","2-4","2-5",
-        "3-1","3-2","3-3","3-4","3-5","3-6","3-7","3-8","3-9",
-        "4-1","4-2","4-3","4-4","4-5",
-        "5-1","5-2","5-3",
-        "6-1","6-2","6-3","6-4","6-5",
-        "7-1","7-2","7-3"
-      ];
+      const allCodes = STANDARD_MILESTONE_STAGE_CODES;
       let cursorDate = new Date();
       await tx.projectMilestone.createMany({
         data: allCodes.map((code, index) => {
@@ -241,6 +235,7 @@ export const DataService = {
         assignedToId: m.assignedToId || m.project.customer.salesRepId,
         assignedToName: m.assignedTo?.name || m.project.customer.salesRep.name,
         attachments: m.attachments, notes: m.notes,
+        auditSubmitted: m.salesTask?.subject.startsWith("【需審核】") || false,
       });
       result[m.projectId] = list;
     }
@@ -250,6 +245,112 @@ export const DataService = {
   async getMilestonesByProjectId(projectId: string): Promise<ProjectMilestoneItem[]> {
     const result = await this.getMilestonesByProjectIds([projectId]);
     return result[projectId] || [];
+  },
+
+  async ensureProjectMilestones(projectId: string) {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE
+      `;
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { salesRepId: true },
+      });
+      if (!project) throw new Error("查無此案場資料");
+
+      const existing = await tx.projectMilestone.findMany({
+        where: { projectId },
+        select: { stageCode: true, stageOrder: true, plannedDueDate: true },
+      });
+      const existingCodes = new Set(existing.map((milestone) => milestone.stageCode));
+      const missingCodes = STANDARD_MILESTONE_STAGE_CODES.filter((code) => !existingCodes.has(code));
+      if (missingCodes.length === 0) return;
+
+      let stageOrder = Math.max(0, ...existing.map((milestone) => milestone.stageOrder));
+      let dueDate = existing.reduce<Date | null>(
+        (latest, milestone) =>
+          milestone.plannedDueDate && (!latest || milestone.plannedDueDate > latest)
+            ? milestone.plannedDueDate
+            : latest,
+        null,
+      ) || new Date();
+
+      await tx.projectMilestone.createMany({
+        data: missingCodes.map((code) => {
+          dueDate = new Date(dueDate);
+          dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
+          stageOrder += 1;
+          return {
+            projectId,
+            stageCode: code,
+            phase: STAGE_CODE_TO_PHASE[code],
+            stageOrder,
+            plannedDueDate: dueDate,
+            status: MilestoneStatus.PENDING,
+            assignedToId: project.salesRepId,
+          };
+        }),
+      });
+    });
+  },
+
+  async submitMilestoneForReview(
+    projectId: string,
+    milestoneId: string,
+    submittedById: string,
+    reviewerId: string,
+    notes?: string,
+  ) {
+    await prisma.$transaction(async (tx) => {
+      const milestone = await tx.projectMilestone.findFirst({
+        where: { id: milestoneId, projectId },
+        select: { stageCode: true, status: true, priority: true, plannedDueDate: true },
+      });
+      if (!milestone) throw new Error("找不到此里程碑");
+      if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
+        throw new Error("此里程碑不需要審核");
+      }
+      if (
+        milestone.status !== MilestoneStatus.IN_PROGRESS &&
+        milestone.status !== MilestoneStatus.OVERDUE
+      ) {
+        throw new Error("只能提交目前進行中的審核項目");
+      }
+
+      await tx.salesTask.upsert({
+        where: { milestoneId },
+        create: {
+          projectId,
+          milestoneId,
+          assignedToId: reviewerId,
+          assignedById: submittedById,
+          taskType: TaskType.DRAWING,
+          subject: `【需審核】${MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode]}`,
+          dueDatetime: milestone.plannedDueDate || new Date(Date.now() + 2 * 86400000),
+          priority: TaskPriority.HIGH,
+          isCompleted: false,
+          resultNotes: notes || null,
+        },
+        update: {
+          assignedToId: reviewerId,
+          assignedById: submittedById,
+          subject: `【需審核】${MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode]}`,
+          dueDatetime: milestone.plannedDueDate || new Date(Date.now() + 2 * 86400000),
+          priority: TaskPriority.HIGH,
+          isCompleted: false,
+          completedAt: null,
+          resultNotes: notes || null,
+        },
+      });
+    });
+  },
+
+  async getMilestoneStageCode(projectId: string, milestoneId: string) {
+    const milestone = await prisma.projectMilestone.findFirst({
+      where: { projectId, id: milestoneId },
+      select: { stageCode: true },
+    });
+    return milestone?.stageCode;
   },
 
   async updateMilestone(projectId: string, milestoneId: string, updates: Partial<ProjectMilestoneItem>) {
@@ -285,7 +386,9 @@ export const DataService = {
           const existingTask = await tx.salesTask.findUnique({ where: { milestoneId } });
           const isCompleted = milestone.status === MilestoneStatus.COMPLETED;
           const assigneeChanged = existingTask && existingTask.assignedToId !== updates.assignedToId;
-          await tx.salesTask.upsert({
+          const auditSubmissionPending =
+            existingTask?.subject.startsWith("【需審核】") && !existingTask.isCompleted;
+          if (!auditSubmissionPending) await tx.salesTask.upsert({
             where: { milestoneId },
             create: {
               projectId,
@@ -807,6 +910,17 @@ export const DataService = {
   // 里程碑拖曳重新排序
   // -------------------------------------------------------------
   async reorderMilestones(projectId: string, orderedMilestoneIds: string[]) {
+    const existingMilestones = await prisma.projectMilestone.findMany({
+      where: { projectId },
+      select: { id: true },
+    });
+    if (
+      orderedMilestoneIds.length !== existingMilestones.length ||
+      new Set(orderedMilestoneIds).size !== existingMilestones.length ||
+      existingMilestones.some(({ id }) => !orderedMilestoneIds.includes(id))
+    ) {
+      throw new Error("排序清單必須包含此案件的所有里程碑且不可重複");
+    }
     await prisma.$transaction(
       orderedMilestoneIds.map((id, index) =>
         prisma.projectMilestone.update({

@@ -19,7 +19,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
-import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS } from "@/lib/mock-data";
+import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS, normalizeProjectColumns } from "@/lib/mock-data";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO } from "@/types/dto";
 
 type ManagedUser = { id: string; name: string; email: string; role: AppRole };
@@ -97,7 +97,7 @@ export default function AdminPage() {
       ]);
       const colData = await colRes.json();
       const dayData = await dayRes.json();
-      if (Array.isArray(colData.columns)) setColumns(colData.columns);
+      setColumns(normalizeProjectColumns(colData.columns));
       if (dayData.stageDays) setStageDays(dayData.stageDays);
     } catch (err) {
       console.error("Failed to load configs", err);
@@ -422,17 +422,13 @@ export default function AdminPage() {
                     case "quoteAndUnits":
                     case "amount":
                       return (
-                        <td key={col.key} className="p-3 border-r text-right">
+                        <td key={col.key} className="p-3 border-r">
                           <div className="font-bold text-slate-900">$38.5 萬</div>
                           <div className="text-[10px] text-slate-400">2 戶</div>
                         </td>
                       );
                     case "unitCount":
-                      return (
-                        <td key={col.key} className="p-3 border-r">
-                          2 戶
-                        </td>
-                      );
+                      return null;
                     case "expectedDate":
                       return (
                         <td key={col.key} className="p-3 border-r">

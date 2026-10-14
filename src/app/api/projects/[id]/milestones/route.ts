@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
+import { AUDIT_STAGE_CODES } from "@/lib/mock-data";
 
 function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -15,14 +16,14 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
-    const [projectRecord, initialMilestones] = await Promise.all([
-      DataService.getProjectById(projectId, { evaluateSchedule: false }),
-      DataService.getMilestonesByProjectId(projectId),
-    ]);
-
+    const projectRecord = await DataService.getProjectById(projectId, { evaluateSchedule: false });
     if (!projectRecord) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
+    if (projectRecord.currentStage !== "LOST") {
+      await DataService.ensureProjectMilestones(projectId);
+    }
+    const initialMilestones = await DataService.getMilestonesByProjectId(projectId);
     const milestones = projectRecord.currentStage === "WRAP_UP"
       ? await DataService.activateLegacyWrapUpMilestone(projectId)
       : initialMilestones;
@@ -65,6 +66,34 @@ export async function PUT(
       return NextResponse.json({ error: "此案件已流標，階段項目不可編輯或推進" }, { status: 409 });
     }
     const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    const canReviewAudit = isManager || user.id === project.salesRepId;
+
+    if (action === "submitAudit") {
+      if (!milestoneId || typeof milestoneId !== "string") {
+        return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
+      }
+      if (notes !== undefined && typeof notes !== "string") {
+        return NextResponse.json({ error: "審核備註格式無效" }, { status: 400 });
+      }
+      const milestone = (await DataService.getMilestonesByProjectId(projectId))
+        .find((item) => item.id === milestoneId);
+      if (!milestone) return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
+      if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
+        return NextResponse.json({ error: "此里程碑不需要審核" }, { status: 400 });
+      }
+      if (milestone.assignedToId !== user.id) {
+        return NextResponse.json({ error: "僅此進度的負責人員可提交審核" }, { status: 403 });
+      }
+
+      await DataService.submitMilestoneForReview(
+        projectId,
+        milestoneId,
+        user.id,
+        project.salesRepId,
+        notes,
+      );
+      return NextResponse.json({ success: true });
+    }
 
     if (action === "returnToProduction") {
       if (!isManager) {
@@ -104,8 +133,11 @@ export async function PUT(
     }
 
     if (action === "reorder") {
+      if (!isManager) {
+        return NextResponse.json({ error: "僅主管可調整里程碑順序" }, { status: 403 });
+      }
       const { orderedMilestoneIds } = body;
-      if (!Array.isArray(orderedMilestoneIds)) {
+      if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.some((id) => typeof id !== "string")) {
         return NextResponse.json({ error: "缺少 orderedMilestoneIds 陣列" }, { status: 400 });
       }
       const milestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
@@ -132,6 +164,18 @@ export async function PUT(
       }
       if (notes !== undefined && typeof notes !== "string") {
         return NextResponse.json({ error: "完成備註格式無效" }, { status: 400 });
+      }
+      if (isCompleted && AUDIT_STAGE_CODES.has(
+        (await DataService.getMilestoneStageCode(projectId, milestoneId)) || "",
+      )) {
+        const milestone = (await DataService.getMilestonesByProjectId(projectId))
+          .find((item) => item.id === milestoneId);
+        if (!milestone?.auditSubmitted) {
+          return NextResponse.json({ error: "請先提交審核，再由審核人員完成此進度" }, { status: 409 });
+        }
+        if (!canReviewAudit) {
+          return NextResponse.json({ error: "僅審核人員可完成此進度" }, { status: 403 });
+        }
       }
       if (isCompleted && actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
         return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
@@ -169,6 +213,13 @@ export async function PUT(
       ) {
         return NextResponse.json({ error: "里程碑欄位格式無效" }, { status: 400 });
       }
+      if (updates.assignedToId !== undefined) {
+        const milestone = (await DataService.getMilestonesByProjectId(projectId))
+          .find((item) => item.id === milestoneId);
+        if (milestone?.auditSubmitted) {
+          return NextResponse.json({ error: "審核進行中，暫不可變更此進度負責人" }, { status: 409 });
+        }
+      }
       if (typeof updates.assignedToId === "string" && updates.assignedToId) {
         const assignee = await DataService.getUserById(updates.assignedToId);
         if (!assignee || !["SALES_MANAGER", "SALES", "ASSISTANT"].includes(assignee.role)) {
@@ -201,6 +252,18 @@ export async function PUT(
       }
       if (project.currentStage === "LOST") {
         return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
+      }
+      if (AUDIT_STAGE_CODES.has(
+        (await DataService.getMilestoneStageCode(projectId, milestoneId)) || "",
+      )) {
+        const milestone = (await DataService.getMilestonesByProjectId(projectId))
+          .find((item) => item.id === milestoneId);
+        if (!milestone?.auditSubmitted) {
+          return NextResponse.json({ error: "請先提交審核，再由審核人員完成此進度" }, { status: 409 });
+        }
+        if (!canReviewAudit) {
+          return NextResponse.json({ error: "僅審核人員可完成此進度" }, { status: 403 });
+        }
       }
 
       // 快速推進此里程碑完成，並啟動下一里程碑
@@ -246,10 +309,16 @@ export async function PUT(
       error.message === "案件已離開收尾階段" ||
       error.message === "已完成的里程碑不可編輯" ||
       error.message === "找不到此里程碑" ||
+      error.message === "此里程碑不需要審核" ||
+      error.message === "只能提交目前進行中的審核項目" ||
+      error.message === "排序清單必須包含此案件的所有里程碑且不可重複" ||
       error.message === "找不到已完成的里程碑" ||
       error.message === "請由最後一個已完成的里程碑開始回退"
     )) {
-      return NextResponse.json({ error: error.message }, { status: error.message === "找不到此里程碑" ? 404 : 409 });
+      const status = error.message === "找不到此里程碑" ? 404
+        : error.message === "排序清單必須包含此案件的所有里程碑且不可重複" ? 400
+          : 409;
+      return NextResponse.json({ error: error.message }, { status });
     }
     return NextResponse.json({ error: "更新里程碑失敗" }, { status: 500 });
   }

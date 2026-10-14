@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
+import { AUDIT_STAGE_CODES } from "@/lib/mock-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
       }
 
       const canReviewProjectTasks =
-        projectId && (user.role === "LEVEL_MANAGER" || user.role === "SALES_MANAGER");
+        projectId && ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
       assignedToId = canReviewProjectTasks ? undefined : user.id;
     }
 
@@ -84,11 +85,34 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    const user = await DataService.getUserById(sessionUserId);
+    if (!user) return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
+
     const body = await req.json();
     const { taskId, isCompleted, resultNotes, completedAt } = body;
 
     if (!taskId || typeof isCompleted !== "boolean") {
       return NextResponse.json({ error: "缺少 taskId 或 isCompleted 狀態" }, { status: 400 });
+    }
+    if (isCompleted) {
+      const task = await DataService.getTaskById(taskId);
+      if (task?.milestoneId) {
+        const stageCode = await DataService.getMilestoneStageCode(task.projectId, task.milestoneId);
+        if (stageCode && AUDIT_STAGE_CODES.has(stageCode)) {
+          const project = await DataService.getProjectById(task.projectId, { evaluateSchedule: false });
+          const isReviewer =
+            ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role) ||
+            user.id === project?.salesRepId;
+          if (!isReviewer) {
+            return NextResponse.json({ error: "僅審核人員可完成此審核待辦" }, { status: 403 });
+          }
+          if (!task.subject.startsWith("【需審核】")) {
+            return NextResponse.json({ error: "此進度尚未提交審核" }, { status: 409 });
+          }
+        }
+      }
     }
     if (completedAt !== undefined) {
       const parsedDate =

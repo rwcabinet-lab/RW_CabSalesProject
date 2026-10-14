@@ -398,7 +398,7 @@ export default function SalesWorkbenchPage() {
               <label>施工地址 *<input required value={newProjectData.siteAddress} onChange={(e) => setNewProjectData({...newProjectData, siteAddress: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <label>戶數<input type="number" value={newProjectData.unitCount} onChange={(e) => setNewProjectData({...newProjectData, unitCount: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <label>成本金額（萬）<input type="number" step="0.1" value={newProjectData.cost} onChange={(e) => setNewProjectData({...newProjectData, cost: e.target.value})} className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"/></label>
-              <label>報價金額（萬）<input type="number" step="0.1" value={newProjectData.quoteAmount} onChange={(e) => setNewProjectData({...newProjectData, quoteAmount: e.target.value})} className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"/></label>
+              <label>報價（萬）<input type="number" step="0.1" value={newProjectData.quoteAmount} onChange={(e) => setNewProjectData({...newProjectData, quoteAmount: e.target.value})} className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"/></label>
               <label>預計完工日<input type="date" value={newProjectData.expectedDate} onChange={(e) => setNewProjectData({...newProjectData, expectedDate: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <div className="flex items-end"><button disabled={savingProject || !newProjectData.projectName} className="w-full bg-emerald-600 text-white rounded p-1.5 font-bold">{savingProject ? "儲存中" : "儲存案場"}</button></div>
             </div>
@@ -410,7 +410,7 @@ export default function SalesWorkbenchPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "quoteAndUnits" || col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                  <th key={col.key} className={`p-3 ${col.key === "actions" ? "text-center" : ""}`}>
                     {col.key === "expectedDate" ? (
                       <button
                         type="button"
@@ -494,7 +494,7 @@ export default function SalesWorkbenchPage() {
                       case "quoteAndUnits":
                       case "amount":
                         return (
-                          <td key={col.key} className="p-3 text-right">
+                          <td key={col.key} className="p-3">
                             <div className="tabular-nums font-bold text-slate-900">
                               {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
                             </div>
@@ -504,11 +504,7 @@ export default function SalesWorkbenchPage() {
                           </td>
                         );
                       case "unitCount":
-                        return (
-                          <td key={col.key} className="p-3 text-slate-600">
-                            {p.unitCount ? `${p.unitCount}戶` : "未填"}
-                          </td>
-                        );
+                        return null;
                       case "expectedDate":
                         return (
                           <td key={col.key} className="p-3 text-slate-600 font-medium">

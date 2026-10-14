@@ -345,7 +345,7 @@ export default function ManagerDashboardPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "quoteAndUnits" || col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                  <th key={col.key} className={`p-3 ${col.key === "actions" ? "text-center" : ""}`}>
                     {col.key === "expectedDate" ? (
                       <button
                         type="button"
@@ -427,7 +427,7 @@ export default function ManagerDashboardPage() {
                       case "quoteAndUnits":
                       case "amount":
                         return (
-                          <td key={col.key} className="p-3 text-right">
+                          <td key={col.key} className="p-3">
                             <div className="tabular-nums font-bold text-slate-900">
                               {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
                             </div>
@@ -437,11 +437,7 @@ export default function ManagerDashboardPage() {
                           </td>
                         );
                       case "unitCount":
-                        return (
-                          <td key={col.key} className="p-3 text-slate-600">
-                            {p.unitCount ? `${p.unitCount}戶` : "未填"}
-                          </td>
-                        );
+                        return null;
                       case "expectedDate":
                         return (
                           <td key={col.key} className="p-3 text-slate-600 font-medium">

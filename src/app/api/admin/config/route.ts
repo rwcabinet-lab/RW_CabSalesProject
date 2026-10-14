@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { DEFAULT_PROJECT_COLUMNS, MILESTONE_DEFAULT_DAYS } from "@/lib/mock-data";
+import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/mock-data";
 import { getUserFromRequest } from "@/lib/access-control";
 
 export async function GET(req: NextRequest) {
   try {
     const key = req.nextUrl.searchParams.get("key");
     if (key === "columns") {
-      const columns = await DataService.getAppConfig("project_columns", DEFAULT_PROJECT_COLUMNS);
+      const savedColumns = await DataService.getAppConfig<unknown>("project_columns", []);
+      const columns = normalizeProjectColumns(savedColumns);
       return NextResponse.json({ columns });
     }
     if (key === "stageDays") {

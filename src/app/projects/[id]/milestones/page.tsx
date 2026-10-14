@@ -17,8 +17,7 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
-  ArrowUp,
-  ArrowDown,
+  GripVertical,
   Sparkles,
 } from "lucide-react";
 import {
@@ -27,6 +26,7 @@ import {
   PROJECT_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   AUDIT_STAGE_CODES,
+  QUOTE_STAGE_CODES,
 } from "@/lib/mock-data";
 import type {
   ApiResponse,
@@ -81,6 +81,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("DEVELOP");
+  const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null);
 
   // 行內編輯
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -262,34 +263,41 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // 拖曳/按鈕上下移動調整順序
-  const handleMoveMilestone = async (phase: MilestonePhaseDTO, index: number, direction: "up" | "down") => {
-    const group = phaseGroups[phase];
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= group.length) return;
+  const handleReorderMilestones = async (
+    phase: MilestonePhaseDTO,
+    sourceId: string,
+    targetId: string,
+  ) => {
+    if (sourceId === targetId || isProjectLost || !canManageMilestones) return;
+    const reorderedPhase = [...phaseGroups[phase]];
+    const sourceIndex = reorderedPhase.findIndex(({ id }) => id === sourceId);
+    const targetIndex = reorderedPhase.findIndex(({ id }) => id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const [movedMilestone] = reorderedPhase.splice(sourceIndex, 1);
+    reorderedPhase.splice(targetIndex, 0, movedMilestone);
 
-    const newGroup = [...group];
-    const temp = newGroup[index];
-    newGroup[index] = newGroup[targetIndex];
-    newGroup[targetIndex] = temp;
-
-    // 樂觀更新前端畫面
-    const newOrderedIds = newGroup.map((m) => m.id);
-    const updatedMilestones = milestones.map((m) => {
-      const idx = newOrderedIds.indexOf(m.id);
-      return idx !== -1 ? { ...m, stageOrder: idx + 1 } : m;
+    const ordered = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+    const phaseIndexes = ordered.flatMap((milestone, index) =>
+      STAGE_CODE_TO_PHASE[milestone.stageCode] === phase ? [index] : [],
+    );
+    phaseIndexes.forEach((index, phaseIndex) => {
+      ordered[index] = reorderedPhase[phaseIndex];
     });
-    setMilestones(updatedMilestones);
+    const orderedIds = ordered.map(({ id }) => id);
+    setMilestones(ordered.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
 
-    // 後端同步
     try {
-      await fetch(`/api/projects/${projectId}/milestones`, {
+      const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reorder", orderedMilestoneIds: newOrderedIds }),
+        body: JSON.stringify({ action: "reorder", orderedMilestoneIds: orderedIds }),
       });
-    } catch (err) {
-      console.error("更新順序失敗", err);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "更新順序失敗");
+      await fetchData();
+    } catch (error) {
+      console.error("更新順序失敗", error);
+      alert(error instanceof Error ? error.message : "更新順序失敗");
       await fetchData();
     }
   };
@@ -301,25 +309,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     setSubmittingAudit(true);
     try {
       const { milestone, notes } = submitAuditModal;
-      // 建立審核待辦給負責業務/主管
-      await fetch("/api/tasks", {
-        method: "POST",
+      const response = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          milestoneId: milestone.id,
-          subject: `【需審核】${project?.projectName} - ${MILESTONE_STAGE_LABELS[milestone.stageCode]}`,
-          dueDatetime: new Date(Date.now() + 86400000 * 2).toISOString(),
-          priority: "HIGH",
-          taskType: "DRAWING",
-          assignedToId: project?.salesRepId || currentUserId,
-        }),
+        body: JSON.stringify({ action: "submitAudit", milestoneId: milestone.id, notes }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "提交審核失敗");
       alert(`已將【${MILESTONE_STAGE_LABELS[milestone.stageCode]}】提交審核，待辦已發送給主責人員。`);
       setSubmitAuditModal(null);
       await fetchData();
     } catch (err) {
-      alert("提交審核失敗");
+      alert(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
       setSubmittingAudit(false);
     }
@@ -410,6 +411,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">載入詳細資料中...</div>;
 
   const isProjectLost = project?.currentStage === "LOST";
+  const canReviewAudit =
+    canManageMilestones || (!!project && currentUserId === project.salesRepId);
 
   // 依大階段分組
   const phaseGroups: Record<MilestonePhaseDTO, MilestoneWithLight[]> = {
@@ -573,22 +576,41 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <h2 className="text-sm font-bold text-slate-800">
               {PHASE_LABELS[activePhase]}
             </h2>
-            <span className="text-xs text-slate-400">
-              可點擊上下箭頭調整子進度執行順序
-            </span>
+            <span className="text-xs text-slate-400">拖曳圖卡可調整子進度順序</span>
           </div>
 
           <div className="space-y-3">
-            {phaseGroups[activePhase].map((m, idx) => {
+            {phaseGroups[activePhase].map((m) => {
               const isEditing = editingId === m.id;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
+              const isAuditSubmitted = m.auditSubmitted === true;
               const isActive = m.status === "IN_PROGRESS" || m.status === "OVERDUE";
+              const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
 
               return (
                 <div
                   key={m.id}
+                  draggable={canManageMilestones && !isProjectLost && !isEditing}
+                  onDragStart={(event) => {
+                    setDraggedMilestoneId(m.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", m.id);
+                  }}
+                  onDragOver={(event) => {
+                    if (canManageMilestones && draggedMilestoneId) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceId = event.dataTransfer.getData("text/plain") || draggedMilestoneId;
+                    setDraggedMilestoneId(null);
+                    if (sourceId) void handleReorderMilestones(activePhase, sourceId, m.id);
+                  }}
+                  onDragEnd={() => setDraggedMilestoneId(null)}
                   className={`rounded-xl border p-4 transition ${
                     isProjectLost
                       ? "border-slate-200 bg-slate-50/80 opacity-70"
@@ -669,28 +691,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3">
-                          {/* 拖曳/排序箭頭 */}
-                          {!isProjectLost && (
-                            <div className="flex flex-col gap-0.5 mt-0.5">
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => handleMoveMilestone(activePhase, idx, "up")}
-                                className="p-0.5 text-slate-400 hover:text-blue-600 disabled:opacity-20"
-                                title="向上調整順序"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === phaseGroups[activePhase].length - 1}
-                                onClick={() => handleMoveMilestone(activePhase, idx, "down")}
-                                className="p-0.5 text-slate-400 hover:text-blue-600 disabled:opacity-20"
-                                title="向下調整順序"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                          {canManageMilestones && !isProjectLost && (
+                            <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-slate-400" aria-label="拖曳調整順序" />
                           )}
 
                           <div>
@@ -703,7 +705,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               </span>
                               {isAuditStage && (
                                 <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
-                                  需審核項目
+                                  {isAuditSubmitted ? "等待審核" : "需審核"}
                                 </span>
                               )}
                               {m.trafficLight?.color === "RED" && (
@@ -737,8 +739,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                           </button>
 
-                          {/* 審核項目：負責人提交審核；審核主管/業務直接完成 */}
-                          {isActive && !isProjectLost && isAuditStage && (
+                          {isActive && !isProjectLost && isAuditStage && !isAuditSubmitted && currentUserId === m.assignedToId && (
                             <button
                               type="button"
                               onClick={() => setSubmitAuditModal({ milestone: m, notes: "" })}
@@ -748,15 +749,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             </button>
                           )}
 
-                          {/* 推進/完成按鈕 */}
                           {isActive && !isProjectLost && (
+                            (!isAuditStage || (isAuditSubmitted && canReviewAudit)) && (
                             <button
                               type="button"
                               onClick={() => setCompletionModal({ milestone: m, actualDueDate: todayDate(), notes: "" })}
                               className="flex items-center gap-1 px-3 py-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
                             >
-                              <Sparkles className="w-3 h-3" /> 完成並推進
+                              <Sparkles className="w-3 h-3" /> {isAuditStage ? "審核完成並推進" : "完成並推進"}
                             </button>
+                            )
                           )}
 
                           {canManageMilestones && !isProjectLost && (
@@ -808,7 +810,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   ) : (
                                     <span className="text-slate-400">尚未完成</span>
                                   )}
-                                  {r.amount != null && <span>金額：${r.amount.toLocaleString()}</span>}
+                                  {isQuoteStage && r.amount != null && <span>報價：${r.amount.toLocaleString()}</span>}
                                   {r.notes && <span className="text-slate-600 italic">備註：{r.notes}</span>}
                                 </div>
                                 {!isProjectLost && (
@@ -832,7 +834,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           {newRecordForm && newRecordForm.milestoneId === m.id && (
                             <form onSubmit={handleAddRecord} className="mt-3 p-2.5 bg-blue-50/50 border border-blue-200 rounded-lg space-y-2 text-xs">
                               <div className="font-bold text-blue-900">填寫新紀錄</div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <div className={`grid grid-cols-2 gap-2 ${isQuoteStage ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
                                 <div>
                                   <label className="block text-slate-600 mb-0.5">預定完成日</label>
                                   <input
@@ -851,16 +853,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                     className="w-full border rounded p-1"
                                   />
                                 </div>
-                                <div>
-                                  <label className="block text-slate-600 mb-0.5">金額/報價</label>
-                                  <input
-                                    type="number"
-                                    placeholder="可選填"
-                                    value={newRecordForm.amount}
-                                    onChange={(e) => setNewRecordForm({ ...newRecordForm, amount: e.target.value })}
-                                    className="w-full border rounded p-1"
-                                  />
-                                </div>
+                                {isQuoteStage && (
+                                  <div>
+                                    <label className="block text-slate-600 mb-0.5">報價</label>
+                                    <input
+                                      type="number"
+                                      placeholder="可選填"
+                                      value={newRecordForm.amount}
+                                      onChange={(e) => setNewRecordForm({ ...newRecordForm, amount: e.target.value })}
+                                      className="w-full border rounded p-1"
+                                    />
+                                  </div>
+                                )}
                                 <div>
                                   <label className="block text-slate-600 mb-0.5">備註說明</label>
                                   <input
