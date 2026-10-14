@@ -762,13 +762,14 @@ export const DataService = {
   },
 
   async getTasks(filter?: { projectId?: string; assignedToId?: string; assignedById?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
+    const excludeMilestoneTasks = Boolean(filter?.assignedToId || filter?.assignedById);
     const tasks = await prisma.salesTask.findMany({
       where: {
         ...(filter?.projectId ? { projectId: filter.projectId } : {}),
         ...(filter?.assignedToId ? { assignedToId: filter.assignedToId } : {}),
         ...(filter?.assignedById ? { assignedById: filter.assignedById } : {}),
         ...(filter?.isCompleted !== undefined ? { isCompleted: filter.isCompleted } : {}),
-        ...(filter?.isCompleted === true ? { milestoneId: null } : {}),
+        ...(excludeMilestoneTasks ? { milestoneId: null } : {}),
       },
       relationLoadStrategy: "join",
       include: { project: true, assignedTo: true, assignedBy: true }, orderBy: { dueDatetime: "asc" }
