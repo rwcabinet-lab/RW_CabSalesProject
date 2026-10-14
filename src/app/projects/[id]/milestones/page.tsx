@@ -195,7 +195,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
       setMilestones(data.milestones);
       setTasks(tasksData);
-      setCompletedTasks(completedTasksData);
+      setCompletedTasks(completedTasksData.filter((task) => !task.milestoneId));
 
       if (usersRes.ok) {
         const u = await usersRes.json();

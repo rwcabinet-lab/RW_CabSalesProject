@@ -768,6 +768,7 @@ export const DataService = {
         ...(filter?.assignedToId ? { assignedToId: filter.assignedToId } : {}),
         ...(filter?.assignedById ? { assignedById: filter.assignedById } : {}),
         ...(filter?.isCompleted !== undefined ? { isCompleted: filter.isCompleted } : {}),
+        ...(filter?.isCompleted === true ? { milestoneId: null } : {}),
       },
       relationLoadStrategy: "join",
       include: { project: true, assignedTo: true, assignedBy: true }, orderBy: { dueDatetime: "asc" }
