@@ -112,8 +112,8 @@ export const DataService = {
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
       expectedDate: dateValue(p.expectedDate),
-      estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : undefined,
-      unitCount: p.unitCount || undefined, cost: p.cost ? Number(p.cost) : undefined, quoteAmount: p.quoteAmount ? Number(p.quoteAmount) : undefined
+      estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
+      unitCount: p.unitCount ?? undefined, cost: p.cost != null ? Number(p.cost) : undefined, quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined
     }));
   },
 
@@ -137,8 +137,8 @@ export const DataService = {
       salesAssistantId: p.salesAssistantId || undefined, salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage, isDelayed: p.isDelayed,
       expectedDate: dateValue(p.expectedDate),
-      estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : undefined,
-      unitCount: p.unitCount || undefined, cost: p.cost ? Number(p.cost) : undefined, quoteAmount: p.quoteAmount ? Number(p.quoteAmount) : undefined
+      estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
+      unitCount: p.unitCount ?? undefined, cost: p.cost != null ? Number(p.cost) : undefined, quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined
     };
     if (options?.evaluateSchedule === false) return project;
     const milestones = await this.getMilestonesByProjectId(id);

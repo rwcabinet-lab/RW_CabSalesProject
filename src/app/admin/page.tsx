@@ -407,16 +407,11 @@ export default function AdminPage() {
                           林宏遠 / 張育菁
                         </td>
                       );
-                    case "stage":
+                    case "stageProgress":
                       return (
                         <td key={col.key} className="p-3 border-r font-bold text-slate-700">
                           設計提案/報價/簽約
-                        </td>
-                      );
-                    case "activeMilestone":
-                      return (
-                        <td key={col.key} className="p-3 border-r font-bold text-blue-700">
-                          報價單製作
+                          <div className="mt-1 text-[10px] font-normal text-slate-500">報價單</div>
                         </td>
                       );
                     case "quoteAndUnits":

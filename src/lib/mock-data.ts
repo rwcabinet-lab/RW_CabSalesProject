@@ -65,9 +65,6 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ① 案件開發
   "1-1": "客源開發",
   "1-2": "案件分配",
-  "1-3": "初步接洽",
-  "1-4": "報價提交",
-  "1-5": "合約簽訂",
   // ② 現況及需求確認
   "2-1": "需求訪談",
   "2-2": "設計建議",
@@ -120,7 +117,6 @@ export const AUDIT_STAGE_CODES = new Set<string>([
 
 /** 哪些進度屬於報價相關 (只有此類項目歷次紀錄才有報價欄位) */
 export const QUOTE_STAGE_CODES = new Set<string>([
-  "1-4", // 報價提交
   "3-2", // 報價單
   "6-5", // 加減帳
   "7-1", // 批價
@@ -128,7 +124,7 @@ export const QUOTE_STAGE_CODES = new Set<string>([
 
 /** 各子進度預設作業天數 */
 export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
-  "1-1": 5, "1-2": 2, "1-3": 3, "1-4": 5, "1-5": 5,
+  "1-1": 5, "1-2": 2,
   "2-1": 3, "2-2": 3, "2-3": 2, "2-4": 2, "2-5": 2,
   "3-1": 5, "3-2": 2, "3-3": 3, "3-4": 2, "3-5": 3, "3-6": 2, "3-7": 3, "3-8": 2, "3-9": 5,
   "4-1": 2, "4-2": 2, "4-3": 7, "4-4": 3, "4-5": 3,
@@ -178,7 +174,7 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
 };
 
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
-  "1-1": "DEVELOP", "1-2": "DEVELOP", "1-3": "DEVELOP", "1-4": "DEVELOP", "1-5": "DEVELOP",
+  "1-1": "DEVELOP", "1-2": "DEVELOP",
   "2-1": "REQUIREMENT", "2-2": "REQUIREMENT", "2-3": "REQUIREMENT", "2-4": "REQUIREMENT", "2-5": "REQUIREMENT",
   "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL", "3-6": "PROPOSAL", "3-7": "PROPOSAL", "3-8": "PROPOSAL", "3-9": "PROPOSAL",
   "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD", "4-5": "PRE_PROD",
@@ -189,7 +185,7 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
 };
 
 export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
-  "1-1", "1-2", "1-3", "1-4", "1-5",
+  "1-1", "1-2",
   "2-1", "2-2", "2-3", "2-4", "2-5",
   "3-1", "3-2", "3-3", "3-4", "3-5",
   "4-1", "4-2", "4-3", "4-4",
@@ -204,11 +200,10 @@ export const DEFAULT_PROJECT_COLUMNS = [
   { key: "projectName", label: "案場/施工地址", visible: true, order: 1 },
   { key: "customer", label: "客戶 (折數)", visible: true, order: 2 },
   { key: "salesRep", label: "負責業務/業助", visible: true, order: 3 },
-  { key: "stage", label: "目前階段", visible: true, order: 4 },
-  { key: "activeMilestone", label: "當前進度", visible: true, order: 5 },
-  { key: "quoteAndUnits", label: "報價", visible: true, order: 6 },
-  { key: "expectedDate", label: "預定完工日", visible: true, order: 7 },
-  { key: "actions", label: "操作", visible: true, order: 8 },
+  { key: "stageProgress", label: "階段 / 進度", visible: true, order: 4 },
+  { key: "quoteAndUnits", label: "報價／戶數", visible: true, order: 5 },
+  { key: "expectedDate", label: "預定完工日", visible: true, order: 6 },
+  { key: "actions", label: "操作", visible: true, order: 7 },
 ];
 
 export function normalizeProjectColumns(value: unknown) {
@@ -223,12 +218,25 @@ export function normalizeProjectColumns(value: unknown) {
   const quoteColumns = savedColumns.filter(({ key }) =>
     ["quoteAndUnits", "amount", "unitCount", "budget"].includes(key),
   );
+  const stageColumns = savedColumns.filter(({ key }) =>
+    ["stageProgress", "stage", "activeMilestone"].includes(key),
+  );
   const quoteColumn = quoteColumns.length
     ? {
         key: "quoteAndUnits",
-        label: "報價",
+        label: "報價／戶數",
         visible: quoteColumns.some((column) => column.visible !== false),
         order: Math.min(...quoteColumns.map((column) =>
+          typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
+        )),
+      }
+    : undefined;
+  const stageProgressColumn = stageColumns.length
+    ? {
+        key: "stageProgress",
+        label: "階段 / 進度",
+        visible: stageColumns.some((column) => column.visible !== false),
+        order: Math.min(...stageColumns.map((column) =>
           typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
         )),
       }
@@ -236,11 +244,12 @@ export function normalizeProjectColumns(value: unknown) {
 
   const savedByKey = new Map(
     savedColumns
-      .filter(({ key }) => !["amount", "unitCount", "budget"].includes(key))
+      .filter(({ key }) => !["amount", "unitCount", "budget", "stage", "activeMilestone"].includes(key))
       .map((column) => [column.key, column]),
   );
   const normalized = DEFAULT_PROJECT_COLUMNS.map((column) => {
     if (column.key === "quoteAndUnits" && quoteColumn) return quoteColumn;
+    if (column.key === "stageProgress" && stageProgressColumn) return stageProgressColumn;
     const saved = savedByKey.get(column.key);
     return saved
       ? { ...column, ...saved, label: column.label, visible: saved.visible !== false }
@@ -453,50 +462,41 @@ export const INITIAL_MILESTONES: Record<string, ProjectMilestoneItem[]> = {
   p1: [
     { id: "m1-1-1", projectId: "p1", stageCode: "1-1", phase: "CONTACT",    stageOrder: 1,  plannedDueDate: "2026-09-20", actualDueDate: "2026-09-20", status: "COMPLETED", assignedToId: "u3", assignedToName: "林宏遠", notes: "初步聯繫確認需求範圍" },
     { id: "m1-1-2", projectId: "p1", stageCode: "1-2", phase: "CONTACT",    stageOrder: 2,  plannedDueDate: "2026-09-23", status: "IN_PROGRESS", assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-1-3", projectId: "p1", stageCode: "1-3", phase: "CONTACT",    stageOrder: 3,  plannedDueDate: "2026-09-30", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-1-4", projectId: "p1", stageCode: "1-4", phase: "CONTACT",    stageOrder: 4,  plannedDueDate: "2026-10-08", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m1-1-5", projectId: "p1", stageCode: "1-5", phase: "CONTACT",    stageOrder: 5,  plannedDueDate: "2026-10-15", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-2-1", projectId: "p1", stageCode: "2-1", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-10-17", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-2-2", projectId: "p1", stageCode: "2-2", phase: "DESIGN",     stageOrder: 7,  plannedDueDate: "2026-10-21", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m1-2-3", projectId: "p1", stageCode: "2-3", phase: "DESIGN",     stageOrder: 8,  plannedDueDate: "2026-10-25", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-2-4", projectId: "p1", stageCode: "2-4", phase: "DESIGN",     stageOrder: 9,  plannedDueDate: "2026-11-05", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m1-3-1", projectId: "p1", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-11-20", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m1-3-2", projectId: "p1", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-11-28", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m1-3-3", projectId: "p1", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 12, plannedDueDate: "2026-12-02", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-3-4", projectId: "p1", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 13, plannedDueDate: "2026-12-04", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m1-3-5", projectId: "p1", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 14, plannedDueDate: "2026-12-06", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m1-2-1", projectId: "p1", stageCode: "2-1", phase: "DESIGN",     stageOrder: 3,  plannedDueDate: "2026-10-17", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m1-2-2", projectId: "p1", stageCode: "2-2", phase: "DESIGN",     stageOrder: 4,  plannedDueDate: "2026-10-21", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
+    { id: "m1-2-3", projectId: "p1", stageCode: "2-3", phase: "DESIGN",     stageOrder: 5,  plannedDueDate: "2026-10-25", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m1-2-4", projectId: "p1", stageCode: "2-4", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-11-05", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
+    { id: "m1-3-1", projectId: "p1", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 7,  plannedDueDate: "2026-11-20", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m1-3-2", projectId: "p1", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 8,  plannedDueDate: "2026-11-28", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m1-3-3", projectId: "p1", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 9,  plannedDueDate: "2026-12-02", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m1-3-4", projectId: "p1", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-12-04", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m1-3-5", projectId: "p1", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-12-06", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
   ],
   p2: [
     { id: "m2-1-1", projectId: "p2", stageCode: "1-1", phase: "CONTACT",    stageOrder: 1,  plannedDueDate: "2026-09-12", actualDueDate: "2026-09-12", status: "COMPLETED", assignedToId: "u3", assignedToName: "林宏遠" },
     { id: "m2-1-2", projectId: "p2", stageCode: "1-2", phase: "CONTACT",    stageOrder: 2,  plannedDueDate: "2026-09-15", actualDueDate: "2026-09-15", status: "COMPLETED", assignedToId: "u3", assignedToName: "林宏遠", notes: "已完成現場水平放樣" },
-    { id: "m2-1-3", projectId: "p2", stageCode: "1-3", phase: "CONTACT",    stageOrder: 3,  plannedDueDate: "2026-09-24", status: "IN_PROGRESS", assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-1-4", projectId: "p2", stageCode: "1-4", phase: "CONTACT",    stageOrder: 4,  plannedDueDate: "2026-10-03", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m2-1-5", projectId: "p2", stageCode: "1-5", phase: "CONTACT",    stageOrder: 5,  plannedDueDate: "2026-10-10", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-2-1", projectId: "p2", stageCode: "2-1", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-10-13", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-2-2", projectId: "p2", stageCode: "2-2", phase: "DESIGN",     stageOrder: 7,  plannedDueDate: "2026-10-17", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m2-2-3", projectId: "p2", stageCode: "2-3", phase: "DESIGN",     stageOrder: 8,  plannedDueDate: "2026-10-21", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-2-4", projectId: "p2", stageCode: "2-4", phase: "DESIGN",     stageOrder: 9,  plannedDueDate: "2026-11-01", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m2-3-1", projectId: "p2", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-11-15", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m2-3-2", projectId: "p2", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-11-23", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m2-3-3", projectId: "p2", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 12, plannedDueDate: "2026-11-27", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-3-4", projectId: "p2", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 13, plannedDueDate: "2026-11-29", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
-    { id: "m2-3-5", projectId: "p2", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 14, plannedDueDate: "2026-12-01", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m2-2-1", projectId: "p2", stageCode: "2-1", phase: "DESIGN",     stageOrder: 3,  plannedDueDate: "2026-10-13", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m2-2-2", projectId: "p2", stageCode: "2-2", phase: "DESIGN",     stageOrder: 4,  plannedDueDate: "2026-10-17", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
+    { id: "m2-2-3", projectId: "p2", stageCode: "2-3", phase: "DESIGN",     stageOrder: 5,  plannedDueDate: "2026-10-21", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m2-2-4", projectId: "p2", stageCode: "2-4", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-11-01", status: "PENDING",     assignedToId: "u5", assignedToName: "張育菁" },
+    { id: "m2-3-1", projectId: "p2", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 7,  plannedDueDate: "2026-11-15", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m2-3-2", projectId: "p2", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 8,  plannedDueDate: "2026-11-23", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m2-3-3", projectId: "p2", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 9,  plannedDueDate: "2026-11-27", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m2-3-4", projectId: "p2", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-11-29", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
+    { id: "m2-3-5", projectId: "p2", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-12-01", status: "PENDING",     assignedToId: "u3", assignedToName: "林宏遠" },
   ],
   p3: [
     { id: "m3-1-1", projectId: "p3", stageCode: "1-1", phase: "CONTACT",    stageOrder: 1,  plannedDueDate: "2026-09-01", actualDueDate: "2026-09-01", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
     { id: "m3-1-2", projectId: "p3", stageCode: "1-2", phase: "CONTACT",    stageOrder: 2,  plannedDueDate: "2026-09-04", actualDueDate: "2026-09-03", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-1-3", projectId: "p3", stageCode: "1-3", phase: "CONTACT",    stageOrder: 3,  plannedDueDate: "2026-09-09", actualDueDate: "2026-09-08", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-1-4", projectId: "p3", stageCode: "1-4", phase: "CONTACT",    stageOrder: 4,  plannedDueDate: "2026-09-14", actualDueDate: "2026-09-14", status: "COMPLETED", assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m3-1-5", projectId: "p3", stageCode: "1-5", phase: "CONTACT",    stageOrder: 5,  plannedDueDate: "2026-09-15", actualDueDate: "2026-09-14", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-2-1", projectId: "p3", stageCode: "2-1", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-09-16", actualDueDate: "2026-09-16", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-2-2", projectId: "p3", stageCode: "2-2", phase: "DESIGN",     stageOrder: 7,  plannedDueDate: "2026-09-18", actualDueDate: "2026-09-18", status: "COMPLETED", assignedToId: "u5", assignedToName: "張育菁" },
-    { id: "m3-2-3", projectId: "p3", stageCode: "2-3", phase: "DESIGN",     stageOrder: 8,  plannedDueDate: "2026-09-19", actualDueDate: "2026-09-19", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-2-4", projectId: "p3", stageCode: "2-4", phase: "DESIGN",     stageOrder: 9,  plannedDueDate: "2026-09-19", status: "OVERDUE",     assignedToId: "u5", assignedToName: "張育菁", notes: "業主變更廚房電器規格，需重新拆單與圖面定稿 (已逾期卡關)" },
-    { id: "m3-3-1", projectId: "p3", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-10-05", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m3-3-2", projectId: "p3", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-10-13", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
-    { id: "m3-3-3", projectId: "p3", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 12, plannedDueDate: "2026-10-16", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-3-4", projectId: "p3", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 13, plannedDueDate: "2026-10-18", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
-    { id: "m3-3-5", projectId: "p3", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 14, plannedDueDate: "2026-10-20", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
+    { id: "m3-2-1", projectId: "p3", stageCode: "2-1", phase: "DESIGN",     stageOrder: 3,  plannedDueDate: "2026-09-16", actualDueDate: "2026-09-16", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
+    { id: "m3-2-2", projectId: "p3", stageCode: "2-2", phase: "DESIGN",     stageOrder: 4,  plannedDueDate: "2026-09-18", actualDueDate: "2026-09-18", status: "COMPLETED", assignedToId: "u5", assignedToName: "張育菁" },
+    { id: "m3-2-3", projectId: "p3", stageCode: "2-3", phase: "DESIGN",     stageOrder: 5,  plannedDueDate: "2026-09-19", actualDueDate: "2026-09-19", status: "COMPLETED", assignedToId: "u4", assignedToName: "陳廷瑋" },
+    { id: "m3-2-4", projectId: "p3", stageCode: "2-4", phase: "DESIGN",     stageOrder: 6,  plannedDueDate: "2026-09-19", status: "OVERDUE",     assignedToId: "u5", assignedToName: "張育菁", notes: "業主變更廚房電器規格，需重新拆單與圖面定稿 (已逾期卡關)" },
+    { id: "m3-3-1", projectId: "p3", stageCode: "3-1", phase: "PRODUCTION", stageOrder: 7,  plannedDueDate: "2026-10-05", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m3-3-2", projectId: "p3", stageCode: "3-2", phase: "PRODUCTION", stageOrder: 8,  plannedDueDate: "2026-10-13", status: "PENDING",     assignedToId: "u2", assignedToName: "王志明" },
+    { id: "m3-3-3", projectId: "p3", stageCode: "3-3", phase: "PRODUCTION", stageOrder: 9,  plannedDueDate: "2026-10-16", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
+    { id: "m3-3-4", projectId: "p3", stageCode: "3-4", phase: "PRODUCTION", stageOrder: 10, plannedDueDate: "2026-10-18", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
+    { id: "m3-3-5", projectId: "p3", stageCode: "3-5", phase: "PRODUCTION", stageOrder: 11, plannedDueDate: "2026-10-20", status: "PENDING",     assignedToId: "u4", assignedToName: "陳廷瑋" },
   ],
 };
 

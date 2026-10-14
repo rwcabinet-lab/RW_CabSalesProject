@@ -14,7 +14,7 @@ export interface TrafficLightStatus {
 /** 里程碑子進度代碼 → 專案大階段對應 */
 export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   // ① 案件開發
-  "1-1": "DEVELOP", "1-2": "DEVELOP", "1-3": "DEVELOP", "1-4": "DEVELOP", "1-5": "DEVELOP",
+  "1-1": "DEVELOP", "1-2": "DEVELOP",
   // ② 現況及需求確認
   "2-1": "REQUIREMENT", "2-2": "REQUIREMENT", "2-3": "REQUIREMENT", "2-4": "REQUIREMENT", "2-5": "REQUIREMENT",
   // ③ 設計提案/報價/簽約

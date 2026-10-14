@@ -406,16 +406,13 @@ export default function ManagerDashboardPage() {
                             {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
                           </td>
                         );
-                      case "stage":
+                      case "stageProgress":
                         return (
                           <td key={col.key} className="p-3 font-bold text-slate-700">
                             {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
-                          </td>
-                        );
-                      case "activeMilestone":
-                        return (
-                          <td key={col.key} className="p-3 font-bold text-slate-700">
-                            {p.currentStage === "LOST" ? p.currentStageLabel : `${p.lastCompletedMilestoneName || p.activeMilestoneName}`}
+                            <div className="mt-1 text-[10px] font-normal text-slate-500">
+                              {p.currentStage === "LOST" ? p.currentStageLabel : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
+                            </div>
                             {p.unassignedNextMilestoneName && (
                               <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">
                                 <AlertCircle className="h-3 w-3" />

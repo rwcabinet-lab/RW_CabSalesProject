@@ -54,6 +54,20 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = 
   PENDING:     { label: "待開始",    bg: "bg-slate-100",   text: "text-slate-600" },
 };
 
+const CUSTOMER_TYPE_LABELS: Record<string, string> = {
+  LONGMEI_STORE: "隆美",
+  CABINET_FACTORY: "工廠",
+  DESIGN_COMPANY: "設計公司",
+  DEALER_COMPANY: "經銷公司",
+  CONSTRUCTION: "建設／營造",
+  LABOR_MATERIAL: "連工帶料",
+  INDIVIDUAL: "一般消費者",
+  DESIGNER: "設計師",
+  PR: "公關客戶",
+  DEALER: "經銷商",
+  HOMEOWNER: "一般消費者",
+};
+
 // 7 大階段 + 額外階段依序排列
 const PHASE_ORDER: MilestonePhaseDTO[] = [
   "DEVELOP",
@@ -78,6 +92,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [canManageMilestones, setCanManageMilestones] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
+  const [tasks, setTasks] = useState<TaskDTO[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<TaskDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("DEVELOP");
@@ -145,15 +161,25 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoading(true);
       setLoadError("");
 
-      const [milestonesRes, usersRes, sessionRes, projectsRes] = await Promise.all([
+      const [milestonesRes, usersRes, sessionRes, projectsRes, tasksRes, completedTasksRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/milestones`),
         fetch("/api/auth/users"),
         fetch("/api/auth/session", { cache: "no-store" }),
         fetch("/api/projects"),
+        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`),
+        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`),
       ]);
 
       const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
       if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
+      const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
+      if (!tasksRes.ok || !Array.isArray(tasksData)) {
+        throw new Error(tasksData.error || "無法載入待辦事項");
+      }
+      const completedTasksData = await completedTasksRes.json() as ApiResponse<TaskDTO[]>;
+      if (!completedTasksRes.ok || !Array.isArray(completedTasksData)) {
+        throw new Error(completedTasksData.error || "無法載入已完成待辦");
+      }
 
       if (data.project) {
         setProject(data.project);
@@ -168,6 +194,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       }
 
       setMilestones(data.milestones);
+      setTasks(tasksData);
+      setCompletedTasks(completedTasksData);
 
       if (usersRes.ok) {
         const u = await usersRes.json();
@@ -518,11 +546,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pt-4 text-xs">
             <div><span className="text-slate-400">客戶：</span><span className="font-semibold text-slate-700">{project.customerName}</span></div>
-            <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName}</span></div>
-            <div><span className="text-slate-400">目前階段：</span><span className="font-bold text-blue-700">{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}</span></div>
+            <div><span className="text-slate-400">客戶類型：</span><span className="font-semibold text-slate-700">{CUSTOMER_TYPE_LABELS[project.customerType] || project.customerType}</span></div>
+            <div><span className="text-slate-400">客戶折數：</span><span className="font-semibold text-slate-700">{project.defaultDiscount === 1 ? "牌價" : `${(project.defaultDiscount * 10).toFixed(1)} 折`}</span></div>
+            <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
+            <div><span className="text-slate-400">客戶主責業務：</span><span className="font-semibold text-slate-700">{project.customerSalesRepName || "—"}</span></div>
+            <div><span className="text-slate-400">業務助理：</span><span className="font-semibold text-slate-700">{project.salesAssistantName || "未指派"}</span></div>
+            <div><span className="text-slate-400">案件階段：</span><span className="font-bold text-blue-700">{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}</span></div>
+            <div><span className="text-slate-400">當前進度：</span><span className="font-semibold text-slate-700">{milestones.find((item) => item.status === "IN_PROGRESS" || item.status === "OVERDUE")?.stageName || "—"}</span></div>
             <div><span className="text-slate-400">預計完工日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
+            <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
+            <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatTenThousands(project.quoteAmount) : project.totalAmount != null ? formatTenThousands(project.totalAmount) : "未填"}</span></div>
+            <div><span className="text-slate-400">預算：</span><span className="font-semibold text-slate-700">{project.estimatedBudget != null ? formatTenThousands(project.estimatedBudget) : "未填"}</span></div>
+            <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatTenThousands(project.cost) : "未填"}</span></div>
+            <div><span className="text-slate-400">時程狀態：</span><span className={`font-semibold ${project.isDelayed ? "text-red-700" : "text-emerald-700"}`}>{project.isDelayed ? "逾期" : "正常"}</span></div>
+            <div className="sm:col-span-2"><span className="text-slate-400">現況說明：</span><span className="font-semibold text-slate-700">{project.siteCondition || "未填"}</span></div>
           </div>
         </section>
       )}
@@ -897,6 +936,62 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b bg-slate-50 px-5 py-4">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+          <h2 className="text-sm font-bold text-slate-800">已完成待辦備查</h2>
+        </div>
+        {completedTasks.length ? (
+          <div className="divide-y">
+            {completedTasks.map((task) => (
+              <div key={task.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                <div>
+                  <p className="font-semibold text-slate-800">{task.subject}</p>
+                  <p className="mt-1 text-slate-500">
+                    負責人：{task.assignedToName || "—"}
+                    {task.milestoneId ? " · 里程碑待辦" : ""}
+                    {task.resultNotes ? ` · 備註：${task.resultNotes}` : ""}
+                  </p>
+                </div>
+                <span className="text-slate-500">到期：{task.dueDatetime.slice(0, 10)}</span>
+                <span className="font-semibold text-emerald-700">完成：{task.completedAt?.slice(0, 10) || "—"}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-5 py-8 text-center text-xs text-slate-400">目前沒有已完成待辦</p>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b bg-slate-50 px-5 py-4">
+          <Clock className="h-5 w-5 text-blue-600" />
+          <h2 className="text-sm font-bold text-slate-800">待辦事項</h2>
+        </div>
+        {tasks.length ? (
+          <div className="divide-y">
+            {tasks.map((task) => (
+              <div key={task.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                <div>
+                  <p className="font-semibold text-slate-800">{task.subject}</p>
+                  <p className="mt-1 text-slate-500">
+                    負責人：{task.assignedToName || "—"}
+                    {task.milestoneId ? " · 里程碑待辦" : ""}
+                    {task.assignedByName ? ` · 指派者：${task.assignedByName}` : ""}
+                  </p>
+                </div>
+                <span className="text-slate-500">到期：{task.dueDatetime.slice(0, 10)}</span>
+                <span className={`font-semibold ${task.priority === "HIGH" ? "text-red-600" : task.priority === "MEDIUM" ? "text-amber-600" : "text-slate-500"}`}>
+                  優先度：{task.priority === "HIGH" ? "高" : task.priority === "MEDIUM" ? "中" : "低"}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="px-5 py-8 text-center text-xs text-slate-400">目前沒有待辦事項</p>
+        )}
+      </section>
 
       {/* 完成並推進確認彈窗 */}
       {completionModal && (

@@ -479,16 +479,13 @@ export default function SalesWorkbenchPage() {
                             {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
                           </td>
                         );
-                      case "stage":
+                      case "stageProgress":
                         return (
                           <td key={col.key} className="p-3 font-bold text-slate-700">
                             {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
-                          </td>
-                        );
-                      case "activeMilestone":
-                        return (
-                          <td key={col.key} className="p-3 font-bold text-blue-900">
-                            {p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}
+                            <div className="mt-1 text-[10px] font-normal text-slate-500">
+                              {p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}
+                            </div>
                           </td>
                         );
                       case "quoteAndUnits":
