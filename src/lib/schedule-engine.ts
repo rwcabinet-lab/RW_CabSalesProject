@@ -50,14 +50,14 @@ export const ScheduleEngine = {
     const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (daysDiff < 0 || milestone.status === "OVERDUE") {
-      return { color: "RED", label: `已逾期 ${Math.abs(daysDiff)} 天`, daysDiff };
+      return { color: "RED", label: `逾期 ${Math.abs(daysDiff)} 天`, daysDiff };
     }
 
     if (daysDiff <= 3) {
-      return { color: "YELLOW", label: `${daysDiff} 天內到期`, daysDiff };
+      return { color: "YELLOW", label: `剩 ${daysDiff} 天`, daysDiff };
     }
 
-    return { color: "GREEN", label: `正常 (剩餘 ${daysDiff} 天)`, daysDiff };
+    return { color: "GREEN", label: `剩 ${daysDiff} 天`, daysDiff };
   },
 
   /**

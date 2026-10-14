@@ -65,21 +65,21 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ① 案件開發
   "1-1": "客源開發",
   "1-2": "案件分配",
-  "1-3": "初步接洽(舊)",
-  "1-4": "報價提交(舊)",
-  "1-5": "合約簽訂(舊)",
+  "1-3": "初步接洽",
+  "1-4": "報價提交",
+  "1-5": "合約簽訂",
   // ② 現況及需求確認
   "2-1": "需求訪談",
   "2-2": "設計建議",
   "2-3": "圖面索取",
   "2-4": "丈量",
   "2-5": "場勘",
-  // ③ 設計提案/報價/簽約
-  "3-1": "設計圖製作",
-  "3-2": "設計圖審核",
-  "3-3": "報價單製作",
-  "3-4": "報價單審核",
-  "3-5": "提案簡報製作",
+  // ③ 設計提案/報價/簽約 (不拆分製作與審核，依審核機制控管)
+  "3-1": "設計圖",
+  "3-2": "報價單",
+  "3-3": "提案簡報",
+  "3-4": "合約",
+  "3-5": "送約/簽約",
   "3-6": "提案簡報",
   "3-7": "合約製作",
   "3-8": "合約審核",
@@ -87,8 +87,8 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ④ 生產前確認/拆單
   "4-1": "復丈",
   "4-2": "二次場勘",
-  "4-3": "施工圖製作",
-  "4-4": "施工圖審核",
+  "4-3": "施工圖",
+  "4-4": "拆單並提交生產",
   "4-5": "拆單並提交生產",
   // ⑤ 生產及派送
   "5-1": "生產",
@@ -109,13 +109,24 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "X-2": "已流標",
 };
 
-/** 需要審核的子進度清單 (點擊提交後需由審核者按完成) */
+/** 需要審核的子進度清單 (繪圖/報價/提案/合約/施工圖) */
 export const AUDIT_STAGE_CODES = new Set<string>([
-  "3-2", // 設計圖審核
-  "3-4", // 報價單審核
-  "3-6", // 提案簡報 (提案)
-  "3-8", // 合約審核
-  "4-4", // 施工圖審核
+  "3-1", // 設計圖
+  "3-2", // 報價單
+  "3-3", // 提案簡報
+  "3-4", // 合約
+  "4-3", // 施工圖
+  "4-4", // 施工圖審核(向下相容)
+]);
+
+/** 哪些進度屬於報價相關 (只有此類項目歷次紀錄才有報價欄位) */
+export const QUOTE_STAGE_CODES = new Set<string>([
+  "1-4", // 報價提交
+  "3-2", // 報價單
+  "3-3", // 報價單(向下相容)
+  "3-4", // 報價單審核(向下相容)
+  "6-5", // 加減帳
+  "7-1", // 批價
 ]);
 
 /** 各子進度預設作業天數 */
@@ -180,7 +191,7 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "X-1": "EXTRA", "X-2": "EXTRA",
 };
 
-/** 預設案件表格欄位定義 (全域通用，可由管理員拖曳排序與開關) */
+/** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */
 export const DEFAULT_PROJECT_COLUMNS = [
   { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },
   { key: "projectName", label: "案場/施工地址", visible: true, order: 1 },
@@ -188,10 +199,9 @@ export const DEFAULT_PROJECT_COLUMNS = [
   { key: "salesRep", label: "負責業務/業助", visible: true, order: 3 },
   { key: "stage", label: "目前階段", visible: true, order: 4 },
   { key: "activeMilestone", label: "當前進度", visible: true, order: 5 },
-  { key: "amount", label: "預算/金額", visible: true, order: 6 },
-  { key: "unitCount", label: "戶數", visible: true, order: 7 },
-  { key: "expectedDate", label: "預定完工日", visible: true, order: 8 },
-  { key: "actions", label: "操作", visible: true, order: 9 },
+  { key: "quoteAndUnits", label: "報價/戶數", visible: true, order: 6 },
+  { key: "expectedDate", label: "預定完工日", visible: true, order: 7 },
+  { key: "actions", label: "操作", visible: true, order: 8 },
 ];
 
 // ----------------------------------------------------------------

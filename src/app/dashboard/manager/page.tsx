@@ -25,6 +25,7 @@ export default function ManagerDashboardPage() {
   const [stageFilter, setStageFilter] = useState("ACTIVE");
   const [businessFilter, setBusinessFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
 
   // 任務指派
   const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
@@ -163,6 +164,7 @@ export default function ManagerDashboardPage() {
   if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
   if (!data) return null;
 
+  // 預定完工日排序
   // 案場總覽過濾：預設排除已流標/已立帳
   const filteredOverview = data.allProjectsOverview.filter(p => {
     if (stageFilter === "ACTIVE") {
@@ -175,6 +177,23 @@ export default function ManagerDashboardPage() {
     if (statusFilter && projectStatus !== statusFilter) return false;
     return true;
   });
+
+  // 依完工日排序
+  const sortedOverview = [...filteredOverview].sort((a, b) => {
+    if (dateSort === "NONE") return 0;
+    const dateA = a.expectedDate || "";
+    const dateB = b.expectedDate || "";
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+  });
+
+  const toggleDateSort = () => {
+    if (dateSort === "NONE") setDateSort("ASC");
+    else if (dateSort === "ASC") setDateSort("DESC");
+    else setDateSort("NONE");
+  };
 
   const businessOptions = Array.from(new Set(data.allProjectsOverview.map((project) => project.salesRepName))).sort();
   const visibleColumns = [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
@@ -326,15 +345,28 @@ export default function ManagerDashboardPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
-                    {col.label}
+                  <th key={col.key} className={`p-3 ${col.key === "quoteAndUnits" || col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                    {col.key === "expectedDate" ? (
+                      <button
+                        type="button"
+                        onClick={toggleDateSort}
+                        className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
+                      >
+                        {col.label}
+                        <span className="text-[11px] text-blue-600 font-black">
+                          {dateSort === "ASC" ? "🔼" : dateSort === "DESC" ? "🔽" : "↕️"}
+                        </span>
+                      </button>
+                    ) : (
+                      col.label
+                    )}
                   </th>
                 ))}
                 <th className="p-3 text-center">指派任務</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredOverview.map((p) => (
+              {sortedOverview.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50">
                   {visibleColumns.map((col) => {
                     switch (col.key) {
@@ -392,10 +424,16 @@ export default function ManagerDashboardPage() {
                             )}
                           </td>
                         );
+                      case "quoteAndUnits":
                       case "amount":
                         return (
-                          <td key={col.key} className="p-3 text-right font-bold tabular-nums">
-                            {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
+                          <td key={col.key} className="p-3 text-right">
+                            <div className="tabular-nums font-bold text-slate-900">
+                              {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
+                            </div>
                           </td>
                         );
                       case "unitCount":
@@ -406,7 +444,7 @@ export default function ManagerDashboardPage() {
                         );
                       case "expectedDate":
                         return (
-                          <td key={col.key} className="p-3 text-slate-600">
+                          <td key={col.key} className="p-3 text-slate-600 font-medium">
                             {p.expectedDate?.slice(0, 10) || "-"}
                           </td>
                         );

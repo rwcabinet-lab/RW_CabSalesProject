@@ -14,6 +14,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var c = localStorage.getItem('app_theme_color');
+                var d = localStorage.getItem('app_theme_density');
+                if (c && c !== 'blue') document.documentElement.classList.add('theme-' + c);
+                if (d === 'compact') document.documentElement.classList.add('density-compact');
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
         <Navbar />
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">

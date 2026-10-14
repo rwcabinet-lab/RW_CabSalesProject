@@ -36,6 +36,7 @@ export default function SalesWorkbenchPage() {
   // 篩選條件：預設排除已流標與已立帳 (進行中)
   const [monthFilter, setMonthFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("ACTIVE"); // 預設 ACTIVE 進行中 (排除 LOST / BILLED)
+  const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
 
   // 行內新增/編輯案場
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
@@ -211,6 +212,7 @@ export default function SalesWorkbenchPage() {
 
   if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">正在載入業務工作台...</div>;
 
+  // 預定完工日排序
   // 過濾邏輯：預設排除已流標/已立帳 (stageFilter === "ACTIVE")
   const filteredProjects = projects.filter((p) => {
     let match = true;
@@ -225,6 +227,23 @@ export default function SalesWorkbenchPage() {
     }
     return match;
   });
+
+  // 依完工日排序
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (dateSort === "NONE") return 0;
+    const dateA = a.expectedDate || "";
+    const dateB = b.expectedDate || "";
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+  });
+
+  const toggleDateSort = () => {
+    if (dateSort === "NONE") setDateSort("ASC");
+    else if (dateSort === "ASC") setDateSort("DESC");
+    else setDateSort("NONE");
+  };
 
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
   const isAdmin = currentUser.role === "ADMIN";
@@ -391,14 +410,27 @@ export default function SalesWorkbenchPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
-                    {col.label}
+                  <th key={col.key} className={`p-3 ${col.key === "quoteAndUnits" || col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                    {col.key === "expectedDate" ? (
+                      <button
+                        type="button"
+                        onClick={toggleDateSort}
+                        className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
+                      >
+                        {col.label}
+                        <span className="text-[11px] text-blue-600 font-black">
+                          {dateSort === "ASC" ? "🔼" : dateSort === "DESC" ? "🔽" : "↕️"}
+                        </span>
+                      </button>
+                    ) : (
+                      col.label
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredProjects.map((p) => (
+              {sortedProjects.map((p) => (
                 <tr
                   key={p.id}
                   className={`hover:brightness-95 ${
@@ -459,12 +491,16 @@ export default function SalesWorkbenchPage() {
                             {p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}
                           </td>
                         );
+                      case "quoteAndUnits":
                       case "amount":
                         return (
                           <td key={col.key} className="p-3 text-right">
-                            <span className="tabular-nums font-bold">
+                            <div className="tabular-nums font-bold text-slate-900">
                               {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
-                            </span>
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
+                            </div>
                           </td>
                         );
                       case "unitCount":
@@ -475,7 +511,7 @@ export default function SalesWorkbenchPage() {
                         );
                       case "expectedDate":
                         return (
-                          <td key={col.key} className="p-3 text-slate-600">
+                          <td key={col.key} className="p-3 text-slate-600 font-medium">
                             {p.expectedDate?.slice(0, 10) || "未設定"}
                           </td>
                         );

@@ -161,7 +161,25 @@ export default function AdminPage() {
     setThemeDensity(density);
     localStorage.setItem("app_theme_color", color);
     localStorage.setItem("app_theme_density", density);
-    setNotice(`已套用【${color === "blue" ? "經典藍" : color === "dark" ? "暗黑極簡" : color === "emerald" ? "森林綠" : color === "amber" ? "暖陽金" : "質樸灰"}】與【${density === "comfortable" ? "寬鬆版面" : "緊湊版面"}】風格。`);
+
+    // 即時動態套用至 document.documentElement 與 document.body
+    const themeClasses = ["theme-blue", "theme-emerald", "theme-amber", "theme-slate", "theme-dark"];
+    document.documentElement.classList.remove(...themeClasses);
+    document.body.classList.remove(...themeClasses);
+    if (color !== "blue") {
+      document.documentElement.classList.add(`theme-${color}`);
+      document.body.classList.add(`theme-${color}`);
+    }
+
+    if (density === "compact") {
+      document.documentElement.classList.add("density-compact");
+      document.body.classList.add("density-compact");
+    } else {
+      document.documentElement.classList.remove("density-compact");
+      document.body.classList.remove("density-compact");
+    }
+
+    setNotice(`已即時套用【${color === "blue" ? "經典藍" : color === "dark" ? "暗黑極簡" : color === "emerald" ? "森林綠" : color === "amber" ? "暖陽金" : "質樸灰"}】與【${density === "comfortable" ? "寬鬆版面" : "緊湊版面"}】風格！`);
   };
 
   // 欄位開關與上移下移
@@ -267,12 +285,12 @@ export default function AdminPage() {
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
 
-      {/* 1. 案件清單全域欄位設定 (增減與順序調整) */}
+      {/* 1. 案件清單全域欄位設定 (主管監控室即時表格樣式，支援拖曳與顯隱) */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sliders className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-bold">案件清單欄位項目與順序（全域通用）</h2>
+            <h2 className="text-lg font-bold">案件清單欄位項目與順序（全域表格視圖調整）</h2>
           </div>
           <button
             type="button"
@@ -285,50 +303,155 @@ export default function AdminPage() {
           </button>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          在此勾選顯示/隱藏各欄位，或點擊上下箭頭調整前後順序。業務工作台與主管監控看板將同步採用此排列。
+          以主管監控室表格樣式預覽。您可以點擊表頭的 <b>👁️ 圖示</b> 開關欄位顯示，或點擊 <b>◀ / ▶ 箭頭或直接拖曳表頭</b> 調整欄位左右順序。儲存後工作台與主管看板將同步套用。
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {columns.map((col, idx) => (
-            <div
-              key={col.key}
-              className={`flex items-center justify-between p-3 rounded-lg border text-sm transition ${
-                col.visible ? "bg-slate-50 border-slate-300" : "bg-slate-100/50 border-dashed border-slate-200 opacity-60"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleColumnVisible(col.key)}
-                  className="p-1 text-slate-600 hover:text-blue-600"
-                  title={col.visible ? "點擊隱藏此欄位" : "點擊顯示此欄位"}
-                >
-                  {col.visible ? <Eye className="h-4 w-4 text-blue-600" /> : <EyeOff className="h-4 w-4 text-slate-400" />}
-                </button>
-                <span className="font-semibold">{col.label}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={idx === 0}
-                  onClick={() => moveColumn(idx, "up")}
-                  className="p-1 text-slate-400 hover:text-slate-800 disabled:opacity-20"
-                  title="向前移動"
-                >
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={idx === columns.length - 1}
-                  onClick={() => moveColumn(idx, "down")}
-                  className="p-1 text-slate-400 hover:text-slate-800 disabled:opacity-20"
-                  title="向後移動"
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+        {/* 模擬即時預覽表格 */}
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/50">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-100 text-slate-700">
+              <tr>
+                {columns.map((col, idx) => (
+                  <th
+                    key={col.key}
+                    draggable
+                    onDragStart={(e) => e.dataTransfer.setData("text/plain", idx.toString())}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromIdx = Number(e.dataTransfer.getData("text/plain"));
+                      if (!isNaN(fromIdx) && fromIdx !== idx) {
+                        const newCols = [...columns];
+                        const [moved] = newCols.splice(fromIdx, 1);
+                        newCols.splice(idx, 0, moved);
+                        newCols.forEach((c, i) => (c.order = i));
+                        setColumns(newCols);
+                      }
+                    }}
+                    className={`p-3 border-r border-slate-200 transition cursor-grab active:cursor-grabbing select-none ${
+                      col.visible ? "bg-white text-slate-800" : "bg-slate-100/70 text-slate-400 line-through"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-bold flex items-center gap-1">
+                        ⋮⋮ {col.label}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleColumnVisible(col.key)}
+                          className="p-1 hover:text-blue-600 rounded"
+                          title={col.visible ? "點擊隱藏此欄位" : "點擊顯示此欄位"}
+                        >
+                          {col.visible ? <Eye className="h-3.5 w-3.5 text-blue-600" /> : <EyeOff className="h-3.5 w-3.5 text-slate-400" />}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moveColumn(idx, "up")}
+                          className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20"
+                          title="向左移動"
+                        >
+                          ◀
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === columns.length - 1}
+                          onClick={() => moveColumn(idx, "down")}
+                          className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20"
+                          title="向右移動"
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              <tr className="hover:bg-slate-50 text-slate-600">
+                {columns.map((col) => {
+                  if (!col.visible) {
+                    return (
+                      <td key={col.key} className="p-3 border-r text-center text-slate-300 italic bg-slate-50/50">
+                        (已隱藏)
+                      </td>
+                    );
+                  }
+                  switch (col.key) {
+                    case "trafficLight":
+                      return (
+                        <td key={col.key} className="p-3 border-r">
+                          <span className="px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 text-[11px]">
+                            ● 剩 5 天
+                          </span>
+                        </td>
+                      );
+                    case "projectName":
+                      return (
+                        <td key={col.key} className="p-3 border-r font-bold text-slate-900">
+                          樣品案場 A
+                          <div className="text-[10px] text-slate-400 font-normal">台北市大安區新生南路</div>
+                        </td>
+                      );
+                    case "customer":
+                      return (
+                        <td key={col.key} className="p-3 border-r">
+                          隆美興業 <span className="text-[10px] bg-blue-50 text-blue-700 px-1 rounded font-semibold">8.5折</span>
+                        </td>
+                      );
+                    case "salesRep":
+                      return (
+                        <td key={col.key} className="p-3 border-r">
+                          林宏遠 / 張育菁
+                        </td>
+                      );
+                    case "stage":
+                      return (
+                        <td key={col.key} className="p-3 border-r font-bold text-slate-700">
+                          設計提案/報價/簽約
+                        </td>
+                      );
+                    case "activeMilestone":
+                      return (
+                        <td key={col.key} className="p-3 border-r font-bold text-blue-700">
+                          報價單製作
+                        </td>
+                      );
+                    case "quoteAndUnits":
+                    case "amount":
+                      return (
+                        <td key={col.key} className="p-3 border-r text-right">
+                          <div className="font-bold text-slate-900">$38.5 萬</div>
+                          <div className="text-[10px] text-slate-400">2 戶</div>
+                        </td>
+                      );
+                    case "unitCount":
+                      return (
+                        <td key={col.key} className="p-3 border-r">
+                          2 戶
+                        </td>
+                      );
+                    case "expectedDate":
+                      return (
+                        <td key={col.key} className="p-3 border-r">
+                          2026-11-30
+                        </td>
+                      );
+                    case "actions":
+                      return (
+                        <td key={col.key} className="p-3 border-r text-center">
+                          <span className="px-2 py-1 rounded bg-slate-100 font-bold text-slate-600">操作鈕</span>
+                        </td>
+                      );
+                    default:
+                      return <td key={col.key} className="p-3 border-r">-</td>;
+                  }
+                })}
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
