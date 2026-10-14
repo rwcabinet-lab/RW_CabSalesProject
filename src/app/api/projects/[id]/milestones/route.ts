@@ -103,6 +103,16 @@ export async function PUT(
       });
     }
 
+    if (action === "reorder") {
+      const { orderedMilestoneIds } = body;
+      if (!Array.isArray(orderedMilestoneIds)) {
+        return NextResponse.json({ error: "缺少 orderedMilestoneIds 陣列" }, { status: 400 });
+      }
+      const milestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
+      const updatedProject = await DataService.getProjectById(projectId);
+      return NextResponse.json({ success: true, project: updatedProject, milestones });
+    }
+
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }

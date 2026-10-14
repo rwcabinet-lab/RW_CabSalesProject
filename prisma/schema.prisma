@@ -105,6 +105,13 @@ enum ProjectStage {
   BILLED
   WRAP_UP
   LOST
+  DEVELOP
+  REQUIREMENT
+  PROPOSAL
+  PRE_PROD
+  PROD_SHIP
+  INSTALL
+  CLOSURE
 }
 
 model Project {
@@ -136,26 +143,53 @@ model Project {
 }
 
 model ProjectMilestone {
-  id             String          @id @default(cuid())
-  projectId      String          @map("project_id")
-  stageCode      String          @map("stage_code")
-  phase          String          @default("CONTACT")
-  stageOrder     Int             @default(1) @map("stage_order")
-  plannedDueDate DateTime?       @map("planned_due_date")
-  actualDueDate  DateTime?       @map("actual_due_date")
-  status         MilestoneStatus @default(PENDING)
-  priority       TaskPriority    @default(MEDIUM)
-  assignedToId   String?         @map("assigned_to_id")
+  id             String            @id @default(cuid())
+  projectId      String            @map("project_id")
+  stageCode      String            @map("stage_code")
+  phase          String            @default("DEVELOP")
+  stageOrder     Int               @default(1) @map("stage_order")
+  plannedDueDate DateTime?         @map("planned_due_date")
+  actualDueDate  DateTime?         @map("actual_due_date")
+  status         MilestoneStatus   @default(PENDING)
+  priority       TaskPriority      @default(MEDIUM)
+  assignedToId   String?           @map("assigned_to_id")
   attachments    String?
   notes          String?
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  assignedTo     User?           @relation(fields: [assignedToId], references: [id])
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  assignedTo     User?             @relation(fields: [assignedToId], references: [id])
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   salesTask      SalesTask?
+  records        MilestoneRecord[]
 
   @@index([status, plannedDueDate])
   @@map("project_milestones")
+}
+
+model MilestoneRecord {
+  id             String           @id @default(cuid())
+  milestoneId    String           @map("milestone_id")
+  recordOrder    Int              @default(1) @map("record_order")
+  plannedDueDate DateTime?        @map("planned_due_date")
+  actualDueDate  DateTime?        @map("actual_due_date")
+  amount         Decimal?         @db.Decimal(12, 2)
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  milestone      ProjectMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([milestoneId])
+  @@map("milestone_records")
+}
+
+model AppConfig {
+  id        String   @id @default("global")
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_configs")
 }
 
 model Quotation {

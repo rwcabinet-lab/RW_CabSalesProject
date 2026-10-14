@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Kanban, LayoutDashboard, Clock, CheckSquare, TrendingUp, Sparkles, AlertCircle, Calendar, Trash2 } from "lucide-react";
+import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { formatTenThousands } from "@/lib/currency";
-import type { ApiResponse, AssignableUserDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
+import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/mock-data";
+import type { ApiResponse, AssignableUserDTO, ColumnItemDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -13,14 +14,15 @@ const todayDate = () =>
 export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardDTO | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUserDTO[]>([]);
+  const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  // 過濾條件
+  // 過濾條件：預設排除已流標與已立帳 (進行中)
   const [monthFilter, setMonthFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState("ACTIVE");
   const [businessFilter, setBusinessFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -31,35 +33,43 @@ export default function ManagerDashboardPage() {
   const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [monthFilter]); // 只將 monthFilter 送入 API，timeStandard 給前端過濾用
+    // 平行載入消除延遲
+    Promise.all([fetchDashboardData(), fetchAssignableUsers(), fetchUserSession(), fetchColumnConfig()]);
+  }, [monthFilter]);
 
-  useEffect(() => {
-    fetch("/api/auth/users")
-      .then(async (res) => {
-        if (!res.ok) throw new Error("無法載入指派人員");
-        return res.json() as Promise<ApiResponse<AssignableUserDTO[]>>;
-      })
-      .then((users: AssignableUserDTO[]) => {
-        setAssignableUsers(users.filter((user): user is AssignableUserDTO =>
-          user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"
-        ));
-      })
-      .catch((err) => {
-        console.error(err);
-        setAssignableUsers([]);
-      });
-  }, []);
+  const fetchColumnConfig = async () => {
+    try {
+      const res = await fetch("/api/admin/config?key=columns");
+      const colData = await res.json();
+      if (Array.isArray(colData.columns)) setColumns(colData.columns);
+    } catch {
+      // 降級使用預設欄位
+    }
+  };
 
-  useEffect(() => {
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("無法載入使用者權限");
-        return res.json() as Promise<ApiResponse<{ user: { role?: string } | null }>>;
-      })
-      .then((session) => setIsAdmin(session.user?.role === "ADMIN"))
-      .catch((error) => console.error("Failed to load current user:", error));
-  }, []);
+  const fetchAssignableUsers = async () => {
+    try {
+      const res = await fetch("/api/auth/users");
+      if (!res.ok) return;
+      const users = await res.json() as AssignableUserDTO[];
+      if (Array.isArray(users)) {
+        setAssignableUsers(users.filter(u => ["SALES_MANAGER", "SALES", "ASSISTANT"].includes(u.role)));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchUserSession = async () => {
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      if (!res.ok) return;
+      const session = await res.json();
+      setIsAdmin(session.user?.role === "ADMIN");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -92,7 +102,6 @@ export default function ManagerDashboardPage() {
         window.alert(result.error || "刪除任務失敗");
         return;
       }
-
       setData((current) => current ? {
         ...current,
         assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
@@ -130,14 +139,8 @@ export default function ManagerDashboardPage() {
       const res = await fetch("/api/dashboard/manager", {
         method: assignModal.taskId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(assignModal.taskId ? {
-          taskId: assignModal.taskId,
-          assignedToId: assignModal.userId,
-          subject: assignModal.subject,
-          priority: assignModal.priority,
-          dueDatetime: `${assignModal.dueDate}T00:00:00.000Z`,
-        } : {
-          projectId: assignModal.projectId,
+        body: JSON.stringify({
+          ...(assignModal.taskId ? { taskId: assignModal.taskId } : { projectId: assignModal.projectId }),
           assignedToId: assignModal.userId,
           subject: assignModal.subject,
           priority: assignModal.priority,
@@ -156,19 +159,25 @@ export default function ManagerDashboardPage() {
     }
   };
 
-  if (loading && !data) return <div className="p-16 text-center">載入主管看板中...</div>;
+  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管看板中...</div>;
   if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
   if (!data) return null;
 
-  // 案場總覽前端二次過濾 (大階段過濾)
+  // 案場總覽過濾：預設排除已流標/已立帳
   const filteredOverview = data.allProjectsOverview.filter(p => {
-    if (stageFilter && p.currentStage !== stageFilter) return false;
+    if (stageFilter === "ACTIVE") {
+      if (p.currentStage === "LOST" || p.currentStage === "BILLED") return false;
+    } else if (stageFilter && p.currentStage !== stageFilter) {
+      return false;
+    }
     if (businessFilter && p.salesRepName !== businessFilter) return false;
     const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
     if (statusFilter && projectStatus !== statusFilter) return false;
     return true;
   });
+
   const businessOptions = Array.from(new Set(data.allProjectsOverview.map((project) => project.salesRepName))).sort();
+  const visibleColumns = [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
 
   return (
     <div className="space-y-8 pb-16">
@@ -210,23 +219,22 @@ export default function ManagerDashboardPage() {
                 <div>
                   <h3 className="font-semibold">{task.subject}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "設為未完成"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "進行中"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
                   <span>預定完成：{task.dueDatetime.slice(0, 10)}</span>
-                  <Link href={`/projects/${task.projectId}/milestones`} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
+                  <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
                   <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
                 </div>
               </article>
             ))}
           </div>
-        ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有指派給登入者的任務</p>}
+        ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有已指派任務</p>}
       </section>
 
-      {/* 恢復：圖表區塊 (人員負載與階段瓶頸) */}
+      {/* 圖表區塊 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 人員案場負載與異常分佈 */}
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <h3 className="text-base font-bold flex items-center gap-2 mb-6">
             <Users className="w-5 h-5 text-blue-600" />
@@ -245,7 +253,6 @@ export default function ManagerDashboardPage() {
           </div>
         </div>
 
-        {/* 案件階段分佈與卡關瓶頸 */}
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <h3 className="text-base font-bold flex items-center gap-2 mb-6">
             <TrendingUp className="w-5 h-5 text-emerald-600" />
@@ -268,7 +275,7 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* 新增的所有案件狀態總覽區域 */}
+      {/* 統一案件清單 (套用全域欄位設定) */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 所有案件狀態總覽</h2>
@@ -279,98 +286,183 @@ export default function ManagerDashboardPage() {
             <label className="flex items-center gap-2">
               狀態：
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">全部</option>
+                <option value="">全部狀態</option>
                 <option value="RED">逾期</option>
                 <option value="YELLOW">即將到期</option>
                 <option value="GREEN">正常</option>
                 <option value="GRAY">未排定/已完成</option>
-                <option value="LOST">流標</option>
+                <option value="LOST">已流標</option>
               </select>
             </label>
             <label className="flex items-center gap-2">
               業務：
               <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">全部</option>
+                <option value="">全部業務</option>
                 {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2">
               階段：
               <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">全部</option>
-                <option value="CONTACT">接洽期</option>
-                <option value="DESIGN">設計確認期</option>
-                <option value="PRODUCTION">生產施工期</option>
-                <option value="CLOSED">結案</option>
+                <option value="ACTIVE">進行中案件 (預設，排除已流標/已立帳)</option>
+                <option value="">全部階段</option>
+                <option value="DEVELOP">第一階段：案件開發</option>
+                <option value="REQUIREMENT">第二階段：現況及需求確認</option>
+                <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
+                <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
+                <option value="PROD_SHIP">第五階段：生產及派送</option>
+                <option value="INSTALL">第六階段：安裝及驗收</option>
+                <option value="CLOSURE">第七階段：結案/售後</option>
+                <option value="WRAP_UP">收尾中</option>
+                <option value="LOST">已流標</option>
                 <option value="BILLED">已立帳</option>
-                <option value="WRAP_UP">收尾</option>
-                <option value="LOST">流標</option>
-                <option value="DONE">完成</option>
               </select>
             </label>
           </div>
         </div>
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-100 text-slate-600">
-            <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場</th><th className="p-3">業務/當前進度業助</th><th className="p-3">階段/進度</th><th className="p-3">預定完工日</th>              <th className="p-3 text-center">案件細節{isAdmin && " / 操作"}</th><th className="p-3">指派任務</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredOverview.map(p => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="p-3">
-                  <span className={`px-2 py-1 rounded-full font-bold ${p.trafficLight.color==="RED"?"bg-red-100 text-red-700":p.trafficLight.color==="YELLOW"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>
-                    ● {p.trafficLight.label}
-                  </span>
-                </td>
-                <td className="p-3 font-bold">{p.projectName}</td>
-                <td className="p-3">{p.salesRepName} / {p.salesAssistantName || "-"}</td>
-                <td className="p-3 font-bold text-slate-700">
-                  {p.currentStage === "LOST" ? p.currentStageLabel : `${p.currentStageLabel} - ${p.lastCompletedMilestoneName || p.activeMilestoneName}`}
-                  {p.unassignedNextMilestoneName && (
-                    <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-black text-red-700">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      下一項「{p.unassignedNextMilestoneName}」尚未指派負責人
-                    </div>
-                  )}
-                </td>
-                <td className="p-3">{p.expectedDate?.slice(0, 10) || "-"}</td>
-                <td className="p-3 text-center">
-                  <Link href={`/projects/${p.id}/milestones`} className="inline-flex h-8 w-24 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">案件細節</Link>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteProject(p)}
-                      disabled={deletingProjectId !== null}
-                      aria-label={`刪除案件 ${p.projectName}`}
-                      className="ml-2 inline-flex h-8 items-center justify-center gap-1 rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />{deletingProjectId === p.id ? "刪除中" : "刪除"}
-                    </button>
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  <button onClick={() => setAssignModal({
-                    open: true,
-                    projectId: p.id,
-                    projectName: p.projectName,
-                    taskId: "",
-                    userId: "",
-                    subject: "",
-                    priority: "MEDIUM",
-                    dueDate: todayDate(),
-                  })} className="inline-flex h-8 w-24 items-center justify-center rounded bg-blue-600 px-2 text-xs font-bold text-white shadow hover:bg-blue-700">指派任務</button>
-                </td>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-100 text-slate-600">
+              <tr>
+                {visibleColumns.map((col) => (
+                  <th key={col.key} className={`p-3 ${col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                    {col.label}
+                  </th>
+                ))}
+                <th className="p-3 text-center">指派任務</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y">
+              {filteredOverview.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50">
+                  {visibleColumns.map((col) => {
+                    switch (col.key) {
+                      case "trafficLight":
+                        return (
+                          <td key={col.key} className="p-3">
+                            <span className={`px-2 py-1 rounded-full font-bold ${
+                              p.trafficLight.color === "RED" ? "bg-red-100 text-red-700" :
+                              p.trafficLight.color === "YELLOW" ? "bg-amber-100 text-amber-700" :
+                              "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              ● {p.trafficLight.label}
+                            </span>
+                          </td>
+                        );
+                      case "projectName":
+                        return (
+                          <td key={col.key} className="p-3 font-bold">
+                            {p.projectName}
+                            {p.siteAddress && <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>}
+                          </td>
+                        );
+                      case "customer":
+                        return (
+                          <td key={col.key} className="p-3">
+                            {p.customerName}{" "}
+                            {p.defaultDiscount && (
+                              <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
+                                {p.defaultDiscount === 1 ? "牌價" : `${(p.defaultDiscount * 10).toFixed(1)}折`}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      case "salesRep":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-700 font-medium">
+                            {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
+                          </td>
+                        );
+                      case "stage":
+                        return (
+                          <td key={col.key} className="p-3 font-bold text-slate-700">
+                            {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
+                          </td>
+                        );
+                      case "activeMilestone":
+                        return (
+                          <td key={col.key} className="p-3 font-bold text-slate-700">
+                            {p.currentStage === "LOST" ? p.currentStageLabel : `${p.lastCompletedMilestoneName || p.activeMilestoneName}`}
+                            {p.unassignedNextMilestoneName && (
+                              <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">
+                                <AlertCircle className="h-3 w-3" />
+                                下一項「{p.unassignedNextMilestoneName}」待指派
+                              </div>
+                            )}
+                          </td>
+                        );
+                      case "amount":
+                        return (
+                          <td key={col.key} className="p-3 text-right font-bold tabular-nums">
+                            {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
+                          </td>
+                        );
+                      case "unitCount":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-600">
+                            {p.unitCount ? `${p.unitCount}戶` : "未填"}
+                          </td>
+                        );
+                      case "expectedDate":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-600">
+                            {p.expectedDate?.slice(0, 10) || "-"}
+                          </td>
+                        );
+                      case "actions":
+                        return (
+                          <td key={col.key} className="p-3 text-center">
+                            <Link
+                              href={`/projects/${p.id}/milestones`}
+                              prefetch={true}
+                              className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700"
+                            >
+                              案件細節
+                            </Link>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteProject(p)}
+                                disabled={deletingProjectId !== null}
+                                className="ml-2 inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />刪除
+                              </button>
+                            )}
+                          </td>
+                        );
+                      default:
+                        return null;
+                    }
+                  })}
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => setAssignModal({
+                        open: true,
+                        projectId: p.id,
+                        projectName: p.projectName,
+                        taskId: "",
+                        userId: "",
+                        subject: "",
+                        priority: "MEDIUM",
+                        dueDate: todayDate(),
+                      })}
+                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow hover:bg-blue-700"
+                    >
+                      指派任務
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 指派任務 Modal */}
       {assignModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
             <h3 className="font-bold mb-4 flex items-center gap-2"><Sparkles className="text-blue-600 w-5 h-5"/> {assignModal.taskId ? "變更指派任務" : "指派任務"} - {assignModal.projectName}</h3>
             <form onSubmit={handleAssignTask} className="space-y-3 text-sm">

@@ -156,19 +156,27 @@ export const DataService = {
         data: {
           projectName: data.projectName, customerId: data.customerId, siteAddress: data.siteAddress,
           siteCondition: data.siteCondition, salesRepId: customer.salesRepId,
-          currentStage: ProjectStage.CONTACT, expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
+          currentStage: ProjectStage.DEVELOP, expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
           unitCount: data.unitCount, cost: data.cost, quoteAmount: data.quoteAmount, estimatedBudget: data.quoteAmount || data.cost,
         },
       });
-      const allCodes: MilestoneStageCode[] = ["1-1","1-2","1-3","1-4","1-5","2-1","2-2","2-3","2-4","3-1","3-2","3-3","3-4","3-5"];
+      const allCodes: MilestoneStageCode[] = [
+        "1-1","1-2",
+        "2-1","2-2","2-3","2-4","2-5",
+        "3-1","3-2","3-3","3-4","3-5","3-6","3-7","3-8","3-9",
+        "4-1","4-2","4-3","4-4","4-5",
+        "5-1","5-2","5-3",
+        "6-1","6-2","6-3","6-4","6-5",
+        "7-1","7-2","7-3"
+      ];
       let cursorDate = new Date();
       await tx.projectMilestone.createMany({
         data: allCodes.map((code, index) => {
           const planned = new Date(cursorDate);
-          planned.setDate(planned.getDate() + MILESTONE_DEFAULT_DAYS[code]);
+          planned.setDate(planned.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
           cursorDate = planned;
           return {
-            projectId: p.id, stageCode: code, phase: STAGE_CODE_TO_PHASE[code], stageOrder: index + 1,
+            projectId: p.id, stageCode: code, phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP", stageOrder: index + 1,
             plannedDueDate: planned, status: index === 0 ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING, assignedToId: p.salesRepId,
           };
         }),
@@ -793,5 +801,98 @@ export const DataService = {
         resultNotes: resultNotes || undefined,
       },
     });
-  }
+  },
+
+  // -------------------------------------------------------------
+  // 里程碑拖曳重新排序
+  // -------------------------------------------------------------
+  async reorderMilestones(projectId: string, orderedMilestoneIds: string[]) {
+    await prisma.$transaction(
+      orderedMilestoneIds.map((id, index) =>
+        prisma.projectMilestone.update({
+          where: { id, projectId },
+          data: { stageOrder: index + 1 },
+        })
+      )
+    );
+    return this.getMilestonesByProjectId(projectId);
+  },
+
+  // -------------------------------------------------------------
+  // 里程碑多次記錄 [+] 功能
+  // -------------------------------------------------------------
+  async getMilestoneRecords(milestoneId: string) {
+    const records = await prisma.milestoneRecord.findMany({
+      where: { milestoneId },
+      orderBy: { recordOrder: "asc" },
+    });
+    return records.map((r) => ({
+      id: r.id,
+      milestoneId: r.milestoneId,
+      recordOrder: r.recordOrder,
+      plannedDueDate: dateOnlyValue(r.plannedDueDate),
+      actualDueDate: dateOnlyValue(r.actualDueDate),
+      amount: r.amount ? Number(r.amount) : null,
+      notes: r.notes || "",
+      createdAt: r.createdAt.toISOString(),
+    }));
+  },
+
+  async addMilestoneRecord(milestoneId: string, data: {
+    plannedDueDate?: string;
+    actualDueDate?: string;
+    amount?: number;
+    notes?: string;
+  }) {
+    const maxOrder = (await prisma.milestoneRecord.aggregate({
+      where: { milestoneId },
+      _max: { recordOrder: true },
+    }))._max.recordOrder || 0;
+
+    const record = await prisma.milestoneRecord.create({
+      data: {
+        milestoneId,
+        recordOrder: maxOrder + 1,
+        plannedDueDate: data.plannedDueDate ? new Date(data.plannedDueDate) : null,
+        actualDueDate: data.actualDueDate ? new Date(data.actualDueDate) : null,
+        amount: data.amount !== undefined ? data.amount : null,
+        notes: data.notes || null,
+      },
+    });
+
+    // 若填寫了實際完成日，同步更新所屬里程碑的實際完成日
+    if (data.actualDueDate) {
+      await prisma.projectMilestone.update({
+        where: { id: milestoneId },
+        data: { actualDueDate: new Date(data.actualDueDate) },
+      });
+    }
+
+    return record;
+  },
+
+  async deleteMilestoneRecord(recordId: string) {
+    return prisma.milestoneRecord.delete({ where: { id: recordId } });
+  },
+
+  // -------------------------------------------------------------
+  // 全域設定 (案件清單自訂欄位 / 子進度預設天數)
+  // -------------------------------------------------------------
+  async getAppConfig<T>(key: string, defaultValue: T): Promise<T> {
+    try {
+      const config = await prisma.appConfig.findUnique({ where: { key } });
+      if (!config) return defaultValue;
+      return JSON.parse(config.value) as T;
+    } catch {
+      return defaultValue;
+    }
+  },
+
+  async setAppConfig(key: string, value: unknown) {
+    return prisma.appConfig.upsert({
+      where: { key },
+      create: { key, value: JSON.stringify(value) },
+      update: { value: JSON.stringify(value) },
+    });
+  },
 };

@@ -60,42 +60,103 @@ export interface QuotationData {
   updatedAt: string;
 }
 
-/** 各子進度的顯示名稱 */
+/** 各子進度的顯示名稱 (7大階段 + 額外階段) */
 export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
-  "1-1": "初步接洽",
-  "1-2": "現場丈量",
-  "1-3": "報價提交",
-  "1-4": "繪圖確認",
-  "1-5": "合約簽訂",
-  "2-1": "已簽約確認",
-  "2-2": "資料送審",
-  "2-3": "覆量確認",
-  "2-4": "施工圖繪製",
-  "3-1": "下單生產",
-  "3-2": "現場施工",
-  "3-3": "驗收作業",
-  "3-4": "已結案",
-  "3-5": "已立帳",
+  // ① 案件開發
+  "1-1": "客源開發",
+  "1-2": "案件分配",
+  "1-3": "初步接洽(舊)",
+  "1-4": "報價提交(舊)",
+  "1-5": "合約簽訂(舊)",
+  // ② 現況及需求確認
+  "2-1": "需求訪談",
+  "2-2": "設計建議",
+  "2-3": "圖面索取",
+  "2-4": "丈量",
+  "2-5": "場勘",
+  // ③ 設計提案/報價/簽約
+  "3-1": "設計圖製作",
+  "3-2": "設計圖審核",
+  "3-3": "報價單製作",
+  "3-4": "報價單審核",
+  "3-5": "提案簡報製作",
+  "3-6": "提案簡報",
+  "3-7": "合約製作",
+  "3-8": "合約審核",
+  "3-9": "送約/簽約",
+  // ④ 生產前確認/拆單
+  "4-1": "復丈",
+  "4-2": "二次場勘",
+  "4-3": "施工圖製作",
+  "4-4": "施工圖審核",
+  "4-5": "拆單並提交生產",
+  // ⑤ 生產及派送
+  "5-1": "生產",
+  "5-2": "出貨",
+  "5-3": "派工",
+  // ⑥ 安裝及驗收
+  "6-1": "安裝",
+  "6-2": "監工及現場處置",
+  "6-3": "工程驗收",
+  "6-4": "提交成果驗收",
+  "6-5": "加減帳",
+  // ⑦ 結案/售後
+  "7-1": "批價",
+  "7-2": "請款",
+  "7-3": "追蹤二次回購",
+  // 額外階段
   "X-1": "收尾",
-  "X-2": "流標",
+  "X-2": "已流標",
 };
+
+/** 需要審核的子進度清單 (點擊提交後需由審核者按完成) */
+export const AUDIT_STAGE_CODES = new Set<string>([
+  "3-2", // 設計圖審核
+  "3-4", // 報價單審核
+  "3-6", // 提案簡報 (提案)
+  "3-8", // 合約審核
+  "4-4", // 施工圖審核
+]);
 
 /** 各子進度預設作業天數 */
 export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
-  "1-1": 3,  "1-2": 2,  "1-3": 5,  "1-4": 7,  "1-5": 5,
-  "2-1": 2,  "2-2": 3,  "2-3": 3,  "2-4": 10,
-  "3-1": 14, "3-2": 7,  "3-3": 3,  "3-4": 2,  "3-5": 2,
-  "X-1": 5,  "X-2": 1,
+  "1-1": 5, "1-2": 2, "1-3": 3, "1-4": 5, "1-5": 5,
+  "2-1": 3, "2-2": 3, "2-3": 2, "2-4": 2, "2-5": 2,
+  "3-1": 5, "3-2": 2, "3-3": 3, "3-4": 2, "3-5": 3, "3-6": 2, "3-7": 3, "3-8": 2, "3-9": 5,
+  "4-1": 2, "4-2": 2, "4-3": 7, "4-4": 3, "4-5": 3,
+  "5-1": 14, "5-2": 3, "5-3": 2,
+  "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 3,
+  "7-1": 3, "7-2": 5, "7-3": 30,
+  "X-1": 5, "X-2": 1,
 };
 
 export const PHASE_LABELS: Record<MilestonePhase, string> = {
-  CONTACT:    "第一階段：接洽/丈量/報價/繪圖/簽約",
-  DESIGN:     "第二階段：已簽約/資料送審/覆量中/繪製施工",
-  PRODUCTION: "第三階段：生產中/施工中/待驗收/已結案/已立帳",
-  EXTRA:      "額外階段：收尾/流標",
+  DEVELOP:     "第一階段：案件開發",
+  REQUIREMENT: "第二階段：現況及需求確認",
+  PROPOSAL:    "第三階段：設計提案/報價/簽約",
+  PRE_PROD:    "第四階段：生產前確認/拆單",
+  PROD_SHIP:   "第五階段：生產及派送",
+  INSTALL:     "第六階段：安裝及驗收",
+  CLOSURE:     "第七階段：結案/售後",
+  EXTRA:       "額外階段：收尾/已流標",
+  // 向下相容
+  CONTACT:     "接洽期",
+  DESIGN:      "設計確認期",
+  PRODUCTION:  "生產施工期",
 };
 
 export const PROJECT_STAGE_LABELS: Record<string, string> = {
+  DEVELOP: "案件開發",
+  REQUIREMENT: "現況及需求確認",
+  PROPOSAL: "設計提案/報價/簽約",
+  PRE_PROD: "生產前確認/拆單",
+  PROD_SHIP: "生產及派送",
+  INSTALL: "安裝及驗收",
+  CLOSURE: "結案/售後",
+  CLOSED: "已結案",
+  BILLED: "已立帳",
+  WRAP_UP: "收尾",
+  LOST: "已流標",
   INQUIRY: "接洽期",
   MEASUREMENT: "接洽期",
   QUOTE: "接洽期",
@@ -106,18 +167,32 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   CONTACT: "接洽期",
   DESIGN: "設計確認期",
   PRODUCTION: "生產施工期",
-  CLOSED: "已結案",
-  BILLED: "已立帳",
-  WRAP_UP: "收尾",
-  LOST: "流標",
 };
 
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
-  "1-1": "CONTACT", "1-2": "CONTACT", "1-3": "CONTACT", "1-4": "CONTACT", "1-5": "CONTACT",
-  "2-1": "DESIGN",  "2-2": "DESIGN",  "2-3": "DESIGN",  "2-4": "DESIGN",
-  "3-1": "PRODUCTION", "3-2": "PRODUCTION", "3-3": "PRODUCTION", "3-4": "PRODUCTION", "3-5": "PRODUCTION",
+  "1-1": "DEVELOP", "1-2": "DEVELOP", "1-3": "DEVELOP", "1-4": "DEVELOP", "1-5": "DEVELOP",
+  "2-1": "REQUIREMENT", "2-2": "REQUIREMENT", "2-3": "REQUIREMENT", "2-4": "REQUIREMENT", "2-5": "REQUIREMENT",
+  "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL", "3-6": "PROPOSAL", "3-7": "PROPOSAL", "3-8": "PROPOSAL", "3-9": "PROPOSAL",
+  "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD", "4-5": "PRE_PROD",
+  "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
+  "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
+  "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE",
   "X-1": "EXTRA", "X-2": "EXTRA",
 };
+
+/** 預設案件表格欄位定義 (全域通用，可由管理員拖曳排序與開關) */
+export const DEFAULT_PROJECT_COLUMNS = [
+  { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },
+  { key: "projectName", label: "案場/施工地址", visible: true, order: 1 },
+  { key: "customer", label: "客戶 (折數)", visible: true, order: 2 },
+  { key: "salesRep", label: "負責業務/業助", visible: true, order: 3 },
+  { key: "stage", label: "目前階段", visible: true, order: 4 },
+  { key: "activeMilestone", label: "當前進度", visible: true, order: 5 },
+  { key: "amount", label: "預算/金額", visible: true, order: 6 },
+  { key: "unitCount", label: "戶數", visible: true, order: 7 },
+  { key: "expectedDate", label: "預定完工日", visible: true, order: 8 },
+  { key: "actions", label: "操作", visible: true, order: 9 },
+];
 
 // ----------------------------------------------------------------
 // 初始種子資料

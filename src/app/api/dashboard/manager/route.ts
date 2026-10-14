@@ -97,14 +97,21 @@ export async function GET(req: NextRequest) {
 
     // 4. 所有案件狀態總覽 (含月份過濾)
     const stageLabels: Record<string, string> = {
-      CONTACT:    "接洽期",
-      DESIGN:     "設計確認期",
-      PRODUCTION: "生產施工期",
-      CLOSED:     "已結案",
-      BILLED:     "已立帳",
-      WRAP_UP:    "收尾",
-      LOST:       "流標",
-      DONE:       "完成",
+      DEVELOP:     "案件開發",
+      REQUIREMENT: "現況及需求確認",
+      PROPOSAL:    "設計提案/報價/簽約",
+      PRE_PROD:    "生產前確認/拆單",
+      PROD_SHIP:   "生產及派送",
+      INSTALL:     "安裝及驗收",
+      CLOSURE:     "結案/售後",
+      CLOSED:      "已結案",
+      BILLED:      "已立帳",
+      WRAP_UP:     "收尾",
+      LOST:        "已流標",
+      DONE:        "完成",
+      CONTACT:     "接洽期",
+      DESIGN:      "設計確認期",
+      PRODUCTION:  "生產施工期",
     };
 
     // 依月份過濾（使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
@@ -136,18 +143,22 @@ export async function GET(req: NextRequest) {
       return {
         id: p.id,
         projectName: p.projectName,
+        siteAddress: p.siteAddress,
         customerName: p.customerName,
         customerType: p.customerType,
+        defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
-        currentStageLabel: p.currentStage === "LOST" ? "流標" : stageLabels[p.currentStage] || p.currentStage,
+        currentStageLabel: p.currentStage === "LOST" ? "已流標" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.customerSalesRepName || p.salesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.isDelayed,
         trafficLight: p.currentStage === "LOST"
-          ? { color: "RED" as const, label: "流標", daysDiff: 0 }
+          ? { color: "RED" as const, label: "已流標", daysDiff: 0 }
           : trafficLight,
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,
+        cost: p.cost,
+        quoteAmount: p.quoteAmount,
         totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
         lastCompletedMilestoneName: lastCompletedMilestone
           ? MILESTONE_STAGE_LABELS[lastCompletedMilestone.stageCode]
@@ -173,11 +184,20 @@ export async function GET(req: NextRequest) {
 
     // 5. 階段瓶頸分析
     const stageCountMap: Record<string, { count: number; delayedCount: number; label: string }> = {
-      CONTACT:    { count: 0, delayedCount: 0, label: "接洽期" },
-      DESIGN:     { count: 0, delayedCount: 0, label: "設計確認期" },
-      PRODUCTION: { count: 0, delayedCount: 0, label: "生產施工期" },
-      CLOSED:     { count: 0, delayedCount: 0, label: "已結案" },
-      BILLED:     { count: 0, delayedCount: 0, label: "已立帳" },
+      DEVELOP:     { count: 0, delayedCount: 0, label: "案件開發" },
+      REQUIREMENT: { count: 0, delayedCount: 0, label: "現況及需求確認" },
+      PROPOSAL:    { count: 0, delayedCount: 0, label: "設計提案/報價/簽約" },
+      PRE_PROD:    { count: 0, delayedCount: 0, label: "生產前確認/拆單" },
+      PROD_SHIP:   { count: 0, delayedCount: 0, label: "生產及派送" },
+      INSTALL:     { count: 0, delayedCount: 0, label: "安裝及驗收" },
+      CLOSURE:     { count: 0, delayedCount: 0, label: "結案/售後" },
+      WRAP_UP:     { count: 0, delayedCount: 0, label: "收尾" },
+      LOST:        { count: 0, delayedCount: 0, label: "已流標" },
+      CONTACT:     { count: 0, delayedCount: 0, label: "接洽期" },
+      DESIGN:      { count: 0, delayedCount: 0, label: "設計確認期" },
+      PRODUCTION:  { count: 0, delayedCount: 0, label: "生產施工期" },
+      CLOSED:      { count: 0, delayedCount: 0, label: "已結案" },
+      BILLED:      { count: 0, delayedCount: 0, label: "已立帳" },
     };
     for (const p of projects) {
       if (stageCountMap[p.currentStage]) {

@@ -6,16 +6,16 @@ import {
   CheckSquare,
   Clock,
   Plus,
-  Building,
   Edit3,
   CheckCircle2,
   X,
   Trash2,
 } from "lucide-react";
-import { PROJECT_STAGE_LABELS } from "@/lib/mock-data";
+import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/mock-data";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 import type {
   ApiResponse,
+  ColumnItemDTO,
   CustomerDTO,
   TaskDTO,
   WorkbenchDashboardDTO,
@@ -31,10 +31,11 @@ export default function SalesWorkbenchPage() {
   const [currentUser, setCurrentUser] = useState({ id: "", name: "使用者", role: "SALES" });
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
+  const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
 
-  // 篩選條件
+  // 篩選條件：預設排除已流標與已立帳 (進行中)
   const [monthFilter, setMonthFilter] = useState("");
-  const [timeStandard, setTimeStandard] = useState(""); // 簽約/生產/完工/結案等階段過濾
+  const [stageFilter, setStageFilter] = useState("ACTIVE"); // 預設 ACTIVE 進行中 (排除 LOST / BILLED)
 
   // 行內新增/編輯案場
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
@@ -58,9 +59,19 @@ export default function SalesWorkbenchPage() {
   const [completionError, setCompletionError] = useState("");
 
   useEffect(() => {
-    fetchWorkbenchData();
-    fetchCustomers();
+    // 平行載入資料，消除等待時間
+    Promise.all([fetchWorkbenchData(), fetchCustomers(), fetchColumnConfig()]);
   }, []);
+
+  const fetchColumnConfig = async () => {
+    try {
+      const res = await fetch("/api/admin/config?key=columns");
+      const data = await res.json();
+      if (Array.isArray(data.columns)) setColumns(data.columns);
+    } catch {
+      // 降級使用預設欄位
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -198,18 +209,23 @@ export default function SalesWorkbenchPage() {
     setIsProjectPanelOpen(true);
   };
 
-  if (loading) return <div className="p-16 text-center">正在載入業務工作台...</div>;
+  if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">正在載入業務工作台...</div>;
 
-  // 過濾邏輯
+  // 過濾邏輯：預設排除已流標/已立帳 (stageFilter === "ACTIVE")
   const filteredProjects = projects.filter((p) => {
     let match = true;
-    if (timeStandard && p.currentStage !== timeStandard) match = false;
+    if (stageFilter === "ACTIVE") {
+      if (p.currentStage === "LOST" || p.currentStage === "BILLED") match = false;
+    } else if (stageFilter) {
+      if (p.currentStage !== stageFilter) match = false;
+    }
     if (monthFilter) {
       const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
       if (!dateToCheck.startsWith(monthFilter)) match = false;
     }
     return match;
   });
+
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
   const isAdmin = currentUser.role === "ADMIN";
   const visibleTasks = isAdmin ? tasks : pendingTasks;
@@ -254,6 +270,8 @@ export default function SalesWorkbenchPage() {
       window.alert("刪除案件時發生錯誤，請稍後重試");
     }
   };
+
+  const visibleColumns = [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
 
   return (
     <div className="space-y-8 pb-16">
@@ -324,20 +342,25 @@ export default function SalesWorkbenchPage() {
           </div>
         </div>
 
-        <div className="bg-white p-4 border-b flex gap-4 bg-slate-50/50">
+        <div className="bg-white p-4 border-b flex flex-wrap gap-4 bg-slate-50/50">
           <label className="flex items-center gap-2 text-sm font-semibold">
             月份：<input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="border rounded px-2 py-1" />
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold">
             階段：
-            <select value={timeStandard} onChange={(e) => setTimeStandard(e.target.value)} className="border rounded px-2 py-1">
-              <option value="">全部</option>
-              <option value="CONTACT">接洽期 (含報價/簽約)</option>
-              <option value="DESIGN">設計確認期</option>
-              <option value="PRODUCTION">生產施工期</option>
-              <option value="CLOSED">結案</option>
-              <option value="WRAP_UP">收尾</option>
-              <option value="LOST">流標</option>
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
+              <option value="ACTIVE">進行中案件 (預設，排除已流標/已立帳)</option>
+              <option value="">全部案件</option>
+              <option value="DEVELOP">第一階段：案件開發</option>
+              <option value="REQUIREMENT">第二階段：現況及需求確認</option>
+              <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
+              <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
+              <option value="PROD_SHIP">第五階段：生產及派送</option>
+              <option value="INSTALL">第六階段：安裝及驗收</option>
+              <option value="CLOSURE">第七階段：結案/售後</option>
+              <option value="WRAP_UP">收尾中</option>
+              <option value="LOST">已流標</option>
+              <option value="BILLED">已立帳</option>
             </select>
           </label>
         </div>
@@ -363,62 +386,152 @@ export default function SalesWorkbenchPage() {
           </form>
         )}
 
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-100 text-slate-600">
-            <tr>
-              <th className="p-3">狀態</th><th className="p-3">案場/地址</th><th className="p-3">客戶 (折數)</th><th className="p-3 text-right">預算/戶數</th><th className="p-3">目前階段</th><th className="p-3">當前進度</th><th className="p-3">預計完工日</th><th className="p-3 text-center">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredProjects.map(p => (
-              <tr
-                key={p.id}
-                className={`hover:brightness-95 ${
-                  p.activeMilestone?.phase === "EXTRA" || p.currentStage === "WRAP_UP" || p.currentStage === "LOST"
-                    ? "bg-red-50"
-                    : p.activeMilestone?.phase === "PRODUCTION" || ["PRODUCTION", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
-                      ? "bg-green-50"
-                      : p.activeMilestone?.phase === "DESIGN" || p.currentStage === "DESIGN"
-                        ? "bg-blue-50"
-                        : "bg-yellow-50"
-                }`}
-              >
-                <td className="p-3"><span className={`px-2 py-1 rounded-full font-bold ${p.trafficLight.color==="RED"?"bg-red-100 text-red-700":p.trafficLight.color==="YELLOW"?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>● {p.trafficLight.label}</span></td>
-                <td className="p-3 font-bold">{p.projectName}<div className="text-[10px] text-slate-500">{p.siteAddress}</div></td>
-                <td className="p-3">{p.customerName} <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">{p.defaultDiscount===1?"牌價":`${(p.defaultDiscount*10).toFixed(1)}折`}</span></td>
-                <td className="p-3 text-right"><span className="tabular-nums">{formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}</span><br/><span className="text-[10px] text-slate-500">{p.unitCount?`${p.unitCount}戶`:"未填"}</span></td>
-                <td className="p-3 font-bold text-slate-700">{PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}</td>
-                <td className="p-3 font-bold">{p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}</td>
-                <td className="p-3">{p.expectedDate?.slice(0, 10) || "未設定"}</td>
-                <td className="p-3 flex gap-2 justify-center">
-                  <button onClick={() => openEditProject(p)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs">編輯</button>
-                  <Link href={`/projects/${p.id}/milestones`} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">案件細節</Link>
-                  {isAdmin && (
-                    <button onClick={() => handleDeleteProject(p)} className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">刪除</button>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-100 text-slate-600">
+              <tr>
+                {visibleColumns.map((col) => (
+                  <th key={col.key} className={`p-3 ${col.key === "amount" ? "text-right" : col.key === "actions" ? "text-center" : ""}`}>
+                    {col.label}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y">
+              {filteredProjects.map((p) => (
+                <tr
+                  key={p.id}
+                  className={`hover:brightness-95 ${
+                    p.currentStage === "LOST" || p.currentStage === "WRAP_UP"
+                      ? "bg-red-50/50"
+                      : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
+                        ? "bg-emerald-50/40"
+                        : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(p.currentStage)
+                          ? "bg-blue-50/40"
+                          : "bg-amber-50/40"
+                  }`}
+                >
+                  {visibleColumns.map((col) => {
+                    switch (col.key) {
+                      case "trafficLight":
+                        return (
+                          <td key={col.key} className="p-3">
+                            <span className={`px-2 py-1 rounded-full font-bold ${
+                              p.trafficLight.color === "RED" ? "bg-red-100 text-red-700" :
+                              p.trafficLight.color === "YELLOW" ? "bg-amber-100 text-amber-700" :
+                              "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              ● {p.trafficLight.label}
+                            </span>
+                          </td>
+                        );
+                      case "projectName":
+                        return (
+                          <td key={col.key} className="p-3 font-bold">
+                            {p.projectName}
+                            <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>
+                          </td>
+                        );
+                      case "customer":
+                        return (
+                          <td key={col.key} className="p-3">
+                            {p.customerName}{" "}
+                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
+                              {p.defaultDiscount === 1 ? "牌價" : `${((p.defaultDiscount || 1) * 10).toFixed(1)}折`}
+                            </span>
+                          </td>
+                        );
+                      case "salesRep":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-700 font-medium">
+                            {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
+                          </td>
+                        );
+                      case "stage":
+                        return (
+                          <td key={col.key} className="p-3 font-bold text-slate-700">
+                            {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
+                          </td>
+                        );
+                      case "activeMilestone":
+                        return (
+                          <td key={col.key} className="p-3 font-bold text-blue-900">
+                            {p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}
+                          </td>
+                        );
+                      case "amount":
+                        return (
+                          <td key={col.key} className="p-3 text-right">
+                            <span className="tabular-nums font-bold">
+                              {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
+                            </span>
+                          </td>
+                        );
+                      case "unitCount":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-600">
+                            {p.unitCount ? `${p.unitCount}戶` : "未填"}
+                          </td>
+                        );
+                      case "expectedDate":
+                        return (
+                          <td key={col.key} className="p-3 text-slate-600">
+                            {p.expectedDate?.slice(0, 10) || "未設定"}
+                          </td>
+                        );
+                      case "actions":
+                        return (
+                          <td key={col.key} className="p-3 flex gap-2 justify-center">
+                            <button
+                              onClick={() => openEditProject(p)}
+                              className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-semibold"
+                            >
+                              編輯
+                            </button>
+                            <Link
+                              href={`/projects/${p.id}/milestones`}
+                              prefetch={true}
+                              className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs font-semibold hover:bg-blue-100 hover:text-blue-700"
+                            >
+                              案件細節
+                            </Link>
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeleteProject(p)}
+                                className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-semibold"
+                              >
+                                刪除
+                              </button>
+                            )}
+                          </td>
+                        );
+                      default:
+                        return null;
+                    }
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-xl w-96">
+          <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
             <h3 className="font-bold mb-4">新增待辦</h3>
             <form onSubmit={handleCreateTask} className="space-y-3 text-sm">
-              <label className="block">關聯案場<select required value={newTaskData.projectId} onChange={e=>setNewTaskData({...newTaskData, projectId: e.target.value})} className="w-full border p-1.5"><option value="">選擇</option>{projects.map(p=><option key={p.id} value={p.id}>{p.projectName}</option>)}</select></label>
-              <label className="block">主題<input required value={newTaskData.subject} onChange={e=>setNewTaskData({...newTaskData, subject: e.target.value})} className="w-full border p-1.5"/></label>
-              <label className="block">預計完成時間<input required type="datetime-local" value={newTaskData.dueDatetime} onChange={e=>setNewTaskData({...newTaskData, dueDatetime: e.target.value})} className="w-full border p-1.5"/></label>
-              <label className="block">優先度
-                <select value={newTaskData.priority} onChange={e=>setNewTaskData({...newTaskData, priority: e.target.value})} className="w-full border p-1.5">
+              <label className="block font-semibold">關聯案場<select required value={newTaskData.projectId} onChange={e=>setNewTaskData({...newTaskData, projectId: e.target.value})} className="w-full border p-1.5 mt-1 rounded"><option value="">選擇</option>{projects.map(p=><option key={p.id} value={p.id}>{p.projectName}</option>)}</select></label>
+              <label className="block font-semibold">主題<input required value={newTaskData.subject} onChange={e=>setNewTaskData({...newTaskData, subject: e.target.value})} className="w-full border p-1.5 mt-1 rounded"/></label>
+              <label className="block font-semibold">預計完成時間<input required type="datetime-local" value={newTaskData.dueDatetime} onChange={e=>setNewTaskData({...newTaskData, dueDatetime: e.target.value})} className="w-full border p-1.5 mt-1 rounded"/></label>
+              <label className="block font-semibold">優先度
+                <select value={newTaskData.priority} onChange={e=>setNewTaskData({...newTaskData, priority: e.target.value})} className="w-full border p-1.5 mt-1 rounded">
                   <option value="HIGH">高</option>
                   <option value="MEDIUM">中</option>
                   <option value="LOW">低</option>
                 </select>
               </label>
-              <div className="flex justify-end gap-2"><button type="button" onClick={()=>setShowTaskModal(false)} className="px-3 py-1 bg-slate-200 rounded">取消</button><button disabled={creatingTask} className="px-3 py-1 bg-blue-600 text-white rounded">建立</button></div>
+              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={()=>setShowTaskModal(false)} className="px-3 py-1 bg-slate-200 rounded font-bold">取消</button><button disabled={creatingTask} className="px-3 py-1 bg-blue-600 text-white rounded font-bold">建立</button></div>
             </form>
           </div>
         </div>
@@ -458,7 +571,7 @@ export default function SalesWorkbenchPage() {
                   setCompletionError("");
                 }}
                 disabled={completingTask}
-                className="rounded bg-slate-200 px-4 py-2 text-sm"
+                className="rounded bg-slate-200 px-4 py-2 text-sm font-semibold"
               >
                 取消
               </button>

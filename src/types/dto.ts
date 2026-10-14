@@ -27,13 +27,49 @@ export type ProjectStageDTO =
   | "CLOSED"
   | "BILLED"
   | "WRAP_UP"
-  | "LOST";
-export type MilestonePhaseDTO = "CONTACT" | "DESIGN" | "PRODUCTION" | "EXTRA";
+  | "LOST"
+  | "DEVELOP"
+  | "REQUIREMENT"
+  | "PROPOSAL"
+  | "PRE_PROD"
+  | "PROD_SHIP"
+  | "INSTALL"
+  | "CLOSURE";
+
+export type MilestonePhaseDTO =
+  | "DEVELOP"
+  | "REQUIREMENT"
+  | "PROPOSAL"
+  | "PRE_PROD"
+  | "PROD_SHIP"
+  | "INSTALL"
+  | "CLOSURE"
+  | "EXTRA"
+  | "CONTACT"
+  | "DESIGN"
+  | "PRODUCTION";
+
 export type MilestoneStageCodeDTO =
   | "1-1" | "1-2" | "1-3" | "1-4" | "1-5"
-  | "2-1" | "2-2" | "2-3" | "2-4"
-  | "3-1" | "3-2" | "3-3" | "3-4" | "3-5"
+  | "2-1" | "2-2" | "2-3" | "2-4" | "2-5"
+  | "3-1" | "3-2" | "3-3" | "3-4" | "3-5" | "3-6" | "3-7" | "3-8" | "3-9"
+  | "4-1" | "4-2" | "4-3" | "4-4" | "4-5"
+  | "5-1" | "5-2" | "5-3"
+  | "6-1" | "6-2" | "6-3" | "6-4" | "6-5"
+  | "7-1" | "7-2" | "7-3"
   | "X-1" | "X-2";
+
+export interface MilestoneRecordDTO {
+  id: string;
+  milestoneId: string;
+  recordOrder: number;
+  plannedDueDate?: string | null;
+  actualDueDate?: string | null;
+  amount?: number | null;
+  notes?: string | null;
+  createdAt?: string;
+}
+
 export type MilestoneStatusDTO = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 export type TaskPriorityDTO = "HIGH" | "MEDIUM" | "LOW";
 export type TaskTypeDTO = "SITE_VISIT" | "DRAWING" | "QUOTE_FOLLOWUP" | "PAYMENT_REMINDER";
@@ -112,6 +148,9 @@ export interface WorkbenchProjectDTO {
   currentStage: string;
   siteAddress: string;
   isDelayed: boolean;
+  salesRepId?: string;
+  salesRepName?: string;
+  salesAssistantName?: string | null;
   totalAmount: number | null;
   unitCount?: number;
   cost?: number;
@@ -145,6 +184,18 @@ export interface MilestoneDTO {
   plannedStart?: string | null;
   plannedEnd?: string | null;
   stageName?: string;
+  records?: MilestoneRecordDTO[];
+}
+
+export interface ColumnItemDTO {
+  key: string;
+  label: string;
+  visible: boolean;
+  order: number;
+}
+
+export interface ColumnConfigDTO {
+  columns: ColumnItemDTO[];
 }
 
 export interface ProjectWithMilestonesDTO extends ProjectDTO {
@@ -268,8 +319,10 @@ export interface StageBottleneckDTO {
 export interface ManagerProjectOverviewDTO {
   id: string;
   projectName: string;
+  siteAddress?: string;
   customerName: string;
   customerType: string;
+  defaultDiscount?: number;
   currentStage: string;
   currentStageLabel: string;
   salesRepName: string;
@@ -278,6 +331,8 @@ export interface ManagerProjectOverviewDTO {
   trafficLight: TrafficLightDTO;
   expectedDate: string;
   unitCount?: number;
+  cost?: number;
+  quoteAmount?: number;
   totalAmount: number | null;
   lastCompletedMilestoneName: string | null;
   activeMilestoneName: string | null;
