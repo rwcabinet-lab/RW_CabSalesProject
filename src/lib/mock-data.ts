@@ -224,7 +224,7 @@ export function normalizeProjectColumns(value: unknown) {
   const quoteColumn = quoteColumns.length
     ? {
         key: "quoteAndUnits",
-        label: "報價／戶數",
+        label: "報價 / 戶數",
         visible: quoteColumns.some((column) => column.visible !== false),
         order: Math.min(...quoteColumns.map((column) =>
           typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
