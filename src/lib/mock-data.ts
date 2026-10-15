@@ -75,7 +75,7 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "3-1": "設計圖",
   "3-2": "報價單",
   "3-3": "提案簡報",
-  "3-4": "合約",
+  "3-4": "合約擬定",
   "3-5": "送約/簽約",
   "3-6": "提案簡報",
   "3-7": "合約製作",
