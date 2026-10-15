@@ -197,11 +197,11 @@ export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
 /** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */
 export const DEFAULT_PROJECT_COLUMNS = [
   { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },
-  { key: "projectName", label: "案場/施工地址", visible: true, order: 1 },
-  { key: "customer", label: "客戶 (折數)", visible: true, order: 2 },
+  { key: "projectName", label: "案場 / 工地", visible: true, order: 1 },
+  { key: "customer", label: "客戶 / 折數", visible: true, order: 2 },
   { key: "salesRep", label: "負責業務/業助", visible: true, order: 3 },
   { key: "stageProgress", label: "階段 / 進度", visible: true, order: 4 },
-  { key: "quoteAndUnits", label: "報價／戶數", visible: true, order: 5 },
+  { key: "quoteAndUnits", label: "報價 / 戶數", visible: true, order: 5 },
   { key: "expectedDate", label: "預定完工日", visible: true, order: 6 },
   { key: "actions", label: "操作", visible: true, order: 7 },
 ];
