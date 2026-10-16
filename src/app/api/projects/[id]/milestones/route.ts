@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { ScheduleEngine } from "@/lib/schedule-engine";
+import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
-import { AUDIT_STAGE_CODES } from "@/lib/mock-data";
+import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/mock-data";
 import { AppError } from "@/lib/errors";
+
+export const dynamic = "force-dynamic";
 
 function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTrafficLight>[0]>(milestones: T[]) {
+  return milestones.map((m) => ({
+    ...m,
+    trafficLight: ScheduleEngine.getTrafficLight(m),
+  }));
 }
 
 export async function GET(
@@ -17,29 +26,31 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
-    const projectRecord = await DataService.getProjectById(projectId, { evaluateSchedule: false });
+    const [projectRecord, rawInitialMilestones] = await Promise.all([
+      DataService.getProjectById(projectId, { evaluateSchedule: false }),
+      DataService.getMilestonesByProjectId(projectId),
+    ]);
     if (!projectRecord) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
+    let initialMilestones = rawInitialMilestones;
     if (projectRecord.currentStage !== "LOST") {
-      await DataService.ensureProjectMilestones(projectId);
+      const existingCodes = new Set(initialMilestones.map((m) => m.stageCode));
+      const hasMissing = STANDARD_MILESTONE_STAGE_CODES.some((code) => !existingCodes.has(code));
+      if (hasMissing) {
+        await DataService.ensureProjectMilestones(projectId);
+        initialMilestones = await DataService.getMilestonesByProjectId(projectId);
+      }
     }
-    const initialMilestones = await DataService.getMilestonesByProjectId(projectId);
     const milestones = projectRecord.currentStage === "WRAP_UP"
       ? await DataService.activateLegacyWrapUpMilestone(projectId)
       : initialMilestones;
     const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
     const project = { ...projectRecord, isDelayed: projectRecord.isDelayed || isDelayed };
 
-    // 附帶計算各里程碑的燈號 (紅黃綠)
-    const milestonesWithTrafficLights = milestones.map((m) => ({
-      ...m,
-      trafficLight: ScheduleEngine.getTrafficLight(m),
-    }));
-
     return NextResponse.json({
       project,
-      milestones: milestonesWithTrafficLights,
+      milestones: attachTrafficLights(milestones),
     });
   } catch (error) {
     console.error("Failed to get milestones:", error);
@@ -55,11 +66,15 @@ export async function PUT(
     const projectId = params.id;
     const body = await req.json();
     const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted } = body;
-    const user = await getUserFromRequest(req);
+
+    const [user, project, initialMilestones] = await Promise.all([
+      getUserFromRequest(req),
+      DataService.getProjectById(projectId, { evaluateSchedule: false }),
+      DataService.getMilestonesByProjectId(projectId),
+    ]);
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
-    const project = await DataService.getProjectById(projectId, { evaluateSchedule: false });
     if (!project) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
@@ -76,8 +91,7 @@ export async function PUT(
       if (notes !== undefined && typeof notes !== "string") {
         return NextResponse.json({ error: "審核備註格式無效" }, { status: 400 });
       }
-      const milestone = (await DataService.getMilestonesByProjectId(projectId))
-        .find((item) => item.id === milestoneId);
+      const milestone = initialMilestones.find((item) => item.id === milestoneId);
       if (!milestone) return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
       if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
         return NextResponse.json({ error: "此里程碑不需要審核" }, { status: 400 });
@@ -100,17 +114,18 @@ export async function PUT(
       if (!isManager) {
         return NextResponse.json({ error: "僅主管可回到第三階段" }, { status: 403 });
       }
-      const project = await DataService.getProjectById(projectId);
-      if (!project) {
-        return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
-      }
       if (project.currentStage !== "WRAP_UP") {
         return NextResponse.json({ error: "只有收尾階段可返回第三階段" }, { status: 409 });
       }
 
       const milestones = await DataService.returnProjectToProduction(projectId);
-      const updatedProject = await DataService.getProjectById(projectId);
-      return NextResponse.json({ success: true, project: updatedProject, milestones });
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+      const updatedProject = { ...project, currentStage: "PRODUCTION", isDelayed };
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(milestones),
+      });
     }
 
     if (action === "specialAdvance") {
@@ -125,11 +140,17 @@ export async function PUT(
       }
 
       const milestones = await DataService.advanceProjectToSpecialStage(projectId, stageCode, reason.trim());
-      const updatedProject = await DataService.getProjectById(projectId);
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+      const nextStageCode: "X-1" | "X-2" = stageCode;
+      const updatedProject = {
+        ...project,
+        currentStage: STAGE_CODE_TO_PROJECT_STAGE[nextStageCode] || project.currentStage,
+        isDelayed,
+      };
       return NextResponse.json({
         success: true,
         project: updatedProject,
-        milestones,
+        milestones: attachTrafficLights(milestones),
       });
     }
 
@@ -138,22 +159,37 @@ export async function PUT(
       if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.some((id) => typeof id !== "string")) {
         return NextResponse.json({ error: "缺少 orderedMilestoneIds 陣列" }, { status: 400 });
       }
-      const milestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
-      const updatedProject = await DataService.getProjectById(projectId);
-      return NextResponse.json({ success: true, project: updatedProject, milestones });
+      const milestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds, initialMilestones);
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+      const updatedProject = { ...project, isDelayed };
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(milestones),
+      });
     }
 
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }
 
+    const targetMilestone = initialMilestones.find((item) => item.id === milestoneId);
+
     if (action === "rollback") {
       if (!isManager) {
         return NextResponse.json({ error: "僅主管可回退已完成的里程碑" }, { status: 403 });
       }
-      const milestones = await DataService.rollbackMilestone(projectId, milestoneId);
-      const updatedProject = await DataService.getProjectById(projectId);
-      return NextResponse.json({ success: true, project: updatedProject, milestones });
+      const milestones = await DataService.rollbackMilestone(projectId, milestoneId, initialMilestones);
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+      const updatedStage = targetMilestone
+        ? STAGE_CODE_TO_PROJECT_STAGE[targetMilestone.stageCode] || project.currentStage
+        : project.currentStage;
+      const updatedProject = { ...project, currentStage: updatedStage, isDelayed };
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(milestones),
+      });
     }
 
     if (action === "toggleCompletion") {
@@ -163,12 +199,8 @@ export async function PUT(
       if (notes !== undefined && typeof notes !== "string") {
         return NextResponse.json({ error: "完成備註格式無效" }, { status: 400 });
       }
-      if (isCompleted && AUDIT_STAGE_CODES.has(
-        (await DataService.getMilestoneStageCode(projectId, milestoneId)) || "",
-      )) {
-        const milestone = (await DataService.getMilestonesByProjectId(projectId))
-          .find((item) => item.id === milestoneId);
-        if (!milestone?.auditSubmitted) {
+      if (isCompleted && AUDIT_STAGE_CODES.has(targetMilestone?.stageCode || "")) {
+        if (!targetMilestone?.auditSubmitted) {
           return NextResponse.json({ error: "請先提交審核，再由審核人員完成此進度" }, { status: 409 });
         }
         if (!canReviewAudit) {
@@ -185,8 +217,17 @@ export async function PUT(
         isCompleted ? actualDueDate || new Date().toISOString().slice(0, 10) : "",
         typeof notes === "string" ? notes : undefined
       );
-      const updatedProject = await DataService.getProjectById(projectId);
-      return NextResponse.json({ success: true, project: updatedProject, milestones });
+      const firstIncomplete = milestones.find((m) => m.status !== "COMPLETED");
+      const currentStage = firstIncomplete
+        ? STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode] || project.currentStage
+        : targetMilestone?.stageCode === "X-1" ? "WRAP_UP" : "DONE";
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+      const updatedProject = { ...project, currentStage, isDelayed };
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(milestones),
+      });
     }
 
     if (action !== "advance") {
@@ -212,9 +253,7 @@ export async function PUT(
         return NextResponse.json({ error: "里程碑欄位格式無效" }, { status: 400 });
       }
       if (updates.assignedToId !== undefined) {
-        const milestone = (await DataService.getMilestonesByProjectId(projectId))
-          .find((item) => item.id === milestoneId);
-        if (milestone?.auditSubmitted) {
+        if (targetMilestone?.auditSubmitted) {
           return NextResponse.json({ error: "審核進行中，暫不可變更此進度負責人" }, { status: 409 });
         }
       }
@@ -230,14 +269,8 @@ export async function PUT(
       if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
         return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
       }
-      const project = await DataService.getProjectById(projectId);
-      if (!project) {
-        return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
-      }
       if (project.currentStage === "WRAP_UP") {
-        const wrapUpMilestone = (await DataService.getMilestonesByProjectId(projectId))
-          .find((milestone) => milestone.id === milestoneId);
-        if (!wrapUpMilestone || wrapUpMilestone.stageCode !== "X-1") {
+        if (!targetMilestone || targetMilestone.stageCode !== "X-1") {
           return NextResponse.json({ error: "收尾階段僅可完成收尾項目" }, { status: 409 });
         }
 
@@ -245,18 +278,19 @@ export async function PUT(
           notes: typeof notes === "string" ? notes : undefined,
           completedDate: actualDueDate || new Date().toISOString().slice(0, 10),
         });
-        const updatedProject = await DataService.getProjectById(projectId);
-        return NextResponse.json({ success: true, project: updatedProject, milestones });
+        const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
+        const updatedProject = { ...project, isDelayed };
+        return NextResponse.json({
+          success: true,
+          project: updatedProject,
+          milestones: attachTrafficLights(milestones),
+        });
       }
       if (project.currentStage === "LOST") {
         return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
       }
-      if (AUDIT_STAGE_CODES.has(
-        (await DataService.getMilestoneStageCode(projectId, milestoneId)) || "",
-      )) {
-        const milestone = (await DataService.getMilestonesByProjectId(projectId))
-          .find((item) => item.id === milestoneId);
-        if (!milestone?.auditSubmitted) {
+      if (AUDIT_STAGE_CODES.has(targetMilestone?.stageCode || "")) {
+        if (!targetMilestone?.auditSubmitted) {
           return NextResponse.json({ error: "請先提交審核，再由審核人員完成此進度" }, { status: 409 });
         }
         if (!canReviewAudit) {
@@ -265,39 +299,50 @@ export async function PUT(
       }
 
       // 快速推進此里程碑完成，並啟動下一里程碑
-      const result = await DataService.advanceMilestone(projectId, milestoneId, {
-        notes,
-        attachments,
-        completedDate: actualDueDate,
-      });
+      const result = await DataService.advanceMilestone(
+        projectId,
+        milestoneId,
+        {
+          notes,
+          attachments,
+          completedDate: actualDueDate,
+        },
+        initialMilestones,
+      );
 
-      const updatedProject = await DataService.getProjectById(projectId);
+      const updatedProject = {
+        ...project,
+        currentStage: result.newStage,
+        isDelayed: result.isDelayed,
+      };
 
       return NextResponse.json({
         success: true,
         message: `成功完成里程碑並推進案場階段至 ${result.newStage}`,
         project: updatedProject,
-        milestones: result.updatedMilestones,
+        milestones: attachTrafficLights(result.updatedMilestones),
       });
     }
 
     // 一般修改
     if (updates?.notes !== undefined) {
-      const milestone = (await DataService.getMilestonesByProjectId(projectId)).find((item) => item.id === milestoneId);
-      if ((milestone?.stageCode === "X-1" || milestone?.stageCode === "X-2") && (typeof updates.notes !== "string" || !updates.notes.trim())) {
+      if ((targetMilestone?.stageCode === "X-1" || targetMilestone?.stageCode === "X-2") && (typeof updates.notes !== "string" || !updates.notes.trim())) {
         return NextResponse.json({ error: "額外階段的推進原因不可空白" }, { status: 400 });
       }
-      if (milestone?.stageCode === "X-1" || milestone?.stageCode === "X-2") {
+      if (targetMilestone?.stageCode === "X-1" || targetMilestone?.stageCode === "X-2") {
         updates.notes = updates.notes.trim();
       }
     }
     const updated = await DataService.updateMilestone(projectId, milestoneId, updates || {});
-    const updatedProject = await DataService.getProjectById(projectId);
+    const updatedMilestones = initialMilestones.map((m) => (m.id === milestoneId && updated ? updated : m));
+    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
+    const updatedProject = { ...project, isDelayed };
 
     return NextResponse.json({
       success: true,
       milestone: updated,
       project: updatedProject,
+      milestones: attachTrafficLights(evaluatedMilestones),
     });
   } catch (error) {
     if (error instanceof AppError) {

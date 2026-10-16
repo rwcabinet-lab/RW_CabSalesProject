@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/hooks/useQueries";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -86,6 +88,7 @@ const todayDate = () =>
 export default function MilestonesPage({ params }: { params: { id: string } }) {
   const projectId = params.id;
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectDTO | null>(null);
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [assignees, setAssignees] = useState<UserDTO[]>([]);
@@ -425,7 +428,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (!response.ok) throw new Error(result.error || "提交審核失敗");
       alert(`已將【${MILESTONE_STAGE_LABELS[milestone.stageCode]}】提交審核，待辦已發送給主責人員。`);
       setSubmitAuditModal(null);
-      await refreshMilestonesOnly();
+      if (result.project && result.milestones) {
+        applyMilestonesData(result);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => (tRes.ok ? tRes.json() : null))
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
     } catch (err) {
       alert(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
@@ -462,6 +476,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
     } catch (err) {
       alert(err instanceof Error ? err.message : "完成推進失敗");
     } finally {
@@ -490,7 +507,18 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存失敗");
       setEditingId(null);
-      await refreshMilestonesOnly();
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => (tRes.ok ? tRes.json() : null))
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -521,6 +549,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
     } catch (err) {
       setSpecialAdvanceError(err instanceof Error ? err.message : "操作失敗");
     } finally {

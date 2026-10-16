@@ -474,20 +474,35 @@ export const DataService = {
     return (await this.getMilestonesByProjectId(projectId)).find(m => m.id === milestoneId);
   },
 
-  async advanceMilestone(projectId: string, milestoneId: string, options?: { notes?: string; attachments?: string; completedDate?: string }) {
-    const list = await this.getMilestonesByProjectId(projectId);
+  async advanceMilestone(
+    projectId: string,
+    milestoneId: string,
+    options?: { notes?: string; attachments?: string; completedDate?: string },
+    existingMilestones?: ProjectMilestoneItem[]
+  ) {
+    const list = existingMilestones ?? await this.getMilestonesByProjectId(projectId);
+    const originalById = new Map(list.map((m) => [m.id, m]));
     const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
-    const operations: Prisma.PrismaPromise<unknown>[] = [];
+    const operations: Promise<unknown>[] = [];
     for (const milestone of result.updatedMilestones) {
-      operations.push(prisma.projectMilestone.update({
-        where: { id: milestone.id },
-        data: {
-          status: milestone.status,
-          actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
-          notes: milestone.notes,
-          attachments: milestone.attachments,
-        },
-      }));
+      const orig = originalById.get(milestone.id);
+      const hasChanged =
+        !orig ||
+        orig.status !== milestone.status ||
+        orig.actualDueDate !== milestone.actualDueDate ||
+        orig.notes !== milestone.notes ||
+        orig.attachments !== milestone.attachments;
+      if (hasChanged) {
+        operations.push(prisma.projectMilestone.update({
+          where: { id: milestone.id },
+          data: {
+            status: milestone.status,
+            actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
+            notes: milestone.notes,
+            attachments: milestone.attachments,
+          },
+        }));
+      }
       if (milestone.id === milestoneId) {
         operations.push(prisma.salesTask.updateMany({
           where: { milestoneId },
@@ -503,7 +518,7 @@ export const DataService = {
       where: { id: projectId },
       data: { currentStage: result.newCurrentStage as ProjectStage, isDelayed: result.isProjectDelayed },
     }));
-    await prisma.$transaction(operations);
+    await Promise.all(operations);
     return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
   },
 
@@ -580,8 +595,8 @@ export const DataService = {
     return this.getMilestonesByProjectId(projectId);
   },
 
-  async rollbackMilestone(projectId: string, milestoneId: string) {
-    const milestones = await this.getMilestonesByProjectId(projectId);
+  async rollbackMilestone(projectId: string, milestoneId: string, existingMilestones?: ProjectMilestoneItem[]) {
+    const milestones = existingMilestones ?? await this.getMilestonesByProjectId(projectId);
     const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
     if (targetIndex < 0 || milestones[targetIndex].status !== "COMPLETED") {
       throw new NotFoundError("找不到已完成的里程碑");
@@ -593,31 +608,43 @@ export const DataService = {
     const next = milestones[targetIndex + 1];
     const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.projectMilestone.update({
-        where: { id: target.id },
-        data: { status: MilestoneStatus.IN_PROGRESS, actualDueDate: null },
-      });
-      if (next && next.status !== "COMPLETED") {
-        await tx.projectMilestone.update({
-          where: { id: next.id },
-          data: { status: MilestoneStatus.PENDING },
-        });
+    const updatedList = milestones.map((m, idx) => {
+      if (idx === targetIndex) {
+        return { ...m, status: MilestoneStatus.IN_PROGRESS, actualDueDate: null };
       }
-      await tx.salesTask.updateMany({
+      if (idx === targetIndex + 1 && m.status !== "COMPLETED") {
+        return { ...m, status: MilestoneStatus.PENDING };
+      }
+      return m;
+    });
+    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedList);
+    const evaluatedTarget = evaluatedMilestones[targetIndex];
+
+    const operations: Promise<unknown>[] = [
+      prisma.projectMilestone.update({
+        where: { id: target.id },
+        data: { status: evaluatedTarget.status, actualDueDate: null },
+      }),
+      prisma.salesTask.updateMany({
         where: { milestoneId: target.id },
         data: { isCompleted: false, completedAt: null },
-      });
-      await tx.project.update({
+      }),
+      prisma.project.update({
         where: { id: projectId },
-        data: { currentStage: stage, isDelayed: false },
-      });
-    });
+        data: { currentStage: stage, isDelayed },
+      }),
+    ];
+    if (next && next.status !== "COMPLETED") {
+      operations.push(
+        prisma.projectMilestone.update({
+          where: { id: next.id },
+          data: { status: MilestoneStatus.PENDING },
+        })
+      );
+    }
 
-    const updatedMilestones = await this.getMilestonesByProjectId(projectId);
-    const { isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
-    await prisma.project.update({ where: { id: projectId }, data: { isDelayed } });
-    return updatedMilestones;
+    await Promise.all(operations);
+    return evaluatedMilestones;
   },
 
   async advanceProjectToSpecialStage(projectId: string, stageCode: "X-1" | "X-2", reason: string) {
@@ -1001,27 +1028,39 @@ export const DataService = {
   // -------------------------------------------------------------
   // 里程碑拖曳重新排序
   // -------------------------------------------------------------
-  async reorderMilestones(projectId: string, orderedMilestoneIds: string[]) {
-    const existingMilestones = await prisma.projectMilestone.findMany({
-      where: { projectId },
-      select: { id: true },
-    });
+  async reorderMilestones(
+    projectId: string,
+    orderedMilestoneIds: string[],
+    existingMilestones?: ProjectMilestoneItem[]
+  ) {
+    const currentMilestones = existingMilestones ?? await this.getMilestonesByProjectId(projectId);
     if (
-      orderedMilestoneIds.length !== existingMilestones.length ||
-      new Set(orderedMilestoneIds).size !== existingMilestones.length ||
-      existingMilestones.some(({ id }) => !orderedMilestoneIds.includes(id))
+      orderedMilestoneIds.length !== currentMilestones.length ||
+      new Set(orderedMilestoneIds).size !== currentMilestones.length ||
+      currentMilestones.some(({ id }) => !orderedMilestoneIds.includes(id))
     ) {
       throw new BadRequestError("排序清單必須包含此案件的所有里程碑且不可重複");
     }
-    await prisma.$transaction(
-      orderedMilestoneIds.map((id, index) =>
-        prisma.projectMilestone.update({
-          where: { id, projectId },
-          data: { stageOrder: index + 1 },
-        })
-      )
-    );
-    return this.getMilestonesByProjectId(projectId);
+    const byId = new Map(currentMilestones.map((m) => [m.id, m]));
+    const updates: Promise<unknown>[] = [];
+    const reordered: ProjectMilestoneItem[] = [];
+    orderedMilestoneIds.forEach((id, index) => {
+      const item = byId.get(id)!;
+      const newOrder = index + 1;
+      if (item.stageOrder !== newOrder) {
+        updates.push(
+          prisma.projectMilestone.update({
+            where: { id, projectId },
+            data: { stageOrder: newOrder },
+          })
+        );
+      }
+      reordered.push({ ...item, stageOrder: newOrder });
+    });
+    if (updates.length > 0) {
+      await Promise.all(updates);
+    }
+    return ScheduleEngine.evaluateMilestones(reordered).milestones;
   },
 
   // -------------------------------------------------------------

@@ -4,13 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { AppRole, DEFAULT_ROLE_PAGES, getPageAccessKey, PageAccessKey } from "@/lib/page-access";
 
 interface UserAccessProfile {
+  id?: string;
+  name?: string;
   role: Role;
   email: string;
+  createdAt?: Date;
+  updatedAt?: Date;
   pages: PageAccessKey[];
 }
 
-const ACCESS_PROFILE_TTL_MS = 30_000;
-const accessProfileCache = new Map<string, { profile: UserAccessProfile; expiresAt: number }>();
+const ACCESS_PROFILE_TTL_MS = 60_000;
+const globalForAccess = globalThis as unknown as {
+  accessProfileCache?: Map<string, { profile: UserAccessProfile; expiresAt: number }>;
+};
+const accessProfileCache =
+  globalForAccess.accessProfileCache ??
+  (globalForAccess.accessProfileCache = new Map<string, { profile: UserAccessProfile; expiresAt: number }>());
 
 export function cacheUserAccessProfile(
   userId: string,
@@ -33,6 +42,17 @@ export function invalidateRoleAccessProfiles(): void {
 export async function getUserFromRequest(request: NextRequest) {
   const userId = request.cookies.get("cab_sales_user_id")?.value;
   if (!userId) return null;
+  const cached = accessProfileCache.get(userId);
+  if (cached && cached.expiresAt > Date.now() && cached.profile.name) {
+    return {
+      id: cached.profile.id || userId,
+      name: cached.profile.name,
+      email: cached.profile.email,
+      role: cached.profile.role,
+      createdAt: cached.profile.createdAt ?? new Date(0),
+      updatedAt: cached.profile.updatedAt ?? new Date(0),
+    };
+  }
   return prisma.user.findUnique({ where: { id: userId } });
 }
 
@@ -74,11 +94,14 @@ export async function canUserAccessPath(
   if (!profile) {
     const [user] = await prisma.$queryRaw<Array<{
       id: string;
+      name: string;
       role: Role;
       email: string;
+      createdAt: Date;
+      updatedAt: Date;
       pages: string[] | null;
     }>>`
-      SELECT u.id, u.role, u.email, r.pages
+      SELECT u.id, u.name, u.role, u.email, u.created_at AS "createdAt", u.updated_at AS "updatedAt", r.pages
       FROM users AS u
       LEFT JOIN role_page_access AS r ON r.role = u.role
       WHERE u.id = ${userId}
@@ -87,8 +110,12 @@ export async function canUserAccessPath(
     if (!user) return false;
 
     profile = {
+      id: user.id,
+      name: user.name,
       role: user.role,
       email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       pages: user.pages as PageAccessKey[] | null || DEFAULT_ROLE_PAGES[user.role as AppRole],
     };
     cacheUserAccessProfile(userId, profile);
