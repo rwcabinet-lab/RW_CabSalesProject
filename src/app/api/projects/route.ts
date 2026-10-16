@@ -10,29 +10,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const projects = await DataService.getProjects();
-    if (user.role !== "SALES" && user.role !== "ASSISTANT") {
-      return NextResponse.json(projects);
-    }
+    const isSalesOrAssistant = user.role === "SALES" || user.role === "ASSISTANT";
+    const filter = isSalesOrAssistant
+      ? {
+          where: {
+            OR: [
+              { salesRepId: user.id },
+              { salesAssistantId: user.id },
+              { customer: { salesRepId: user.id } },
+              { milestones: { some: { assignedToId: user.id } } },
+              { tasks: { some: { assignedToId: user.id } } },
+            ],
+          },
+        }
+      : undefined;
 
-    const projectIds = projects.map((project) => project.id);
-    const [milestonesByProject, assignedTasks] = await Promise.all([
-      DataService.getMilestonesByProjectIds(projectIds),
-      DataService.getTasks({ assignedToId: user.id }),
-    ]);
-    const assignedProjectIds = new Set(assignedTasks.map((task) => task.projectId));
-    for (const milestones of Object.values(milestonesByProject)) {
-      for (const milestone of milestones) {
-        if (milestone.assignedToId === user.id) assignedProjectIds.add(milestone.projectId);
-      }
-    }
-
-    return NextResponse.json(projects.filter((project) =>
-      project.salesRepId === user.id ||
-      project.customerSalesRepId === user.id ||
-      project.salesAssistantId === user.id ||
-      assignedProjectIds.has(project.id)
-    ));
+    const projects = await DataService.getProjects(filter);
+    return NextResponse.json(projects);
   } catch (error) {
     console.error("取得案場清單失敗:", error);
     return NextResponse.json({ error: "無法取得案場清單" }, { status: 500 });

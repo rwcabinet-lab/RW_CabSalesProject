@@ -96,8 +96,9 @@ export const DataService = {
     });
   },
 
-  async getProjects(): Promise<ProjectDetail[]> {
+  async getProjects(filter?: { where?: Prisma.ProjectWhereInput }): Promise<ProjectDetail[]> {
     const projects = await prisma.project.findMany({
+      where: filter?.where,
       relationLoadStrategy: "join",
       include: projectInclude,
       orderBy: { createdAt: "desc" }

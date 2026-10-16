@@ -13,39 +13,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const [user, allProjects] = await Promise.all([
-      DataService.getUserById(requestedUserId),
-      DataService.getProjects(),
-    ]);
+    const user = await DataService.getUserById(requestedUserId);
     if (!user) {
       return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
-    const allProjectIds = allProjects.map((p) => p.id);
-    const [allMilestonesByProject, assignedTasks] = await Promise.all([
-      DataService.getMilestonesByProjectIds(allProjectIds),
-      DataService.getTasks({ assignedToId: currentUser.id }),
-    ]);
-    const assignedProjectIds = new Set(assignedTasks.map((task) => task.projectId));
-    for (const milestones of Object.values(allMilestonesByProject)) {
-      for (const milestone of milestones) {
-        if (milestone.assignedToId === currentUser.id) assignedProjectIds.add(milestone.projectId);
-      }
-    }
-
-    const myProjects = allProjects.filter(
-      (p) =>
-        p.salesRepId === currentUser.id ||
-        p.customerSalesRepId === currentUser.id ||
-        p.salesAssistantId === currentUser.id ||
-        assignedProjectIds.has(p.id)
-    );
+    const myProjects = await DataService.getProjects({
+      where: {
+        OR: [
+          { salesRepId: currentUser.id },
+          { salesAssistantId: currentUser.id },
+          { customer: { salesRepId: currentUser.id } },
+          { milestones: { some: { assignedToId: currentUser.id } } },
+          { tasks: { some: { assignedToId: currentUser.id } } },
+        ],
+      },
+    });
 
     const projectIds = myProjects.map((p) => p.id);
-    const milestonesByProject = allMilestonesByProject;
-    const latestQuotesByProject = await DataService.getLatestQuotesByProjectIds(projectIds);
-    const tasks = assignedTasks;
+    const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
+      DataService.getMilestonesByProjectIds(projectIds),
+      DataService.getLatestQuotesByProjectIds(projectIds),
+      DataService.getTasks({ assignedToId: currentUser.id }),
+    ]);
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
     const projectsWithDetails = await Promise.all(
