@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import Link from "next/link";
 import {
   CheckSquare,
@@ -37,6 +37,7 @@ export default function SalesWorkbenchPage() {
   const [monthFilter, setMonthFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("ACTIVE"); // 預設 ACTIVE 進行中 (排除 LOST / BILLED)
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
+  const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
 
   // 行內新增/編輯案場
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
@@ -202,20 +203,26 @@ export default function SalesWorkbenchPage() {
   };
 
   const openEditProject = (p: WorkbenchProjectDTO) => {
+    if (editingProjectId === p.id) {
+      setEditingProjectId(null);
+      return;
+    }
     setEditingProjectId(p.id);
     setNewProjectData({
-      projectName: p.projectName, customerId: p.customerId, siteAddress: p.siteAddress, siteCondition: p.siteCondition,
-      expectedDate: p.expectedDate ? p.expectedDate.slice(0,10) : "",
+      projectName: p.projectName,
+      customerId: p.customerId,
+      siteAddress: p.siteAddress,
+      siteCondition: p.siteCondition,
+      expectedDate: p.expectedDate ? p.expectedDate.slice(0, 10) : "",
       unitCount: p.unitCount?.toString() || "",
       cost: p.cost != null ? toTenThousands(p.cost).toFixed(1) : "",
       quoteAmount: p.quoteAmount != null ? toTenThousands(p.quoteAmount).toFixed(1) : "",
     });
-    setIsProjectPanelOpen(true);
   };
 
   if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">正在載入業務工作台...</div>;
 
-  // 預定完工日排序
+  // 預定完工日與狀態排序
   // 過濾邏輯：預設排除已流標/已立帳 (stageFilter === "ACTIVE")
   const filteredProjects = projects.filter((p) => {
     let match = true;
@@ -231,8 +238,21 @@ export default function SalesWorkbenchPage() {
     return match;
   });
 
-  // 依完工日排序
+  // 依完工日與狀態排序
   const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (statusSort !== "NONE") {
+      const getStatusWeight = (item: typeof a) => {
+        if (item.currentStage === "LOST") return 5;
+        if (item.trafficLight.color === "RED") return 1;
+        if (item.trafficLight.color === "YELLOW") return 2;
+        if (item.trafficLight.color === "GREEN") return 3;
+        return 4;
+      };
+      const diff = getStatusWeight(a) - getStatusWeight(b);
+      if (diff !== 0) {
+        return statusSort === "URGENT_FIRST" ? diff : -diff;
+      }
+    }
     if (dateSort === "NONE") return 0;
     const dateA = a.expectedDate || "";
     const dateB = b.expectedDate || "";
@@ -247,6 +267,17 @@ export default function SalesWorkbenchPage() {
     else if (dateSort === "ASC") setDateSort("DESC");
     else setDateSort("NONE");
   };
+
+  const toggleStatusSort = () => {
+    if (statusSort === "NONE") setStatusSort("URGENT_FIRST");
+    else if (statusSort === "URGENT_FIRST") setStatusSort("NORMAL_FIRST");
+    else setStatusSort("NONE");
+  };
+
+  const totalFilteredAmount = sortedProjects.reduce(
+    (sum, p) => sum + (p.quoteAmount || p.totalAmount || 0),
+    0
+  );
 
   const pendingTasks = tasks.filter((task) => !task.isCompleted);
   const isAdmin = currentUser.role === "ADMIN";
@@ -318,16 +349,42 @@ export default function SalesWorkbenchPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {visibleTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-bold">
-                      [{task.projectName}] {task.subject}
-                      {task.isCompleted && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">已完成</span>}
-                      {task.assignedByName && <div className="mt-1 text-[10px] font-normal text-slate-500">建立者/指派者：{task.assignedByName}</div>}
-                    </td>
-                    <td className="p-3">{task.dueDatetime.slice(0, 10)}</td>
-                    <td className="p-3">{task.priority}</td>
-                    <td className="p-3 text-center">
+                {visibleTasks.map((task) => {
+                  const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+                  const isOverdue = !task.isCompleted && task.dueDatetime && task.dueDatetime.slice(0, 10) < todayStr;
+
+                  return (
+                    <tr
+                      key={task.id}
+                      className={isOverdue ? "bg-red-50/80 hover:bg-red-100/70" : "hover:bg-slate-50"}
+                    >
+                      <td className="p-3 font-bold">
+                        <div className="flex items-center flex-wrap gap-1.5">
+                          <span className={isOverdue ? "text-red-900" : ""}>
+                            [{task.projectName}] {task.subject}
+                          </span>
+                          {task.isCompleted && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                              已完成
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                              已逾期
+                            </span>
+                          )}
+                        </div>
+                        {task.assignedByName && (
+                          <div className="mt-1 text-[10px] font-normal text-slate-500">
+                            建立者/指派者：{task.assignedByName}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`p-3 font-medium ${isOverdue ? "text-red-600 font-bold" : ""}`}>
+                        {task.dueDatetime.slice(0, 10)}
+                      </td>
+                      <td className="p-3">{task.priority}</td>
+                      <td className="p-3 text-center">
                       {!task.isCompleted && (
                         <button
                           type="button"
@@ -349,7 +406,8 @@ export default function SalesWorkbenchPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -387,9 +445,17 @@ export default function SalesWorkbenchPage() {
           </label>
         </div>
 
-        {isProjectPanelOpen && (
+        {/* 篩選結果摘要 */}
+        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex justify-between items-center text-xs text-blue-900 font-semibold">
+          <div>
+            篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedProjects.length}</span> 案，報價總額{" "}
+            <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {isProjectPanelOpen && !editingProjectId && (
           <form onSubmit={handleSaveProject} className="p-4 bg-emerald-50 border-b border-emerald-100">
-            <div className="flex justify-between font-bold mb-3">{editingProjectId ? "編輯案場" : "新增案場"} <button type="button" onClick={() => setIsProjectPanelOpen(false)}><X className="w-5 h-5 text-slate-500"/></button></div>
+            <div className="flex justify-between font-bold mb-3">新增案場 <button type="button" onClick={() => setIsProjectPanelOpen(false)}><X className="w-5 h-5 text-slate-500"/></button></div>
             <div className="grid grid-cols-4 gap-4 text-sm">
               <label>案場名稱 *<input required value={newProjectData.projectName} onChange={(e) => setNewProjectData({...newProjectData, projectName: e.target.value})} className="w-full border rounded p-1.5 mt-1"/></label>
               <label>客戶 *
@@ -425,6 +491,17 @@ export default function SalesWorkbenchPage() {
                           {dateSort === "ASC" ? "🔼" : dateSort === "DESC" ? "🔽" : "↕️"}
                         </span>
                       </button>
+                    ) : col.key === "trafficLight" ? (
+                      <button
+                        type="button"
+                        onClick={toggleStatusSort}
+                        className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
+                      >
+                        {col.label}
+                        <span className="text-[11px] text-blue-600 font-black">
+                          {statusSort === "URGENT_FIRST" ? "🔴🔼" : statusSort === "NORMAL_FIRST" ? "🟢🔽" : "↕️"}
+                        </span>
+                      </button>
                     ) : (
                       col.label
                     )}
@@ -434,18 +511,20 @@ export default function SalesWorkbenchPage() {
             </thead>
             <tbody className="divide-y">
               {sortedProjects.map((p) => (
-                <tr
-                  key={p.id}
-                  className={`hover:brightness-95 ${
-                    p.currentStage === "LOST" || p.currentStage === "WRAP_UP"
-                      ? "bg-red-50/50"
-                      : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
-                        ? "bg-emerald-50/40"
-                        : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(p.currentStage)
-                          ? "bg-blue-50/40"
-                          : "bg-amber-50/40"
-                  }`}
-                >
+                <Fragment key={p.id}>
+                  <tr
+                    className={`hover:brightness-95 ${
+                      editingProjectId === p.id
+                        ? "bg-emerald-50/70 ring-1 ring-emerald-500"
+                        : p.currentStage === "LOST" || p.currentStage === "WRAP_UP"
+                        ? "bg-red-50/50"
+                        : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
+                          ? "bg-emerald-50/40"
+                          : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(p.currentStage)
+                            ? "bg-blue-50/40"
+                            : "bg-amber-50/40"
+                    }`}
+                  >
                   {visibleColumns.map((col) => {
                     switch (col.key) {
                       case "trafficLight":
@@ -542,6 +621,117 @@ export default function SalesWorkbenchPage() {
                     }
                   })}
                 </tr>
+                {editingProjectId === p.id && (
+                  <tr className="bg-emerald-50/90 border-b-2 border-emerald-500">
+                    <td colSpan={visibleColumns.length} className="p-4 shadow-inner">
+                      <form onSubmit={handleSaveProject} className="space-y-3">
+                        <div className="flex justify-between items-center font-bold text-slate-800">
+                          <span className="flex items-center gap-1.5 text-emerald-800 text-sm">
+                            <Edit3 className="w-4 h-4" /> 編輯案場：{p.projectName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProjectId(null)}
+                            className="text-slate-500 hover:text-slate-700 p-1"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          <label className="font-semibold text-slate-700">
+                            案場名稱 *
+                            <input
+                              required
+                              value={newProjectData.projectName}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, projectName: e.target.value })}
+                              className="w-full border rounded p-1.5 mt-1 bg-white"
+                            />
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            客戶 *
+                            <select
+                              required
+                              value={newProjectData.customerId}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, customerId: e.target.value })}
+                              className="w-full border rounded p-1.5 mt-1 bg-white"
+                            >
+                              <option value="">選擇客戶</option>
+                              {customers.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            施工地址 *
+                            <input
+                              required
+                              value={newProjectData.siteAddress}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, siteAddress: e.target.value })}
+                              className="w-full border rounded p-1.5 mt-1 bg-white"
+                            />
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            戶數
+                            <input
+                              type="number"
+                              value={newProjectData.unitCount}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, unitCount: e.target.value })}
+                              className="w-full border rounded p-1.5 mt-1 bg-white"
+                            />
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            成本金額（萬）
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={newProjectData.cost}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, cost: e.target.value })}
+                              className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
+                            />
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            報價（萬）
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={newProjectData.quoteAmount}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, quoteAmount: e.target.value })}
+                              className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
+                            />
+                          </label>
+                          <label className="font-semibold text-slate-700">
+                            預計完工日
+                            <input
+                              type="date"
+                              value={newProjectData.expectedDate}
+                              onChange={(e) => setNewProjectData({ ...newProjectData, expectedDate: e.target.value })}
+                              className="w-full border rounded p-1.5 mt-1 bg-white"
+                            />
+                          </label>
+                          <div className="flex items-end gap-2">
+                            <button
+                              type="submit"
+                              disabled={savingProject || !newProjectData.projectName}
+                              className="flex-1 bg-emerald-600 text-white rounded p-1.5 font-bold hover:bg-emerald-700 transition-colors"
+                            >
+                              {savingProject ? "儲存中..." : "確認儲存"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingProjectId(null)}
+                              className="px-3 py-1.5 border rounded font-semibold text-slate-600 bg-white hover:bg-slate-100"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
               ))}
             </tbody>
           </table>

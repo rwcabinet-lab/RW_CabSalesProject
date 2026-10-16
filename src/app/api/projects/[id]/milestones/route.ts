@@ -133,9 +133,6 @@ export async function PUT(
     }
 
     if (action === "reorder") {
-      if (!isManager) {
-        return NextResponse.json({ error: "僅主管可調整里程碑順序" }, { status: 403 });
-      }
       const { orderedMilestoneIds } = body;
       if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.some((id) => typeof id !== "string")) {
         return NextResponse.json({ error: "缺少 orderedMilestoneIds 陣列" }, { status: 400 });

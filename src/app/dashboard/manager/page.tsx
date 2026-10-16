@@ -26,6 +26,7 @@ export default function ManagerDashboardPage() {
   const [businessFilter, setBusinessFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
+  const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
 
   // 任務指派
   const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
@@ -181,8 +182,21 @@ export default function ManagerDashboardPage() {
     return true;
   });
 
-  // 依完工日排序
+  // 依完工日與狀態排序
   const sortedOverview = [...filteredOverview].sort((a, b) => {
+    if (statusSort !== "NONE") {
+      const getStatusWeight = (item: typeof a) => {
+        if (item.currentStage === "LOST") return 5;
+        if (item.trafficLight.color === "RED") return 1;
+        if (item.trafficLight.color === "YELLOW") return 2;
+        if (item.trafficLight.color === "GREEN") return 3;
+        return 4;
+      };
+      const diff = getStatusWeight(a) - getStatusWeight(b);
+      if (diff !== 0) {
+        return statusSort === "URGENT_FIRST" ? diff : -diff;
+      }
+    }
     if (dateSort === "NONE") return 0;
     const dateA = a.expectedDate || "";
     const dateB = b.expectedDate || "";
@@ -198,15 +212,38 @@ export default function ManagerDashboardPage() {
     else setDateSort("NONE");
   };
 
+  const toggleStatusSort = () => {
+    if (statusSort === "NONE") setStatusSort("URGENT_FIRST");
+    else if (statusSort === "URGENT_FIRST") setStatusSort("NORMAL_FIRST");
+    else setStatusSort("NONE");
+  };
+
+  const totalFilteredAmount = sortedOverview.reduce(
+    (sum, p) => sum + (p.quoteAmount || p.totalAmount || 0),
+    0
+  );
+
   const businessOptions = Array.from(new Set(data.allProjectsOverview.map((project) => project.salesRepName))).sort();
   const visibleColumns = [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
 
   return (
     <div className="space-y-8 pb-16">
-      <div className="flex justify-between border-b pb-4">
+      <div className="flex flex-wrap justify-between items-center border-b pb-4 gap-4">
         <div>
           <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控室</span>
           <h1 className="text-2xl font-black mt-1">營運總覽與瓶頸分析</h1>
+        </div>
+
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <div className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-blue-600 shadow-sm">
+            營運總覽與瓶頸分析
+          </div>
+          <Link
+            href="/dashboard/manager/customers"
+            className="px-4 py-2 text-sm font-bold rounded-lg text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            客戶資料統計
+          </Link>
         </div>
       </div>
 
@@ -343,6 +380,14 @@ export default function ManagerDashboardPage() {
           </div>
         </div>
 
+        {/* 篩選結果摘要 */}
+        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex justify-between items-center text-xs text-blue-900 font-semibold">
+          <div>
+            篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedOverview.length}</span> 案，報價總額{" "}
+            <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 text-slate-600">
@@ -358,6 +403,17 @@ export default function ManagerDashboardPage() {
                         {col.label}
                         <span className="text-[11px] text-blue-600 font-black">
                           {dateSort === "ASC" ? "🔼" : dateSort === "DESC" ? "🔽" : "↕️"}
+                        </span>
+                      </button>
+                    ) : col.key === "trafficLight" ? (
+                      <button
+                        type="button"
+                        onClick={toggleStatusSort}
+                        className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
+                      >
+                        {col.label}
+                        <span className="text-[11px] text-blue-600 font-black">
+                          {statusSort === "URGENT_FIRST" ? "🔴🔼" : statusSort === "NORMAL_FIRST" ? "🟢🔽" : "↕️"}
                         </span>
                       </button>
                     ) : (

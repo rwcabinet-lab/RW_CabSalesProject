@@ -140,6 +140,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     actualDueDate: string;
     amount: string;
     notes: string;
+    assignedToId: string;
   } | null>(null);
   const [savingRecord, setSavingRecord] = useState(false);
 
@@ -151,6 +152,53 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     projectName: "", siteAddress: "", siteCondition: "", expectedDate: "",
     unitCount: "", cost: "", quoteAmount: "",
   });
+
+  const openEditProjectInfo = () => {
+    if (!project) return;
+    setProjectEditForm({
+      projectName: project.projectName || "",
+      siteAddress: project.siteAddress || "",
+      siteCondition: project.siteCondition || "",
+      expectedDate: project.expectedDate ? project.expectedDate.slice(0, 10) : "",
+      unitCount: project.unitCount != null ? String(project.unitCount) : "",
+      cost: project.cost != null ? String(toTenThousands(project.cost)) : "",
+      quoteAmount: project.quoteAmount != null ? String(toTenThousands(project.quoteAmount)) : "",
+    });
+    setProjectEditError("");
+    setProjectEditOpen(true);
+  };
+
+  const handleSaveProjectInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project) return;
+    setProjectEditSaving(true);
+    setProjectEditError("");
+    try {
+      const payload = {
+        id: project.id,
+        projectName: projectEditForm.projectName,
+        siteAddress: projectEditForm.siteAddress,
+        siteCondition: projectEditForm.siteCondition,
+        expectedDate: projectEditForm.expectedDate || undefined,
+        unitCount: projectEditForm.unitCount ? Number(projectEditForm.unitCount) : undefined,
+        cost: projectEditForm.cost ? fromTenThousands(Number(projectEditForm.cost)) : undefined,
+        quoteAmount: projectEditForm.quoteAmount ? fromTenThousands(Number(projectEditForm.quoteAmount)) : undefined,
+      };
+      const res = await fetch("/api/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "儲存案場資料失敗");
+      setProjectEditOpen(false);
+      await fetchData();
+    } catch (err) {
+      setProjectEditError(err instanceof Error ? err.message : "儲存失敗");
+    } finally {
+      setProjectEditSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -251,6 +299,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           actualDueDate: newRecordForm.actualDueDate || undefined,
           amount: newRecordForm.amount ? Number(newRecordForm.amount) : undefined,
           notes: newRecordForm.notes || undefined,
+          assignedToId: newRecordForm.assignedToId || undefined,
         }),
       });
       const json = await res.json();
@@ -296,7 +345,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     sourceId: string,
     targetId: string,
   ) => {
-    if (sourceId === targetId || isProjectLost || !canManageMilestones) return;
+    if (sourceId === targetId || isProjectLost) return;
     const reorderedPhase = [...phaseGroups[phase]];
     const sourceIndex = reorderedPhase.findIndex(({ id }) => id === sourceId);
     const targetIndex = reorderedPhase.findIndex(({ id }) => id === targetId);
@@ -523,6 +572,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               {!isProjectLost && (
                 <button
                   type="button"
+                  onClick={openEditProjectInfo}
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 flex items-center gap-1 shadow-sm"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> 編輯案場資料
+                </button>
+              )}
+              {!isProjectLost && (
+                <button
+                  type="button"
                   onClick={() => {
                     setSpecialAdvanceError("");
                     setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
@@ -631,14 +689,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               return (
                 <div
                   key={m.id}
-                  draggable={canManageMilestones && !isProjectLost && !isEditing}
+                  draggable={!isProjectLost && !isEditing}
                   onDragStart={(event) => {
                     setDraggedMilestoneId(m.id);
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", m.id);
                   }}
                   onDragOver={(event) => {
-                    if (canManageMilestones && draggedMilestoneId) {
+                    if (draggedMilestoneId) {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }
@@ -829,7 +887,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             {!isProjectLost && !newRecordForm && (
                               <button
                                 type="button"
-                                onClick={() => setNewRecordForm({ milestoneId: m.id, plannedDueDate: todayDate(), actualDueDate: "", amount: "", notes: "" })}
+                                onClick={() => setNewRecordForm({ milestoneId: m.id, plannedDueDate: todayDate(), actualDueDate: "", amount: "", notes: "", assignedToId: m.assignedToId || "" })}
                                 className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800"
                               >
                                 <Plus className="w-3.5 h-3.5" /> 新增一筆紀錄
@@ -843,6 +901,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               <div key={r.id} className="flex items-center justify-between bg-white px-3 py-1.5 rounded border text-xs">
                                 <div className="flex items-center gap-3">
                                   <span className="font-bold text-slate-500">#{rIdx + 1}</span>
+                                  {r.assignedToName && <span className="font-semibold text-blue-700">👤 {r.assignedToName}</span>}
                                   {r.plannedDueDate && <span>預定：{r.plannedDueDate}</span>}
                                   {r.actualDueDate ? (
                                     <span className="text-emerald-700 font-semibold">實際：{r.actualDueDate}</span>
@@ -873,7 +932,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           {newRecordForm && newRecordForm.milestoneId === m.id && (
                             <form onSubmit={handleAddRecord} className="mt-3 p-2.5 bg-blue-50/50 border border-blue-200 rounded-lg space-y-2 text-xs">
                               <div className="font-bold text-blue-900">填寫新紀錄</div>
-                              <div className={`grid grid-cols-2 gap-2 ${isQuoteStage ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+                              <div className={`grid grid-cols-2 gap-2 ${isQuoteStage ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+                                <div>
+                                  <label className="block text-slate-600 mb-0.5">負責人員</label>
+                                  <select
+                                    value={newRecordForm.assignedToId}
+                                    onChange={(e) => setNewRecordForm({ ...newRecordForm, assignedToId: e.target.value })}
+                                    className="w-full border rounded p-1 bg-white"
+                                  >
+                                    <option value="">選擇人員</option>
+                                    {assignees.map((u) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                                 <div>
                                   <label className="block text-slate-600 mb-0.5">預定完成日</label>
                                   <input
@@ -1114,6 +1188,116 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 <button type="button" onClick={() => setSpecialAdvanceModal(null)} className="px-3 py-1.5 bg-slate-200 rounded font-semibold">取消</button>
                 <button type="submit" disabled={advancing} className="px-4 py-1.5 bg-red-600 text-white font-bold rounded shadow">
                   {advancing ? "處理中..." : `確認轉為${specialAdvanceModal.stageName}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 編輯案場基本資料彈窗 */}
+      {projectEditOpen && project && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base flex items-center gap-2 text-slate-800">
+                <Edit3 className="w-5 h-5 text-blue-600" />
+                編輯案場詳細資料
+              </h3>
+              <button
+                type="button"
+                onClick={() => setProjectEditOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveProjectInfo} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">案場名稱 *</label>
+                  <input
+                    required
+                    type="text"
+                    value={projectEditForm.projectName}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, projectName: e.target.value })}
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">施工地址 *</label>
+                  <input
+                    required
+                    type="text"
+                    value={projectEditForm.siteAddress}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, siteAddress: e.target.value })}
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">戶數</label>
+                  <input
+                    type="number"
+                    value={projectEditForm.unitCount}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, unitCount: e.target.value })}
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">預計完工日</label>
+                  <input
+                    type="date"
+                    value={projectEditForm.expectedDate}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, expectedDate: e.target.value })}
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">成本金額（萬）</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={projectEditForm.cost}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, cost: e.target.value })}
+                    className="w-full border rounded p-2 text-xs text-right tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">報價（萬）</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={projectEditForm.quoteAmount}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, quoteAmount: e.target.value })}
+                    className="w-full border rounded p-2 text-xs text-right tabular-nums"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">現況說明</label>
+                  <textarea
+                    rows={2}
+                    value={projectEditForm.siteCondition}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, siteCondition: e.target.value })}
+                    placeholder="現場施工或空間現況說明..."
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+              </div>
+              {projectEditError && <p className="text-red-600 font-bold">{projectEditError}</p>}
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setProjectEditOpen(false)}
+                  className="px-3 py-1.5 bg-slate-200 rounded font-semibold"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={projectEditSaving}
+                  className="px-4 py-1.5 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors"
+                >
+                  {projectEditSaving ? "儲存中..." : "確認儲存"}
                 </button>
               </div>
             </form>

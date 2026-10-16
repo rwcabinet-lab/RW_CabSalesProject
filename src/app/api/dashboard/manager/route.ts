@@ -33,25 +33,46 @@ export async function GET(req: NextRequest) {
       DataService.getTasks({ assignedById: user.id }),
     ]);
 
+    // Helper to evaluate project delayed state
+    const isProjectDelayed = (p: (typeof projects)[0]) => {
+      if (p.currentStage === "LOST" || p.currentStage === "CLOSED" || p.currentStage === "BILLED") return false;
+      const ms = milestonesByProject[p.id] || [];
+      const activeM = ms.find((m) => m.status === "OVERDUE" || m.status === "IN_PROGRESS");
+      if (activeM) {
+        const tl = ScheduleEngine.getTrafficLight(activeM);
+        return tl.color === "RED" || activeM.status === "OVERDUE";
+      }
+      return p.isDelayed;
+    };
+
+    // Helper to check if project has contract signed [送約/簽約] completed
+    const isProjectContractSigned = (p: (typeof projects)[0]) => {
+      const ms = milestonesByProject[p.id] || [];
+      return ms.some(
+        (m) =>
+          (m.stageCode === "3-5" || m.stageCode === "3-9" || (m.stageCode as string) === "1-5" || MILESTONE_STAGE_LABELS[m.stageCode] === "送約/簽約") &&
+          m.status === "COMPLETED"
+      );
+    };
+
     // 1. KPI 計算
     const totalProjects = projects.length;
-    const delayedProjects = projects.filter((p) => p.isDelayed);
-    const delayedCount = delayedProjects.length;
+    const delayedCount = projects.filter(isProjectDelayed).length;
 
     let signedTotal = 0;
     let contractedCount = 0;
     for (const p of projects) {
-      const latestQuote = latestQuotesByProject[p.id];
-      if (["DESIGN", "PRODUCTION", "CLOSED", "BILLED"].includes(p.currentStage)) {
+      if (isProjectContractSigned(p)) {
         contractedCount++;
-        signedTotal += latestQuote?.totalAmount || p.estimatedBudget || 0;
+        const latestQuote = latestQuotesByProject[p.id];
+        signedTotal += p.quoteAmount || latestQuote?.totalAmount || p.estimatedBudget || 0;
       }
     }
     const conversionRate = totalProjects > 0 ? Math.round((contractedCount / totalProjects) * 100) : 0;
 
     // 2. 時程警示清單
     const alertList = projects
-      .filter((p) => p.isDelayed)
+      .filter(isProjectDelayed)
       .map((p) => {
         const milestones = milestonesByProject[p.id] || [];
         const overdueMilestone =
@@ -84,9 +105,9 @@ export async function GET(req: NextRequest) {
     };
     for (const p of projects) {
       const salesRepName = p.customerSalesRepName || p.salesRepName || "其他業務";
-      addWorkload(`sales:${p.customerSalesRepId || p.salesRepId}`, `${salesRepName}（業務）`, p.isDelayed);
+      addWorkload(`sales:${p.customerSalesRepId || p.salesRepId}`, `${salesRepName}（業務）`, isProjectDelayed(p));
       if (p.salesAssistantId && p.salesAssistantName) {
-        addWorkload(`assistant:${p.salesAssistantId}`, `${p.salesAssistantName}（業助）`, p.isDelayed);
+        addWorkload(`assistant:${p.salesAssistantId}`, `${p.salesAssistantName}（業助）`, isProjectDelayed(p));
       }
     }
     const salesWorkload = Object.values(workloadMap).map((stat) => ({
@@ -140,6 +161,8 @@ export async function GET(req: NextRequest) {
         ? ScheduleEngine.getTrafficLight(activeMilestone)
         : { color: "GRAY" as const, label: "無進行中項目", daysDiff: 0 };
 
+      const isDelayed = isProjectDelayed(p);
+
       return {
         id: p.id,
         projectName: p.projectName,
@@ -151,7 +174,7 @@ export async function GET(req: NextRequest) {
         currentStageLabel: p.currentStage === "LOST" ? "已流標" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.customerSalesRepName || p.salesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
-        isDelayed: p.isDelayed,
+        isDelayed,
         trafficLight: p.currentStage === "LOST"
           ? { color: "RED" as const, label: "已流標", daysDiff: 0 }
           : trafficLight,
@@ -182,35 +205,35 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 5. 階段瓶頸分析
-    const stageCountMap: Record<string, { count: number; delayedCount: number; label: string }> = {
-      DEVELOP:     { count: 0, delayedCount: 0, label: "案件開發" },
-      REQUIREMENT: { count: 0, delayedCount: 0, label: "現況及需求確認" },
-      PROPOSAL:    { count: 0, delayedCount: 0, label: "設計提案/報價/簽約" },
-      PRE_PROD:    { count: 0, delayedCount: 0, label: "生產前確認/拆單" },
-      PROD_SHIP:   { count: 0, delayedCount: 0, label: "生產及派送" },
-      INSTALL:     { count: 0, delayedCount: 0, label: "安裝及驗收" },
-      CLOSURE:     { count: 0, delayedCount: 0, label: "結案/售後" },
-      WRAP_UP:     { count: 0, delayedCount: 0, label: "收尾" },
-      LOST:        { count: 0, delayedCount: 0, label: "已流標" },
-      CONTACT:     { count: 0, delayedCount: 0, label: "接洽期" },
-      DESIGN:      { count: 0, delayedCount: 0, label: "設計確認期" },
-      PRODUCTION:  { count: 0, delayedCount: 0, label: "生產施工期" },
-      CLOSED:      { count: 0, delayedCount: 0, label: "已結案" },
-      BILLED:      { count: 0, delayedCount: 0, label: "已立帳" },
-    };
-    for (const p of projects) {
-      if (stageCountMap[p.currentStage]) {
-        stageCountMap[p.currentStage].count++;
-        if (p.isDelayed) stageCountMap[p.currentStage].delayedCount++;
+    // 5. 階段瓶頸分析 (嚴格統計七大階段)
+    const sevenStages: Array<{ stage: string; label: string; aliases: string[] }> = [
+      { stage: "DEVELOP", label: "一、案件開發", aliases: ["DEVELOP", "CONTACT"] },
+      { stage: "REQUIREMENT", label: "二、現況及需求確認", aliases: ["REQUIREMENT"] },
+      { stage: "PROPOSAL", label: "三、設計提案/報價/簽約", aliases: ["PROPOSAL", "DESIGN"] },
+      { stage: "PRE_PROD", label: "四、生產前確認/拆單", aliases: ["PRE_PROD"] },
+      { stage: "PROD_SHIP", label: "五、生產及派送", aliases: ["PROD_SHIP", "PRODUCTION"] },
+      { stage: "INSTALL", label: "六、安裝及驗收", aliases: ["INSTALL"] },
+      { stage: "CLOSURE", label: "七、結案/售後", aliases: ["CLOSURE", "CLOSED", "BILLED", "WRAP_UP"] },
+    ];
+
+    const stageBottlenecks = sevenStages.map(({ stage, label, aliases }) => {
+      let projectCount = 0;
+      let stageDelayedCount = 0;
+      for (const p of projects) {
+        if (aliases.includes(p.currentStage)) {
+          projectCount++;
+          if (isProjectDelayed(p)) {
+            stageDelayedCount++;
+          }
+        }
       }
-    }
-    const stageBottlenecks = Object.entries(stageCountMap).map(([stage, data]) => ({
-      stage,
-      stageLabel: data.label,
-      projectCount: data.count,
-      delayedCount: data.delayedCount,
-    }));
+      return {
+        stage,
+        stageLabel: label,
+        projectCount,
+        delayedCount: stageDelayedCount,
+      };
+    });
 
     return NextResponse.json({
       kpi: { totalProjects, signedTotal, conversionRate, delayedCount },

@@ -30,7 +30,7 @@ export async function POST(
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
     const body = await req.json();
-    const { milestoneId, plannedDueDate, actualDueDate, amount, notes } = body;
+    const { milestoneId, plannedDueDate, actualDueDate, amount, notes, assignedToId } = body;
     if (typeof milestoneId !== "string" || !milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }
@@ -45,7 +45,8 @@ export async function POST(
     if (
       (plannedDueDate !== undefined && plannedDueDate !== "" && typeof plannedDueDate !== "string") ||
       (actualDueDate !== undefined && actualDueDate !== "" && typeof actualDueDate !== "string") ||
-      (notes !== undefined && typeof notes !== "string")
+      (notes !== undefined && typeof notes !== "string") ||
+      (assignedToId !== undefined && assignedToId !== null && typeof assignedToId !== "string")
     ) {
       return NextResponse.json({ error: "歷次紀錄欄位格式無效" }, { status: 400 });
     }
@@ -54,6 +55,7 @@ export async function POST(
       actualDueDate,
       amount: amount !== undefined && amount !== "" ? amount : undefined,
       notes,
+      assignedToId: assignedToId || undefined,
     });
     return NextResponse.json({ success: true, record });
   } catch (err) {

@@ -49,8 +49,12 @@ export const ScheduleEngine = {
     const diffTime = dueDate.getTime() - currentDate.getTime();
     const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (daysDiff < 0 || milestone.status === "OVERDUE") {
+    if (daysDiff < 0) {
       return { color: "RED", label: `逾期 ${Math.abs(daysDiff)} 天`, daysDiff };
+    }
+
+    if (daysDiff === 0 || milestone.status === "OVERDUE") {
+      return { color: "RED", label: "已到期", daysDiff: 0 };
     }
 
     if (daysDiff <= 3) {

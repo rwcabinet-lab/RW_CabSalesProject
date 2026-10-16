@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings, UserCog } from "lucide-react";
 import { PageAccessKey } from "@/lib/page-access";
 import type { ApiResponse } from "@/types/dto";
 
@@ -102,6 +102,14 @@ export function Navbar() {
               {roleLabel}
             </span>
           </div>
+          <Link
+            href="/settings"
+            title="個人與外觀設定"
+            aria-label="個人與外觀設定"
+            className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-blue-600"
+          >
+            <UserCog className="h-4 w-4" />
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

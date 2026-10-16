@@ -67,6 +67,8 @@ export interface MilestoneRecordDTO {
   actualDueDate?: string | null;
   amount?: number | null;
   notes?: string | null;
+  assignedToId?: string | null;
+  assignedToName?: string | null;
   createdAt?: string;
 }
 

@@ -183,14 +183,24 @@ export const DataService = {
   async updateProject(id: string, data: {
     projectName?: string; customerId?: string; siteAddress?: string; siteCondition?: string;
     expectedDate?: string; unitCount?: number | null; cost?: number | null; quoteAmount?: number | null;
+    salesAssistantId?: string | null; salesRepId?: string; estimatedBudget?: number | null;
   }): Promise<ProjectDetail | undefined> {
+    const updateData: Prisma.ProjectUncheckedUpdateInput = {
+      ...(data.projectName !== undefined ? { projectName: data.projectName } : {}),
+      ...(data.customerId !== undefined ? { customerId: data.customerId } : {}),
+      ...(data.siteAddress !== undefined ? { siteAddress: data.siteAddress } : {}),
+      ...(data.siteCondition !== undefined ? { siteCondition: data.siteCondition || null } : {}),
+      ...(data.expectedDate !== undefined ? { expectedDate: data.expectedDate ? new Date(data.expectedDate) : null } : {}),
+      ...(data.unitCount !== undefined ? { unitCount: data.unitCount } : {}),
+      ...(data.cost !== undefined ? { cost: data.cost } : {}),
+      ...(data.quoteAmount !== undefined ? { quoteAmount: data.quoteAmount } : {}),
+      ...(data.estimatedBudget !== undefined ? { estimatedBudget: data.estimatedBudget } : {}),
+      ...(data.salesAssistantId !== undefined ? { salesAssistantId: data.salesAssistantId || null } : {}),
+      ...(data.salesRepId ? { salesRepId: data.salesRepId } : {}),
+    };
     await prisma.project.update({
       where: { id },
-      data: {
-        projectName: data.projectName, customerId: data.customerId, siteAddress: data.siteAddress,
-        siteCondition: data.siteCondition || null, expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
-        unitCount: data.unitCount, cost: data.cost, quoteAmount: data.quoteAmount,
-      },
+      data: updateData,
     });
     return this.getProjectById(id);
   },
@@ -228,6 +238,11 @@ export const DataService = {
     const result: Record<string, ProjectMilestoneItem[]> = {};
     for (const m of ms) {
       const list = result[m.projectId] || [];
+      const isAuditSubmitted = Boolean(
+        m.salesTask?.subject.startsWith("【需審核】") &&
+        !m.salesTask?.isCompleted &&
+        m.status !== "COMPLETED"
+      );
       list.push({
         id: m.id, projectId: m.projectId, stageCode: m.stageCode as MilestoneStageCode, phase: m.phase as MilestonePhaseDTO, stageOrder: m.stageOrder,
         plannedDueDate: dateOnlyValue(m.plannedDueDate), actualDueDate: dateOnlyValue(m.actualDueDate), status: m.status,
@@ -235,7 +250,7 @@ export const DataService = {
         assignedToId: m.assignedToId || m.project.customer.salesRepId,
         assignedToName: m.assignedTo?.name || m.project.customer.salesRep.name,
         attachments: m.attachments, notes: m.notes,
-        auditSubmitted: m.salesTask?.subject.startsWith("【需審核】") || false,
+        auditSubmitted: isAuditSubmitted,
       });
       result[m.projectId] = list;
     }
@@ -266,7 +281,6 @@ export const DataService = {
       const missingCodes = STANDARD_MILESTONE_STAGE_CODES.filter((code) => !existingCodes.has(code));
       if (missingCodes.length === 0) return;
 
-      let stageOrder = Math.max(0, ...existing.map((milestone) => milestone.stageOrder));
       let dueDate = existing.reduce<Date | null>(
         (latest, milestone) =>
           milestone.plannedDueDate && (!latest || milestone.plannedDueDate > latest)
@@ -275,22 +289,40 @@ export const DataService = {
         null,
       ) || new Date();
 
-      await tx.projectMilestone.createMany({
-        data: missingCodes.map((code) => {
-          dueDate = new Date(dueDate);
-          dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
-          stageOrder += 1;
-          return {
+      for (const code of missingCodes) {
+        dueDate = new Date(dueDate);
+        dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
+        const stdIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(code);
+        await tx.projectMilestone.create({
+          data: {
             projectId,
             stageCode: code,
             phase: STAGE_CODE_TO_PHASE[code],
-            stageOrder,
+            stageOrder: stdIndex !== -1 ? stdIndex + 1 : 99,
             plannedDueDate: dueDate,
             status: MilestoneStatus.PENDING,
             assignedToId: project.salesRepId,
-          };
-        }),
+          },
+        });
+      }
+
+      // 重新依標準順序排列
+      const all = await tx.projectMilestone.findMany({
+        where: { projectId },
+        select: { id: true, stageCode: true, stageOrder: true },
       });
+      all.sort((a, b) => {
+        const idxA = STANDARD_MILESTONE_STAGE_CODES.indexOf(a.stageCode as MilestoneStageCode);
+        const idxB = STANDARD_MILESTONE_STAGE_CODES.indexOf(b.stageCode as MilestoneStageCode);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        return a.stageOrder - b.stageOrder;
+      });
+      for (let i = 0; i < all.length; i++) {
+        await tx.projectMilestone.update({
+          where: { id: all[i].id },
+          data: { stageOrder: i + 1, phase: STAGE_CODE_TO_PHASE[all[i].stageCode as MilestoneStageCode] || "DEVELOP" },
+        });
+      }
     });
   },
 
@@ -762,17 +794,49 @@ export const DataService = {
   },
 
   async getTasks(filter?: { projectId?: string; assignedToId?: string; assignedById?: string; isCompleted?: boolean }): Promise<SalesTaskItem[]> {
-    const excludeMilestoneTasks = Boolean(filter?.assignedToId || filter?.assignedById);
+    // 確保被指派的進行中/逾期正規里程碑，若尚未建立待辦，也能自動補建並出現在被指派人員待辦清單中
+    if (filter?.assignedToId && filter?.isCompleted !== true) {
+      try {
+        const activeMilestones = await prisma.projectMilestone.findMany({
+          where: {
+            assignedToId: filter.assignedToId,
+            status: { in: [MilestoneStatus.IN_PROGRESS, MilestoneStatus.OVERDUE] },
+            project: { currentStage: { notIn: [ProjectStage.LOST, ProjectStage.WRAP_UP] } },
+          },
+          include: { salesTask: true },
+        });
+        for (const am of activeMilestones) {
+          if (!am.salesTask) {
+            const isDrawing = am.phase === "PROPOSAL" || am.phase === "PRE_PROD" || am.stageCode.startsWith("3-") || am.stageCode.startsWith("4-");
+            await prisma.salesTask.create({
+              data: {
+                projectId: am.projectId,
+                milestoneId: am.id,
+                assignedToId: filter.assignedToId,
+                taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                subject: MILESTONE_STAGE_LABELS[am.stageCode as MilestoneStageCode] || "里程碑任務",
+                dueDatetime: am.plannedDueDate || new Date(),
+                priority: am.priority,
+                isCompleted: false,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sync milestone tasks:", err);
+      }
+    }
+
     const tasks = await prisma.salesTask.findMany({
       where: {
         ...(filter?.projectId ? { projectId: filter.projectId } : {}),
         ...(filter?.assignedToId ? { assignedToId: filter.assignedToId } : {}),
         ...(filter?.assignedById ? { assignedById: filter.assignedById } : {}),
         ...(filter?.isCompleted !== undefined ? { isCompleted: filter.isCompleted } : {}),
-        ...(excludeMilestoneTasks ? { milestoneId: null } : {}),
       },
       relationLoadStrategy: "join",
-      include: { project: true, assignedTo: true, assignedBy: true }, orderBy: { dueDatetime: "asc" }
+      include: { project: true, assignedTo: true, assignedBy: true },
+      orderBy: { dueDatetime: "asc" }
     });
     return tasks.map(t => ({
       id: t.id, projectId: t.projectId, projectName: t.project.projectName, assignedToId: t.assignedToId, assignedToName: t.assignedTo.name,
@@ -940,6 +1004,7 @@ export const DataService = {
   async getMilestoneRecords(milestoneId: string) {
     const records = await prisma.milestoneRecord.findMany({
       where: { milestoneId },
+      include: { assignedTo: { select: { id: true, name: true } } },
       orderBy: { recordOrder: "asc" },
     });
     return records.map((r) => ({
@@ -950,6 +1015,8 @@ export const DataService = {
       actualDueDate: dateOnlyValue(r.actualDueDate),
       amount: r.amount ? Number(r.amount) : null,
       notes: r.notes || "",
+      assignedToId: r.assignedToId || null,
+      assignedToName: r.assignedTo?.name || null,
       createdAt: r.createdAt.toISOString(),
     }));
   },
@@ -959,6 +1026,7 @@ export const DataService = {
     actualDueDate?: string;
     amount?: number;
     notes?: string;
+    assignedToId?: string;
   }) {
     const maxOrder = (await prisma.milestoneRecord.aggregate({
       where: { milestoneId },
@@ -973,7 +1041,9 @@ export const DataService = {
         actualDueDate: data.actualDueDate ? new Date(data.actualDueDate) : null,
         amount: data.amount !== undefined ? data.amount : null,
         notes: data.notes || null,
+        assignedToId: data.assignedToId || null,
       },
+      include: { assignedTo: { select: { id: true, name: true } } },
     });
 
     // 若填寫了實際完成日，同步更新所屬里程碑的實際完成日
