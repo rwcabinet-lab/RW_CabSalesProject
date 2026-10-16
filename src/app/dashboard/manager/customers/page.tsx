@@ -5,41 +5,7 @@ import Link from "next/link";
 import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 
-interface CustomerStatItem {
-  id: string;
-  name: string;
-  customerType: string;
-  customerTypeLabel: string;
-  taxId: string;
-  phone: string;
-  address: string;
-  defaultDiscount: number;
-  paymentTerms: string;
-  salesRepId: string;
-  salesRepName: string;
-  totalProjects: number;
-  activeProjects: number;
-  closedProjects: number;
-  lostProjects: number;
-  totalQuoteAmount: number;
-  latestProjectName: string;
-  latestProjectStage: string;
-}
-
-interface CustomerStatsData {
-  kpi: {
-    totalCustomers: number;
-    activeCustomerCount: number;
-    totalQuoteSum: number;
-  };
-  customerTypeDistribution: Array<{
-    type: string;
-    label: string;
-    count: number;
-    totalAmount: number;
-  }>;
-  customers: CustomerStatItem[];
-}
+import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 
 const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   LONGMEI_STORE: "隆美",

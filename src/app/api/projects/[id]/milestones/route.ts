@@ -3,6 +3,7 @@ import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
 import { AUDIT_STAGE_CODES } from "@/lib/mock-data";
+import { AppError } from "@/lib/errors";
 
 function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -299,6 +300,9 @@ export async function PUT(
       project: updatedProject,
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     console.error("Failed to update milestone:", error);
     if (error instanceof Error && (
       error.message === "只能完成目前進行中的里程碑" ||

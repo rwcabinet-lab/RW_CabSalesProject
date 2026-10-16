@@ -2,14 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles } from "lucide-react";
-import type { ApiResponse } from "@/types/dto";
+import type { ApiResponse, UserDTO } from "@/types/dto";
 
-interface UserSession {
-  id: string;
-  name: string;
-  role: string;
-  email?: string;
-}
+type UserSession = UserDTO;
 
 const THEME_OPTIONS = [
   { id: "blue", name: "經典商務藍", bg: "bg-blue-600", border: "border-blue-600", desc: "系統預設，清晰穩重" },

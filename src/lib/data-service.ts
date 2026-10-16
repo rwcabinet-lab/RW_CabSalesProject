@@ -18,6 +18,7 @@ import {
   STANDARD_MILESTONE_STAGE_CODES, STAGE_CODE_TO_PHASE
 } from "./mock-data";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
+import { NotFoundError, BadRequestError, ConflictError } from "./errors";
 
 const dateValue = (value: Date | null | undefined) => value?.toISOString() || undefined;
 const dateOnlyValue = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) || null;
@@ -349,15 +350,15 @@ export const DataService = {
         where: { id: milestoneId, projectId },
         select: { stageCode: true, status: true, priority: true, plannedDueDate: true },
       });
-      if (!milestone) throw new Error("找不到此里程碑");
+      if (!milestone) throw new NotFoundError("找不到此里程碑");
       if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
-        throw new Error("此里程碑不需要審核");
+        throw new BadRequestError("此里程碑不需要審核");
       }
       if (
         milestone.status !== MilestoneStatus.IN_PROGRESS &&
         milestone.status !== MilestoneStatus.OVERDUE
       ) {
-        throw new Error("只能提交目前進行中的審核項目");
+        throw new ConflictError("只能提交目前進行中的審核項目");
       }
 
       await tx.salesTask.upsert({
@@ -403,10 +404,10 @@ export const DataService = {
         select: { status: true },
       });
       if (!currentMilestone) {
-        throw new Error("找不到此里程碑");
+        throw new NotFoundError("找不到此里程碑");
       }
       if (currentMilestone.status === MilestoneStatus.COMPLETED) {
-        throw new Error("已完成的里程碑不可編輯");
+        throw new ConflictError("已完成的里程碑不可編輯");
       }
 
       const milestone = await tx.projectMilestone.update({
@@ -520,7 +521,7 @@ export const DataService = {
       });
       const target = milestones.find((milestone) => milestone.id === milestoneId);
       if (!target) {
-        throw new Error("找不到此里程碑");
+        throw new NotFoundError("找不到此里程碑");
       }
 
       const targetStatus = isCompleted ? MilestoneStatus.COMPLETED : MilestoneStatus.IN_PROGRESS;
@@ -583,10 +584,10 @@ export const DataService = {
     const milestones = await this.getMilestonesByProjectId(projectId);
     const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
     if (targetIndex < 0 || milestones[targetIndex].status !== "COMPLETED") {
-      throw new Error("找不到已完成的里程碑");
+      throw new NotFoundError("找不到已完成的里程碑");
     }
     if (milestones.slice(targetIndex + 1).some((milestone) => milestone.status === "COMPLETED")) {
-      throw new Error("請由最後一個已完成的里程碑開始回退");
+      throw new ConflictError("請由最後一個已完成的里程碑開始回退");
     }
     const target = milestones[targetIndex];
     const next = milestones[targetIndex + 1];
@@ -721,10 +722,10 @@ export const DataService = {
         select: { currentStage: true },
       });
       if (!project) {
-        throw new Error("查無此案場資料");
+        throw new NotFoundError("查無此案場資料");
       }
       if (project.currentStage !== ProjectStage.WRAP_UP) {
-        throw new Error("案件已離開收尾階段");
+        throw new ConflictError("案件已離開收尾階段");
       }
 
       const milestone = await tx.projectMilestone.findFirst({
@@ -736,7 +737,7 @@ export const DataService = {
         },
       });
       if (!milestone) {
-        throw new Error("只能完成目前進行中的收尾項目");
+        throw new ConflictError("只能完成目前進行中的收尾項目");
       }
 
       await tx.projectMilestone.update({
@@ -967,7 +968,7 @@ export const DataService = {
 
     if (taskBeforeUpdate.milestoneId) {
       if (!isCompleted) {
-        throw new Error("里程碑待辦請由案件細節執行回退");
+        throw new BadRequestError("里程碑待辦請由案件細節執行回退");
       }
       if (!taskBeforeUpdate.isCompleted) {
         const project = await prisma.project.findUnique({
@@ -975,7 +976,7 @@ export const DataService = {
           select: { currentStage: true },
         });
         if (project?.currentStage === "WRAP_UP" || project?.currentStage === "LOST") {
-          throw new Error("案件已進入額外階段，無法完成一般里程碑");
+          throw new ConflictError("案件已進入額外階段，無法完成一般里程碑");
         }
         await this.advanceMilestone(taskBeforeUpdate.projectId, taskBeforeUpdate.milestoneId, {
           notes: resultNotes,
@@ -1010,7 +1011,7 @@ export const DataService = {
       new Set(orderedMilestoneIds).size !== existingMilestones.length ||
       existingMilestones.some(({ id }) => !orderedMilestoneIds.includes(id))
     ) {
-      throw new Error("排序清單必須包含此案件的所有里程碑且不可重複");
+      throw new BadRequestError("排序清單必須包含此案件的所有里程碑且不可重複");
     }
     await prisma.$transaction(
       orderedMilestoneIds.map((id, index) =>

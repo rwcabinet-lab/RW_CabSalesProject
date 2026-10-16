@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
+import type { CustomerStatsDashboardDTO } from "@/types/dto";
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
         defaultDiscount: c.defaultDiscount,
         paymentTerms: c.paymentTerms,
         salesRepId: c.salesRepId,
-        salesRepName: c.salesRepName,
+        salesRepName: c.salesRepName || "",
         totalProjects,
         activeProjects,
         closedProjects,
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       totalAmount: data.totalAmount,
     }));
 
-    return NextResponse.json({
+    const responseData: CustomerStatsDashboardDTO = {
       kpi: {
         totalCustomers,
         activeCustomerCount,
@@ -109,7 +110,9 @@ export async function GET(req: NextRequest) {
       },
       customerTypeDistribution,
       customers: customerList,
-    });
+    };
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("取得客戶資料統計失敗:", error);
     return NextResponse.json({ error: "無法取得客戶資料統計" }, { status: 500 });

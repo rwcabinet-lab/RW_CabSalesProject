@@ -1,40 +1,21 @@
-export type CustomerTypeDTO =
-  | "LONGMEI_STORE"
-  | "CABINET_FACTORY"
-  | "DESIGN_COMPANY"
-  | "DEALER_COMPANY"
-  | "CONSTRUCTION"
-  | "LABOR_MATERIAL"
-  | "INDIVIDUAL"
-  | "DESIGNER"
-  | "PR"
-  | "CONTRACTOR"
-  | "DEALER"
-  | "HOMEOWNER";
+import type {
+  CustomerType,
+  PaymentTerms,
+  ProjectStage,
+  MilestoneStatus,
+  TaskPriority,
+  TaskType,
+  QuoteStatus,
+  Role,
+} from "@prisma/client";
 
-export type PaymentTermsDTO = "CASH" | "MONTHLY_30" | "DEPOSIT_BALANCE";
-export type ProjectStageDTO =
-  | "INQUIRY"
-  | "MEASUREMENT"
-  | "QUOTE"
-  | "CONTRACT"
-  | "CAD_DRAWING"
-  | "HANDOFF"
-  | "DONE"
-  | "CONTACT"
-  | "DESIGN"
-  | "PRODUCTION"
-  | "CLOSED"
-  | "BILLED"
-  | "WRAP_UP"
-  | "LOST"
-  | "DEVELOP"
-  | "REQUIREMENT"
-  | "PROPOSAL"
-  | "PRE_PROD"
-  | "PROD_SHIP"
-  | "INSTALL"
-  | "CLOSURE";
+export type CustomerTypeDTO = CustomerType | "PR";
+export type PaymentTermsDTO = PaymentTerms;
+export type ProjectStageDTO = ProjectStage;
+export type MilestoneStatusDTO = MilestoneStatus;
+export type TaskPriorityDTO = TaskPriority;
+export type TaskTypeDTO = TaskType;
+export type QuoteStatusDTO = QuoteStatus;
 
 export type MilestonePhaseDTO =
   | "DEVELOP"
@@ -72,17 +53,49 @@ export interface MilestoneRecordDTO {
   createdAt?: string;
 }
 
-export type MilestoneStatusDTO = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
-export type TaskPriorityDTO = "HIGH" | "MEDIUM" | "LOW";
-export type TaskTypeDTO = "SITE_VISIT" | "DRAWING" | "QUOTE_FOLLOWUP" | "PAYMENT_REMINDER";
-export type QuoteStatusDTO = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
-
 export type ApiResponse<T> = T & { error?: string };
 
 export interface UserDTO {
   id: string;
   name: string;
-  role: string;
+  role: Role | string;
+  email?: string;
+}
+
+export interface CustomerStatItemDTO {
+  id: string;
+  name: string;
+  customerType: string;
+  customerTypeLabel: string;
+  taxId: string;
+  phone: string;
+  address: string;
+  defaultDiscount: number;
+  paymentTerms: string;
+  salesRepId: string;
+  salesRepName: string;
+  totalProjects: number;
+  activeProjects: number;
+  closedProjects: number;
+  lostProjects: number;
+  totalQuoteAmount: number;
+  latestProjectName: string;
+  latestProjectStage: string;
+}
+
+export interface CustomerStatsDashboardDTO {
+  kpi: {
+    totalCustomers: number;
+    activeCustomerCount: number;
+    totalQuoteSum: number;
+  };
+  customerTypeDistribution: Array<{
+    type: string;
+    label: string;
+    count: number;
+    totalAmount: number;
+  }>;
+  customers: CustomerStatItemDTO[];
 }
 
 export interface CustomerDTO {
@@ -353,6 +366,18 @@ export interface AssignableUserDTO {
 export type CustomerItem = CustomerDTO;
 export type ProjectDetail = ProjectDTO;
 export type ProjectMilestoneItem = MilestoneDTO;
-export type SalesTaskItem = TaskDTO;
 export type MilestonePhase = MilestonePhaseDTO;
+
+export interface ManagedUserDTO {
+  id: string;
+  name: string;
+  email: string;
+  role: any;
+}
+
+export interface RolePermissionDTO {
+  role: any;
+  label: string;
+  pages: any[];
+}
 export type MilestoneStageCode = MilestoneStageCodeDTO;
