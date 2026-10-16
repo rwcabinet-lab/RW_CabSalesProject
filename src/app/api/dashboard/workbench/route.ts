@@ -3,6 +3,8 @@ import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/dashboard/workbench?userId=xxx&month=2026-09&timeStandard=sign
 export async function GET(req: NextRequest) {
   try {

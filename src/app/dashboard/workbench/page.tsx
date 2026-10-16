@@ -11,6 +11,7 @@ import {
   X,
   Trash2,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/mock-data";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 import type {
@@ -21,17 +22,39 @@ import type {
   WorkbenchDashboardDTO,
   WorkbenchProjectDTO,
 } from "@/types/dto";
+import { useWorkbenchQuery, useCustomersQuery, useColumnConfigQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 const getDefaultTaskDueDatetime = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 export default function SalesWorkbenchPage() {
+  const queryClient = useQueryClient();
+  const { data: workbenchData, isLoading: workbenchLoading } = useWorkbenchQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: columnConfig = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
+
   const [projects, setProjects] = useState<WorkbenchProjectDTO[]>([]);
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [currentUser, setCurrentUser] = useState({ id: "", name: "使用者", role: "SALES" });
-  const [loading, setLoading] = useState(true);
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
+  const loading = workbenchLoading && !workbenchData;
+  const columns = columnConfig;
+
+  useEffect(() => {
+    if (workbenchData) {
+      if (Array.isArray(workbenchData.myProjects)) setProjects(workbenchData.myProjects);
+      if (Array.isArray(workbenchData.tasks)) setTasks(workbenchData.tasks);
+      if (workbenchData.currentUser) setCurrentUser(workbenchData.currentUser);
+    }
+  }, [workbenchData]);
+
+  const invalidateWorkbench = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers }),
+    ]);
+  };
 
   // 篩選條件：預設排除已流標與已立帳 (進行中)
   const [monthFilter, setMonthFilter] = useState("");
@@ -59,49 +82,6 @@ export default function SalesWorkbenchPage() {
   );
   const [completingTask, setCompletingTask] = useState(false);
   const [completionError, setCompletionError] = useState("");
-
-  useEffect(() => {
-    // 平行載入資料，消除等待時間
-    Promise.all([fetchWorkbenchData(), fetchCustomers(), fetchColumnConfig()]);
-  }, []);
-
-  const fetchColumnConfig = async () => {
-    try {
-      const res = await fetch("/api/projects/config/columns", { cache: "no-store" });
-      const data = await res.json() as ApiResponse<{ columns: ColumnItemDTO[] }>;
-      if (!res.ok || !Array.isArray(data.columns)) {
-        throw new Error(data.error || "無法取得全域案件欄位設定");
-      }
-      setColumns(data.columns);
-    } catch (error) {
-      console.error("Failed to fetch shared project columns:", error);
-    }
-  };
-
-  const fetchCustomers = async () => {
-    try {
-      const res = await fetch("/api/customers");
-      const data = await res.json() as ApiResponse<CustomerDTO[]>;
-      if (Array.isArray(data)) setCustomers(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchWorkbenchData = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/dashboard/workbench");
-      const json = await res.json() as ApiResponse<WorkbenchDashboardDTO>;
-      if (json.currentUser) setCurrentUser(json.currentUser);
-      if (Array.isArray(json.myProjects)) setProjects(json.myProjects);
-      if (Array.isArray(json.tasks)) setTasks(json.tasks);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCompleteTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +119,7 @@ export default function SalesWorkbenchPage() {
 
       setTaskToComplete(null);
       setCompletionNotes("");
+      await invalidateWorkbench();
     } catch (err) {
       console.error("Failed to complete task:", err);
       setTasks((current) => current.map((task) =>
@@ -169,7 +150,7 @@ export default function SalesWorkbenchPage() {
       if (res.ok) {
         setShowTaskModal(false);
         setNewTaskData({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: getDefaultTaskDueDatetime(), priority: "HIGH" });
-        await fetchWorkbenchData();
+        await invalidateWorkbench();
       }
     } finally { setCreatingTask(false); }
   };
@@ -192,7 +173,7 @@ export default function SalesWorkbenchPage() {
       });
       setIsProjectPanelOpen(false);
       setEditingProjectId(null);
-      await fetchWorkbenchData();
+      await invalidateWorkbench();
     } finally { setSavingProject(false); }
   };
 
@@ -297,7 +278,7 @@ export default function SalesWorkbenchPage() {
         window.alert(result.error || "刪除待辦失敗");
         return;
       }
-      await fetchWorkbenchData();
+      await invalidateWorkbench();
     } catch (err) {
       console.error("Failed to delete task:", err);
       window.alert("刪除待辦時發生錯誤，請稍後重試");
@@ -317,7 +298,7 @@ export default function SalesWorkbenchPage() {
         window.alert(result.error || "刪除案件失敗");
         return;
       }
-      await fetchWorkbenchData();
+      await invalidateWorkbench();
     } catch (err) {
       console.error("Failed to delete project:", err);
       window.alert("刪除案件時發生錯誤，請稍後重試");

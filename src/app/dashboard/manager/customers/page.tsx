@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
+import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
 
 const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   LONGMEI_STORE: "隆美",
@@ -34,25 +35,12 @@ function formatTenThousands(amount: number) {
 }
 
 export default function CustomerStatsPage() {
-  const [data, setData] = useState<CustomerStatsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading } = useManagerCustomerStatsQuery();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [salesFilter, setSalesFilter] = useState("");
   const [sortBy, setSortBy] = useState<"projects" | "amount" | "name">("projects");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  useEffect(() => {
-    fetch("/api/dashboard/manager/customers")
-      .then((res) => res.json())
-      .then((resData) => {
-        if (!resData.error) {
-          setData(resData);
-        }
-      })
-      .catch((err) => console.error("獲取客戶統計失敗:", err))
-      .finally(() => setLoading(false));
-  }, []);
 
   const salesOptions = useMemo(() => {
     if (!data) return [];

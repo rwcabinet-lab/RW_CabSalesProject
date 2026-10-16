@@ -4,21 +4,23 @@ import { useState, useEffect } from "react";
 import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatTenThousands } from "@/lib/currency";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/mock-data";
 import type { ApiResponse, AssignableUserDTO, ColumnItemDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
+import {
+  useManagerDashboardQuery,
+  useUsersQuery,
+  useSessionQuery,
+  useColumnConfigQuery,
+  QUERY_KEYS,
+} from "@/hooks/useQueries";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 export default function ManagerDashboardPage() {
-  const [data, setData] = useState<ManagerDashboardDTO | null>(null);
-  const [assignableUsers, setAssignableUsers] = useState<AssignableUserDTO[]>([]);
-  const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const queryClient = useQueryClient();
 
   // 過濾條件：預設排除已流標與已立帳 (進行中)
   const [monthFilter, setMonthFilter] = useState("");
@@ -28,71 +30,44 @@ export default function ManagerDashboardPage() {
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
 
+  // React Query 資料快取
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useManagerDashboardQuery(monthFilter);
+  const { data: users = [] } = useUsersQuery();
+  const { data: sessionUser } = useSessionQuery();
+  const { data: columnsData = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
+
+  const [data, setData] = useState<ManagerDashboardDTO | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+
+  const assignableUsers = users.filter((u) => ["SALES_MANAGER", "SALES", "ASSISTANT"].includes(u.role as string)) as AssignableUserDTO[];
+  const columns = columnsData;
+  const isAdmin = sessionUser?.role === "ADMIN";
+  const loading = dashboardLoading && !data;
+  const loadError = dashboardError instanceof Error ? dashboardError.message : "";
+
+  useEffect(() => {
+    if (dashboardData) {
+      setData(dashboardData);
+    }
+  }, [dashboardData]);
+
+  const invalidateManager = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData }),
+    ]);
+  };
+
   // 任務指派
   const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
     open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate()
   });
   const [assigning, setAssigning] = useState(false);
-
-  useEffect(() => {
-    // 平行載入消除延遲
-    Promise.all([fetchDashboardData(), fetchAssignableUsers(), fetchUserSession(), fetchColumnConfig()]);
-  }, [monthFilter]);
-
-  const fetchColumnConfig = async () => {
-    try {
-      const res = await fetch("/api/projects/config/columns", { cache: "no-store" });
-      const colData = await res.json() as ApiResponse<{ columns: ColumnItemDTO[] }>;
-      if (!res.ok || !Array.isArray(colData.columns)) {
-        throw new Error(colData.error || "無法取得全域案件欄位設定");
-      }
-      setColumns(colData.columns);
-    } catch (error) {
-      console.error("Failed to fetch shared project columns:", error);
-    }
-  };
-
-  const fetchAssignableUsers = async () => {
-    try {
-      const res = await fetch("/api/auth/users");
-      if (!res.ok) return;
-      const users = await res.json() as AssignableUserDTO[];
-      if (Array.isArray(users)) {
-        setAssignableUsers(users.filter(u => ["SALES_MANAGER", "SALES", "ASSISTANT"].includes(u.role)));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchUserSession = async () => {
-    try {
-      const res = await fetch("/api/auth/session", { cache: "no-store" });
-      if (!res.ok) return;
-      const session = await res.json();
-      setIsAdmin(session.user?.role === "ADMIN");
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/dashboard/manager${monthFilter ? `?month=${monthFilter}` : ""}`);
-      const json = await res.json() as ApiResponse<ManagerDashboardDTO>;
-      if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview) || !Array.isArray(json.assignedTasks)) {
-        throw new Error(json.error || "無法取得主管看板資料");
-      }
-      setData(json);
-      setLoadError("");
-    } catch (err) {
-      console.error(err);
-      setLoadError(err instanceof Error ? err.message : "無法取得主管看板資料");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDeleteAssignedTask = async (task: TaskDTO) => {
     if (!window.confirm(`確定刪除已指派任務「${task.subject}」？`)) return;
@@ -111,6 +86,7 @@ export default function ManagerDashboardPage() {
         ...current,
         assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
       } : current);
+      await invalidateManager();
     } catch (err) {
       console.error("Failed to delete assigned task:", err);
       window.alert("刪除任務時發生錯誤，請稍後重試");
@@ -128,7 +104,9 @@ export default function ManagerDashboardPage() {
       });
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) throw new Error(result.error || "刪除案件失敗");
-      await fetchDashboardData();
+      await invalidateManager();
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
     } catch (error) {
       console.error("Failed to delete project:", error);
       window.alert(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
@@ -155,7 +133,7 @@ export default function ManagerDashboardPage() {
       const result = await res.json() as ApiResponse<{ task: TaskDTO }>;
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
       setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
-      await fetchDashboardData();
+      await invalidateManager();
       alert(assignModal.taskId ? "任務已更新！" : "指派成功！");
     } catch (err) {
       alert(err instanceof Error ? err.message : "指派任務失敗");

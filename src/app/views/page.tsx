@@ -2,42 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { Kanban, BarChart3, Calendar } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
-import type { ApiResponse, CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO, ViewsDataDTO } from "@/types/dto";
+import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
+import { useViewsDataQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 export default function VisualViewsPage() {
+  const queryClient = useQueryClient();
+  const { data: viewsData, isLoading: viewsLoading, error: viewsError, refetch } = useViewsDataQuery();
+
   const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
   const [projects, setProjects] = useState<ProjectWithMilestonesDTO[]>([]);
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [staff, setStaff] = useState<CalendarStaffDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+
+  const loading = viewsLoading && !viewsData;
+  const loadError = viewsError instanceof Error ? viewsError.message : "";
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setLoadError("");
-      const res = await fetch("/api/views/data", { cache: "no-store" });
-      const json = await res.json() as ApiResponse<ViewsDataDTO>;
-      if (!res.ok) {
-        throw new Error(json.error || "無法取得可視化資料");
-      }
-      if (Array.isArray(json.projects)) setProjects(json.projects);
-      if (Array.isArray(json.tasks)) setTasks(json.tasks);
-      if (Array.isArray(json.staff)) setStaff(json.staff);
-    } catch (err) {
-      console.error(err);
-      setLoadError(err instanceof Error ? err.message : "載入可視化資料失敗，請稍後再試。");
-    } finally {
-      setLoading(false);
+    if (viewsData) {
+      if (Array.isArray(viewsData.projects)) setProjects(viewsData.projects);
+      if (Array.isArray(viewsData.tasks)) setTasks(viewsData.tasks);
+      if (Array.isArray(viewsData.staff)) setStaff(viewsData.staff);
     }
-  };
+  }, [viewsData]);
 
   const handleStageChange = async (projectId: string, newStage: string, reason?: string): Promise<boolean> => {
     try {
@@ -50,6 +40,11 @@ export default function VisualViewsPage() {
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, currentStage: newStage } : p))
         );
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench }),
+          queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] }),
+        ]);
         return true;
       }
       return false;
@@ -73,7 +68,7 @@ export default function VisualViewsPage() {
       <div className="p-16 text-center space-y-4">
         <p role="alert" className="text-red-600 font-medium">{loadError}</p>
         <button
-          onClick={fetchData}
+          onClick={() => refetch()}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
         >
           重新載入

@@ -1,15 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2 } from "lucide-react";
-import type { ApiResponse, CustomerDTO, UserDTO } from "@/types/dto";
+import { useQueryClient } from "@tanstack/react-query";
+import type { ApiResponse, CustomerDTO } from "@/types/dto";
+import { useCustomersQuery, useUsersQuery, useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
-  const [salesReps, setSalesReps] = useState<{ id: string; name: string; role: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const queryClient = useQueryClient();
+  const { data: customers = [], isLoading: loading, error: queryError } = useCustomersQuery();
+  const { data: users = [] } = useUsersQuery();
+  const { data: sessionUser } = useSessionQuery();
+
+  const isAdmin = sessionUser?.role === "ADMIN";
+  const loadError = queryError instanceof Error ? queryError.message : "";
+
+  const salesReps = useMemo(() => {
+    return users.filter((user) => user.role === "SALES_MANAGER" || user.role === "SALES");
+  }, [users]);
+
   const [showModal, setShowModal] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
@@ -26,52 +35,6 @@ export default function CustomersPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-
-  useEffect(() => {
-    fetchCustomers();
-    fetchSalesReps();
-    fetchCurrentUser();
-  }, []);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch("/api/auth/session");
-      const data = await res.json() as ApiResponse<{ user: { role: string } | null }>;
-      setIsAdmin(res.ok && data.user?.role === "ADMIN");
-    } catch (err) {
-      console.error("Failed to load current user:", err);
-    }
-  };
-
-  const fetchSalesReps = async () => {
-    try {
-      const res = await fetch("/api/auth/users");
-      const data = await res.json() as ApiResponse<UserDTO[]>;
-      if (res.ok) {
-        setSalesReps(data.filter((user) =>
-          user.role === "SALES_MANAGER" || user.role === "SALES"
-        ));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/customers");
-      const data = await res.json() as ApiResponse<CustomerDTO[]>;
-      if (!res.ok || !Array.isArray(data)) throw new Error(data.error || "無法取得客戶資料");
-      setCustomers(data);
-      setLoadError("");
-    } catch (err) {
-      console.error(err);
-      setLoadError(err instanceof Error ? err.message : "無法取得客戶資料");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTypeChange = (type: string) => {
     const discount = type === "INDIVIDUAL" ? "1.00" : "0.85";
@@ -104,7 +67,8 @@ export default function CustomersPage() {
           salesRepId: salesReps[0]?.id || "",
         });
         setEditingCustomerId(null);
-        fetchCustomers();
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
       } else {
         setSubmitError(result.error || "新增客戶失敗，請確認資料後重試。");
       }
@@ -147,7 +111,8 @@ export default function CustomersPage() {
         window.alert(result.error || "刪除客戶失敗");
         return;
       }
-      await fetchCustomers();
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
     } catch (err) {
       console.error("Failed to delete customer:", err);
       window.alert("刪除客戶時發生錯誤，請稍後重試");

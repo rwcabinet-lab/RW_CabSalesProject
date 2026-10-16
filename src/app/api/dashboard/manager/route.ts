@@ -6,6 +6,8 @@ import { getUserFromRequest } from "@/lib/access-control";
 
 const MANAGER_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"];
 
+export const dynamic = "force-dynamic";
+
 function isValidDueDate(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const datePart = value.slice(0, 10);

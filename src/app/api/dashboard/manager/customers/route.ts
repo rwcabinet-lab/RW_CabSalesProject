@@ -3,6 +3,8 @@ import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
 import type { CustomerStatsDashboardDTO } from "@/types/dto";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req);

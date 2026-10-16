@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles } from "lucide-react";
-import type { ApiResponse, UserDTO } from "@/types/dto";
+import type { UserDTO } from "@/types/dto";
+import { useSessionQuery } from "@/hooks/useQueries";
 
 type UserSession = UserDTO;
 
@@ -15,8 +16,8 @@ const THEME_OPTIONS = [
 ];
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<UserSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: user, isLoading: sessionLoading } = useSessionQuery();
+  const loading = sessionLoading && !user;
 
   // 密碼變更狀態
   const [oldPassword, setOldPassword] = useState("");
@@ -31,15 +32,6 @@ export default function SettingsPage() {
   const [themeSaved, setThemeSaved] = useState(false);
 
   useEffect(() => {
-    // 讀取目前使用者資訊
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((res) => res.json() as Promise<ApiResponse<{ user: UserSession | null }>>)
-      .then((data) => {
-        if (data.user) setUser(data.user);
-      })
-      .catch((err) => console.error("獲取使用者資訊失敗:", err))
-      .finally(() => setLoading(false));
-
     // 讀取目前主題設定
     try {
       const savedTheme = localStorage.getItem("app_theme_color") || "blue";

@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings, UserCog } from "lucide-react";
-import { PageAccessKey } from "@/lib/page-access";
-import type { ApiResponse } from "@/types/dto";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "業務工作台", icon: LayoutDashboard },
@@ -18,31 +17,13 @@ const navItems = [
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<{
-    id: string;
-    name: string;
-    role: string;
-    accessiblePages: PageAccessKey[];
-  } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((response) => response.ok
-        ? response.json() as Promise<ApiResponse<{
-            user: {
-              id: string;
-              name: string;
-              role: string;
-              accessiblePages: PageAccessKey[];
-            } | null;
-          }>>
-        : null)
-      .then((data) => setUser(data?.user || null))
-      .catch(() => setUser(null));
-  }, []);
+  const queryClient = useQueryClient();
+  const { data: user } = useSessionQuery();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    queryClient.setQueryData(QUERY_KEYS.session, null);
+    queryClient.clear();
     router.replace("/login");
     router.refresh();
   };
