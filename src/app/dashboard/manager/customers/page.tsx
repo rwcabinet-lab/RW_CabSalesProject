@@ -41,6 +41,23 @@ interface CustomerStatsData {
   customers: CustomerStatItem[];
 }
 
+const CUSTOMER_TYPE_LABELS: Record<string, string> = {
+  LONGMEI_STORE: "隆美",
+  CABINET_FACTORY: "工廠",
+  DESIGN_COMPANY: "設計公司",
+  DEALER_COMPANY: "經銷公司",
+  CONSTRUCTION: "建設／營造",
+  LABOR_MATERIAL: "連工帶料",
+  INDIVIDUAL: "一般消費者",
+  DESIGNER: "設計師",
+  CONTRACTOR: "統包／營造",
+  PR: "公關客戶",
+  DEALER: "經銷商",
+  HOMEOWNER: "一般消費者",
+  DIRECT: "直接業主",
+  OTHER: "其他",
+};
+
 function formatTenThousands(amount: number) {
   if (!amount) return "$0";
   const inTenThousands = amount / 10000;
@@ -204,7 +221,13 @@ export default function CustomerStatsPage() {
         </h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.customerTypeDistribution} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <BarChart
+              data={data.customerTypeDistribution.map((item) => ({
+                ...item,
+                label: CUSTOMER_TYPE_LABELS[item.type] || item.label,
+              }))}
+              margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+            >
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
@@ -259,7 +282,7 @@ export default function CustomerStatsPage() {
                 <option value="">全部類型</option>
                 {data.customerTypeDistribution.map((t) => (
                   <option key={t.type} value={t.type}>
-                    {t.label} ({t.count})
+                    {CUSTOMER_TYPE_LABELS[t.type] || t.label} ({t.count})
                   </option>
                 ))}
               </select>
@@ -344,7 +367,7 @@ export default function CustomerStatsPage() {
                   </td>
                   <td className="px-4 py-4">
                     <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
-                      {c.customerTypeLabel}
+                      {CUSTOMER_TYPE_LABELS[c.customerType] || c.customerTypeLabel}
                     </span>
                   </td>
                   <td className="px-4 py-4 font-semibold text-slate-800">

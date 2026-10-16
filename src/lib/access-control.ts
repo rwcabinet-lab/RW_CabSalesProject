@@ -48,9 +48,14 @@ export async function canAccessPath(
   pathname: string,
   method?: string,
 ): Promise<boolean> {
+  const routePath = new URL(pathname, "http://localhost").pathname;
+  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
   const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return role === "ADMIN";
   const pages = await getRolePages(role);
+  if (routePath === "/api/tasks" || routePath.startsWith("/api/tasks/") || routePath === "/api/schedule" || routePath.startsWith("/api/schedule/")) {
+    return pages.includes("workbench") || pages.includes("projects") || pages.includes("manager");
+  }
   return pages.includes(pageKey);
 }
 
@@ -90,6 +95,11 @@ export async function canUserAccessPath(
   }
 
   if (profile.email.startsWith("preview-")) return false;
+  const routePath = new URL(pathname, "http://localhost").pathname;
+  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
+  if (routePath === "/api/tasks" || routePath.startsWith("/api/tasks/") || routePath === "/api/schedule" || routePath.startsWith("/api/schedule/")) {
+    return profile.pages.includes("workbench") || profile.pages.includes("projects") || profile.pages.includes("manager");
+  }
   const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return profile.role === "ADMIN";
   return profile.pages.includes(pageKey);

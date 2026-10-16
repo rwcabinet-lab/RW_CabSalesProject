@@ -210,40 +210,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoadError("");
 
       const [milestonesRes, usersRes, sessionRes, projectsRes, tasksRes, completedTasksRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}/milestones`),
+        fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" }),
         fetch("/api/auth/users"),
         fetch("/api/auth/session", { cache: "no-store" }),
-        fetch("/api/projects"),
-        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`),
-        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`),
+        fetch("/api/projects", { cache: "no-store" }),
+        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" }),
+        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`, { cache: "no-store" }),
       ]);
-
-      const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
-      if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
-      const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
-      if (!tasksRes.ok || !Array.isArray(tasksData)) {
-        throw new Error(tasksData.error || "無法載入待辦事項");
-      }
-      const completedTasksData = await completedTasksRes.json() as ApiResponse<TaskDTO[]>;
-      if (!completedTasksRes.ok || !Array.isArray(completedTasksData)) {
-        throw new Error(completedTasksData.error || "無法載入已完成待辦");
-      }
-
-      if (data.project) {
-        setProject(data.project);
-        if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
-          setActivePhase("EXTRA");
-        } else {
-          const matchedPhase = Object.entries(STAGE_CODE_TO_PHASE).find(([code]) => code === data.project.currentStage);
-          if (matchedPhase) {
-            setActivePhase(matchedPhase[1]);
-          }
-        }
-      }
-
-      setMilestones(data.milestones);
-      setTasks(tasksData);
-      setCompletedTasks(completedTasksData.filter((task) => !task.milestoneId));
 
       if (usersRes.ok) {
         const u = await usersRes.json();
@@ -257,6 +230,37 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (projectsRes.ok) {
         const p = await projectsRes.json();
         if (Array.isArray(p)) setProjects(p);
+      }
+
+      const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
+      if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
+
+      if (data.project) {
+        setProject(data.project);
+        const msList = Array.isArray(data.milestones) ? data.milestones : [];
+        const activeMs = msList.find((m) => m.status === "IN_PROGRESS" || m.status === "OVERDUE");
+        if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
+          setActivePhase("EXTRA");
+        } else if (activeMs && STAGE_CODE_TO_PHASE[activeMs.stageCode]) {
+          setActivePhase(STAGE_CODE_TO_PHASE[activeMs.stageCode]);
+        } else if (PHASE_ORDER.includes(data.project.currentStage as MilestonePhaseDTO)) {
+          setActivePhase(data.project.currentStage as MilestonePhaseDTO);
+        } else {
+          setActivePhase("DEVELOP");
+        }
+      }
+
+      setMilestones(Array.isArray(data.milestones) ? data.milestones : []);
+
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
+        if (Array.isArray(tasksData)) setTasks(tasksData);
+      }
+      if (completedTasksRes.ok) {
+        const completedTasksData = await completedTasksRes.json() as ApiResponse<TaskDTO[]>;
+        if (Array.isArray(completedTasksData)) {
+          setCompletedTasks(completedTasksData.filter((task) => !task.milestoneId));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -545,6 +549,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {loadError && (
+        <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+          <span className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {loadError}
+          </span>
+          <button
+            type="button"
+            onClick={() => void fetchData()}
+            className="rounded-lg bg-red-600 px-3 py-1 text-white hover:bg-red-700"
+          >
+            重新載入
+          </button>
+        </div>
+      )}
+
       {/* 案場標頭資訊 */}
       {project && (
         <section className={`bg-white border rounded-2xl p-5 shadow-sm transition ${isProjectLost ? "border-red-300 bg-red-50/20" : ""}`}>
@@ -788,7 +808,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3">
-                          {canManageMilestones && !isProjectLost && (
+                          {!isProjectLost && (
                             <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-slate-400" aria-label="拖曳調整順序" />
                           )}
 

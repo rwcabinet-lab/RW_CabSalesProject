@@ -89,6 +89,20 @@ export function Navbar() {
               </Link>
             );
           })}
+          {user && (
+            <Link
+              href="/settings"
+              prefetch={true}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                pathname === "/settings" || pathname.startsWith("/settings/")
+                  ? "bg-blue-50 text-blue-700 font-semibold"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <UserCog className={`w-4 h-4 ${pathname === "/settings" || pathname.startsWith("/settings/") ? "text-blue-600" : "text-slate-400"}`} />
+              <span className="hidden sm:inline">帳號管理</span>
+            </Link>
+          )}
         </nav>
 
         {/* 使用者資訊 */}
@@ -104,8 +118,8 @@ export function Navbar() {
           </div>
           <Link
             href="/settings"
-            title="個人與外觀設定"
-            aria-label="個人與外觀設定"
+            title="帳號管理"
+            aria-label="帳號管理"
             className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-blue-600"
           >
             <UserCog className="h-4 w-4" />

@@ -247,7 +247,7 @@ export interface ViewsDataDTO {
 export interface CalendarStaffDTO {
   id: string;
   name: string;
-  role: "SALES" | "ASSISTANT";
+  role: "SALES_MANAGER" | "SALES" | "ASSISTANT";
 }
 
 export interface QuoteVersionCreateDTO {

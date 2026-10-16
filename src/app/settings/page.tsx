@@ -162,10 +162,10 @@ export default function SettingsPage() {
       {/* 頁面標題 */}
       <div className="border-b pb-4">
         <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
-          帳號管理
+          個人與外觀設定
         </span>
-        <h1 className="text-2xl font-black mt-1 text-slate-800">個人與外觀設定</h1>
-        <p className="text-xs text-slate-500 mt-1">管理個人帳號資訊、安全密碼及系統介面配色風格</p>
+        <h1 className="text-2xl font-black mt-1 text-slate-800">帳號管理</h1>
+        <p className="text-xs text-slate-500 mt-1">管理個人帳號資訊、設定登入密碼及選擇系統配色風格</p>
       </div>
 
       {/* 個人帳號資訊卡片 */}

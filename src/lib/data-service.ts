@@ -263,67 +263,77 @@ export const DataService = {
   },
 
   async ensureProjectMilestones(projectId: string) {
-    await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE
-      `;
-      const project = await tx.project.findUnique({
-        where: { id: projectId },
-        select: { salesRepId: true },
-      });
-      if (!project) throw new Error("查無此案場資料");
-
-      const existing = await tx.projectMilestone.findMany({
-        where: { projectId },
-        select: { stageCode: true, stageOrder: true, plannedDueDate: true },
-      });
-      const existingCodes = new Set(existing.map((milestone) => milestone.stageCode));
-      const missingCodes = STANDARD_MILESTONE_STAGE_CODES.filter((code) => !existingCodes.has(code));
-      if (missingCodes.length === 0) return;
-
-      let dueDate = existing.reduce<Date | null>(
-        (latest, milestone) =>
-          milestone.plannedDueDate && (!latest || milestone.plannedDueDate > latest)
-            ? milestone.plannedDueDate
-            : latest,
-        null,
-      ) || new Date();
-
-      for (const code of missingCodes) {
-        dueDate = new Date(dueDate);
-        dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
-        const stdIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(code);
-        await tx.projectMilestone.create({
-          data: {
-            projectId,
-            stageCode: code,
-            phase: STAGE_CODE_TO_PHASE[code],
-            stageOrder: stdIndex !== -1 ? stdIndex + 1 : 99,
-            plannedDueDate: dueDate,
-            status: MilestoneStatus.PENDING,
-            assignedToId: project.salesRepId,
-          },
-        });
-      }
-
-      // 重新依標準順序排列
-      const all = await tx.projectMilestone.findMany({
-        where: { projectId },
-        select: { id: true, stageCode: true, stageOrder: true },
-      });
-      all.sort((a, b) => {
-        const idxA = STANDARD_MILESTONE_STAGE_CODES.indexOf(a.stageCode as MilestoneStageCode);
-        const idxB = STANDARD_MILESTONE_STAGE_CODES.indexOf(b.stageCode as MilestoneStageCode);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        return a.stageOrder - b.stageOrder;
-      });
-      for (let i = 0; i < all.length; i++) {
-        await tx.projectMilestone.update({
-          where: { id: all[i].id },
-          data: { stageOrder: i + 1, phase: STAGE_CODE_TO_PHASE[all[i].stageCode as MilestoneStageCode] || "DEVELOP" },
-        });
-      }
+    const existing = await prisma.projectMilestone.findMany({
+      where: { projectId },
+      select: { id: true, stageCode: true, stageOrder: true, phase: true, plannedDueDate: true },
     });
+    const existingCodes = new Set(existing.map((milestone) => milestone.stageCode));
+    const missingCodes = STANDARD_MILESTONE_STAGE_CODES.filter((code) => !existingCodes.has(code));
+    if (missingCodes.length === 0) return;
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { salesRepId: true },
+    });
+    if (!project) throw new Error("查無此案場資料");
+
+    let dueDate = existing.reduce<Date | null>(
+      (latest, milestone) =>
+        milestone.plannedDueDate && (!latest || milestone.plannedDueDate > latest)
+          ? milestone.plannedDueDate
+          : latest,
+      null,
+    ) || new Date();
+
+    const newRows = missingCodes.map((code) => {
+      dueDate = new Date(dueDate);
+      dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
+      const stdIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(code);
+      return {
+        projectId,
+        stageCode: code,
+        phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP",
+        stageOrder: stdIndex !== -1 ? stdIndex + 1 : 99,
+        plannedDueDate: new Date(dueDate),
+        status: MilestoneStatus.PENDING,
+        assignedToId: project.salesRepId,
+      };
+    });
+
+    await prisma.projectMilestone.createMany({
+      data: newRows,
+      skipDuplicates: true,
+    });
+
+    // 重新依標準順序排列，僅針對順序或階段不符的項目進行批次更新
+    const all = await prisma.projectMilestone.findMany({
+      where: { projectId },
+      select: { id: true, stageCode: true, stageOrder: true, phase: true },
+    });
+    all.sort((a, b) => {
+      const idxA = STANDARD_MILESTONE_STAGE_CODES.indexOf(a.stageCode as MilestoneStageCode);
+      const idxB = STANDARD_MILESTONE_STAGE_CODES.indexOf(b.stageCode as MilestoneStageCode);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      return a.stageOrder - b.stageOrder;
+    });
+
+    const updates = all
+      .map((item, idx) => {
+        const targetOrder = idx + 1;
+        const targetPhase = STAGE_CODE_TO_PHASE[item.stageCode as MilestoneStageCode] || "DEVELOP";
+        if (item.stageOrder !== targetOrder || item.phase !== targetPhase) {
+          return prisma.projectMilestone.update({
+            where: { id: item.id },
+            data: { stageOrder: targetOrder, phase: targetPhase },
+          });
+        }
+        return null;
+      })
+      .filter((op): op is ReturnType<typeof prisma.projectMilestone.update> => op !== null);
+
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
+    }
   },
 
   async submitMilestoneForReview(
@@ -797,30 +807,44 @@ export const DataService = {
     // 確保被指派的進行中/逾期正規里程碑，若尚未建立待辦，也能自動補建並出現在被指派人員待辦清單中
     if (filter?.assignedToId && filter?.isCompleted !== true) {
       try {
+        const assignedToId = filter.assignedToId;
         const activeMilestones = await prisma.projectMilestone.findMany({
           where: {
-            assignedToId: filter.assignedToId,
+            assignedToId,
             status: { in: [MilestoneStatus.IN_PROGRESS, MilestoneStatus.OVERDUE] },
             project: { currentStage: { notIn: [ProjectStage.LOST, ProjectStage.WRAP_UP] } },
+            salesTask: { is: null },
           },
-          include: { salesTask: true },
+          select: {
+            id: true,
+            projectId: true,
+            phase: true,
+            stageCode: true,
+            plannedDueDate: true,
+            priority: true,
+          },
         });
-        for (const am of activeMilestones) {
-          if (!am.salesTask) {
-            const isDrawing = am.phase === "PROPOSAL" || am.phase === "PRE_PROD" || am.stageCode.startsWith("3-") || am.stageCode.startsWith("4-");
-            await prisma.salesTask.create({
-              data: {
+        if (activeMilestones.length > 0) {
+          await prisma.salesTask.createMany({
+            data: activeMilestones.map((am) => {
+              const isDrawing =
+                am.phase === "PROPOSAL" ||
+                am.phase === "PRE_PROD" ||
+                am.stageCode.startsWith("3-") ||
+                am.stageCode.startsWith("4-");
+              return {
                 projectId: am.projectId,
                 milestoneId: am.id,
-                assignedToId: filter.assignedToId,
+                assignedToId,
                 taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
                 subject: MILESTONE_STAGE_LABELS[am.stageCode as MilestoneStageCode] || "里程碑任務",
                 dueDatetime: am.plannedDueDate || new Date(),
                 priority: am.priority,
                 isCompleted: false,
-              },
-            });
-          }
+              };
+            }),
+            skipDuplicates: true,
+          });
         }
       } catch (err) {
         console.error("Failed to sync milestone tasks:", err);

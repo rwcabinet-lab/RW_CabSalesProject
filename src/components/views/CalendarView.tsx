@@ -178,7 +178,9 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>{person.name}</span>
-                <span className="text-xs text-slate-400">{person.role === "SALES" ? "業務" : "業助"}</span>
+                <span className="text-xs text-slate-400">
+                  {person.role === "SALES_MANAGER" ? "業務主管" : person.role === "SALES" ? "業務" : "業助"}
+                </span>
               </label>
             ))}
           </div>

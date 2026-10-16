@@ -13,7 +13,9 @@ export async function GET() {
     ]);
     const milestonesByProject = await DataService.getMilestonesByProjectIds(projects.map((project) => project.id));
     const staff = users
-      .filter((user) => user.role === "SALES" || user.role === "ASSISTANT")
+      .filter((user): user is typeof user & { role: "SALES_MANAGER" | "SALES" | "ASSISTANT" } =>
+        user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"
+      )
       .map(({ id, name, role }) => ({ id, name, role }));
 
     const projectsWithMilestones = projects.map((p) => {
