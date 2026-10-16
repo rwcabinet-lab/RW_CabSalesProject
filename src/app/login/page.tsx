@@ -9,7 +9,7 @@ type LoginUser = UserDTO;
 export default function LoginPage() {
   const [users, setUsers] = useState<LoginUser[]>([]);
   const [userId, setUserId] = useState("");
-  const [password, setPassword] = useState("0000");
+  const [password, setPassword] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -88,6 +88,7 @@ export default function LoginPage() {
                 id="login-password"
                 type="password"
                 required
+                placeholder="請輸入密碼（預設：0000）"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}

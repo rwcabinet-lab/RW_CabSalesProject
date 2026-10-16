@@ -316,12 +316,13 @@ export default function ManagerDashboardPage() {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barGap="-100%">
-                <XAxis dataKey="salesRepName" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis xAxisId="total" dataKey="salesRepName" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                <XAxis xAxisId="delayed" dataKey="salesRepName" hide />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                <Bar dataKey="totalProjects" name="總案場數" fill="#60a5fa" radius={[4, 4, 0, 0]} barSize={32} />
-                <Bar dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={16} />
+                <Bar xAxisId="total" dataKey="totalProjects" name="總案場數" fill="#60a5fa" radius={[4, 4, 0, 0]} barSize={32} />
+                <Bar xAxisId="delayed" dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>

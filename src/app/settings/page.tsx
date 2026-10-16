@@ -84,49 +84,53 @@ export default function SettingsPage() {
     }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordStatus(null);
+
+    if (!newPassword || newPassword.length < 4) {
+      setPasswordStatus({
+        type: "error",
+        message: "新密碼長度至少需 4 碼以上",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({
+        type: "error",
+        message: "新密碼與確認密碼不一致",
+      });
+      return;
+    }
+
     setSavingPassword(true);
-
-    setTimeout(() => {
-      // 依使用者指示：做出介面，但密碼維持 0000 驗證
-      if (oldPassword !== "0000") {
-        setPasswordStatus({
-          type: "error",
-          message: "目前密碼不正確（系統預設密碼為 0000）",
-        });
-        setSavingPassword(false);
-        return;
-      }
-
-      if (!newPassword || newPassword.length < 4) {
-        setPasswordStatus({
-          type: "error",
-          message: "新密碼長度至少需 4 碼以上",
-        });
-        setSavingPassword(false);
-        return;
-      }
-
-      if (newPassword !== confirmPassword) {
-        setPasswordStatus({
-          type: "error",
-          message: "新密碼與確認密碼不一致",
-        });
-        setSavingPassword(false);
-        return;
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "密碼更新失敗");
       }
 
       setPasswordStatus({
         type: "success",
-        message: "密碼已成功更新！系統目前維持測試連線，密碼驗證維持 0000 通用相容。",
+        message: data.message || "密碼已成功更新！下次登入即生效。",
       });
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
+    } catch (err) {
+      setPasswordStatus({
+        type: "error",
+        message: err instanceof Error ? err.message : "密碼更新失敗",
+      });
+    } finally {
       setSavingPassword(false);
-    }, 400);
+    }
   };
 
   const roleLabel =
@@ -247,8 +251,8 @@ export default function SettingsPage() {
           </div>
 
           <div className="mt-4 pt-3 border-t text-[11px] text-slate-400 flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5" />
-            系統已開啟相容模式，密碼驗證基準保持為 0000。
+            <Shield className="w-3.5 h-3.5 text-blue-500" />
+            密碼功能已正式啟用，更改後下次登入即生效。新密碼請妥善保管。
           </div>
         </div>
 

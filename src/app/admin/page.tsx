@@ -143,17 +143,38 @@ export default function AdminPage() {
     }
   };
 
-  const handleSavePassword = (e: FormEvent) => {
+  const handleSavePassword = async (e: FormEvent) => {
     e.preventDefault();
     if (passwordModal.newPass !== passwordModal.confirmPass) {
       setPasswordNotice("兩次輸入的密碼不一致");
       return;
     }
-    setPasswordNotice("密碼變更成功！（系統預設與安全驗證維持 0000）");
-    setTimeout(() => {
-      setPasswordModal({ open: false, user: null, newPass: "", confirmPass: "" });
-      setPasswordNotice("");
-    }, 1500);
+    if (passwordModal.newPass.length < 4) {
+      setPasswordNotice("新密碼長度至少需 4 碼以上");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: passwordModal.user?.id,
+          newPassword: passwordModal.newPass,
+          confirmPassword: passwordModal.confirmPass,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "密碼更新失敗");
+      }
+      setPasswordNotice("密碼變更成功！下次登入即生效。");
+      setTimeout(() => {
+        setPasswordModal({ open: false, user: null, newPass: "", confirmPass: "" });
+        setPasswordNotice("");
+      }, 1200);
+    } catch (err) {
+      setPasswordNotice(err instanceof Error ? err.message : "儲存密碼失敗");
+    }
   };
 
   const handleApplyTheme = (color: typeof themeColor, density: typeof themeDensity) => {

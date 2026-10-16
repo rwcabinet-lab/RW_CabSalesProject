@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
+import { DataService } from "@/lib/data-service";
 
-const LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
+const DEFAULT_LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
 
 export async function POST(req: NextRequest) {
   try {
     const { userId, password } = await req.json();
-    if (!userId || password !== LOGIN_PASSWORD) {
+    if (!userId || typeof password !== "string") {
+      return NextResponse.json({ error: "請提供使用者與密碼" }, { status: 400 });
+    }
+
+    const passwords = await DataService.getAppConfig<Record<string, string>>("user_passwords", {});
+    const expectedPassword = passwords[userId] || DEFAULT_LOGIN_PASSWORD;
+
+    if (password !== expectedPassword) {
       return NextResponse.json({ error: "使用者或密碼不正確" }, { status: 401 });
     }
 
