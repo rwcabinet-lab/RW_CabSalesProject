@@ -109,7 +109,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
+        body: JSON.stringify({ userId: user?.id, oldPassword, newPassword, confirmPassword }),
       });
       const data = await res.json();
       if (!res.ok) {

@@ -4,7 +4,9 @@ import { DataService } from "@/lib/data-service";
 
 export async function POST(req: NextRequest) {
   try {
-    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    const body = await req.json();
+    const { oldPassword, newPassword, confirmPassword, targetUserId, userId: bodyUserId } = body;
+    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value || bodyUserId;
     if (!sessionUserId) {
       return NextResponse.json({ error: "未登入或操作逾時，請重新登入" }, { status: 401 });
     }
@@ -13,9 +15,6 @@ export async function POST(req: NextRequest) {
     if (!currentProfile) {
       return NextResponse.json({ error: "找不到使用者身分" }, { status: 401 });
     }
-
-    const body = await req.json();
-    const { oldPassword, newPassword, confirmPassword, targetUserId } = body;
 
     if (!newPassword || typeof newPassword !== "string" || newPassword.length < 4) {
       return NextResponse.json({ error: "新密碼長度至少需 4 碼以上" }, { status: 400 });

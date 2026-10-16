@@ -1575,7 +1575,7 @@ export const DataService = {
     appConfigCache.set(key, { value, expiresAt: Date.now() + APP_CONFIG_TTL_MS });
     return prisma.appConfig.upsert({
       where: { key },
-      create: { key, value: JSON.stringify(value) },
+      create: { id: key, key, value: JSON.stringify(value) },
       update: { value: JSON.stringify(value) },
     });
   },
