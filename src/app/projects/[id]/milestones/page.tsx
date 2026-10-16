@@ -21,6 +21,7 @@ import {
   ChevronRight,
   GripVertical,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import {
   MILESTONE_STAGE_LABELS,
@@ -578,11 +579,50 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const [rollingBack, setRollingBack] = useState(false);
+
+  const handleRollback = async (targetMilestone: MilestoneWithLight) => {
+    const stageName = MILESTONE_STAGE_LABELS[targetMilestone.stageCode] || "此項目";
+    if (!window.confirm(`確定要回退進度至【${stageName}】嗎？\n回退後，該項目將恢復為進行中狀態，而後續項目將重置為待開始。`)) {
+      return;
+    }
+    setRollingBack(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rollback", milestoneId: targetMilestone.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "回退進度失敗");
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => tRes.ok ? tRes.json() : null)
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "回退失敗");
+    } finally {
+      setRollingBack(false);
+    }
+  };
+
   if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">載入詳細資料中...</div>;
 
   const isProjectLost = project?.currentStage === "LOST";
   const canReviewAudit =
     canManageMilestones || (!!project && currentUserId === project.salesRepId);
+  const canRollback = canManageMilestones || (!!project && currentUserId === project.salesRepId);
+
+  const sortedAllMilestones = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+  const lastCompletedMilestone = [...sortedAllMilestones].reverse().find((m) => m.status === "COMPLETED");
 
   // 依大階段分組
   const phaseGroups: Record<MilestonePhaseDTO, MilestoneWithLight[]> = {
@@ -952,6 +992,30 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                             >
                               <Send className="w-3 h-3" /> 提交審核
+                            </button>
+                          )}
+
+                          {canRollback && !isProjectLost && lastCompletedMilestone?.id === m.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleRollback(m)}
+                              disabled={rollingBack}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 shadow-xs"
+                              title="將進度回退至此項目"
+                            >
+                              <RotateCcw className="w-3 h-3 text-amber-600" /> {rollingBack ? "回退中..." : "回退此進度"}
+                            </button>
+                          )}
+
+                          {canRollback && !isProjectLost && isActive && lastCompletedMilestone && (
+                            <button
+                              type="button"
+                              onClick={() => handleRollback(lastCompletedMilestone)}
+                              disabled={rollingBack}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 shadow-xs"
+                              title={`回退至上一個項目：${MILESTONE_STAGE_LABELS[lastCompletedMilestone.stageCode]}`}
+                            >
+                              <RotateCcw className="w-3 h-3 text-slate-500" /> {rollingBack ? "回退中..." : "回退上一步"}
                             </button>
                           )}
 

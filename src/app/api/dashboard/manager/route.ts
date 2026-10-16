@@ -26,13 +26,18 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const monthFilter = searchParams.get("month");
+    const startMonth = searchParams.get("startMonth");
+    const endMonth = searchParams.get("endMonth");
 
-    const [projects, milestonesByProject, latestQuotesByProject, assignedTasks] = await Promise.all([
+    const [projects, milestonesByProject, latestQuotesByProject, allAssignedTasks] = await Promise.all([
       DataService.getProjects(),
       DataService.getMilestonesByProjectIds(),
       DataService.getLatestQuotesByProjectIds(),
       DataService.getTasks({ assignedById: user.id }),
     ]);
+
+    // 正規項目完成推進產生的里程碑待辦（含 milestoneId）不列入主管「已指派任務」列表
+    const assignedTasks = allAssignedTasks.filter((task) => !task.milestoneId);
 
     // Helper to evaluate project delayed state
     const isProjectDelayed = (p: (typeof projects)[0]) => {
@@ -136,8 +141,8 @@ export async function GET(req: NextRequest) {
       PRODUCTION:  "生產施工期",
     };
 
-    // 依月份過濾（使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
-    const filteredProjects = monthFilter
+    // 依月份區間過濾（使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
+    const filteredProjects = (startMonth || endMonth || monthFilter)
       ? projects.filter((p) => {
           const milestones = milestonesByProject[p.id] || [];
           const activeMilestone = p.currentStage === "LOST"
@@ -145,7 +150,12 @@ export async function GET(req: NextRequest) {
             : milestones.find((m) => m.status === "IN_PROGRESS") ||
               milestones.find((m) => m.status === "OVERDUE");
           const dateToCheck = activeMilestone?.plannedDueDate || p.expectedDate || "";
-          return dateToCheck.startsWith(monthFilter);
+          const targetMonth = dateToCheck.slice(0, 7);
+          if (startMonth && targetMonth && targetMonth < startMonth) return false;
+          if (endMonth && targetMonth && targetMonth > endMonth) return false;
+          if ((startMonth || endMonth) && !targetMonth) return false;
+          if (monthFilter && !targetMonth.startsWith(monthFilter)) return false;
+          return true;
         })
       : projects;
 

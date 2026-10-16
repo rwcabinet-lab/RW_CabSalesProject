@@ -57,7 +57,9 @@ export default function SalesWorkbenchPage() {
   };
 
   // 篩選條件：預設排除已流標與已立帳 (進行中)
-  const [monthFilter, setMonthFilter] = useState("");
+  const [startMonth, setStartMonth] = useState("");
+  const [endMonth, setEndMonth] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("ACTIVE"); // 預設 ACTIVE 進行中 (排除 LOST / BILLED)
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
@@ -242,10 +244,14 @@ export default function SalesWorkbenchPage() {
     } else if (stageFilter) {
       if (p.currentStage !== stageFilter) match = false;
     }
-    if (monthFilter) {
-      const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
-      if (!dateToCheck.startsWith(monthFilter)) match = false;
-    }
+    const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
+    if (statusFilter && projectStatus !== statusFilter) match = false;
+
+    const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
+    const projectMonth = dateToCheck.slice(0, 7);
+    if (startMonth && projectMonth && projectMonth < startMonth) match = false;
+    if (endMonth && projectMonth && projectMonth > endMonth) match = false;
+    if ((startMonth || endMonth) && !projectMonth) match = false;
     return match;
   });
 
@@ -436,12 +442,29 @@ export default function SalesWorkbenchPage() {
         </div>
 
         <div className="bg-white p-4 border-b flex flex-wrap gap-4 bg-slate-50/50">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            <span>月份：</span>
+            <input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
+            <span className="text-slate-400">至</span>
+            <input type="month" value={endMonth} onChange={(e) => setEndMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
+            {(startMonth || endMonth) && (
+              <button type="button" onClick={() => { setStartMonth(""); setEndMonth(""); }} className="text-xs text-slate-400 hover:text-slate-600">✕ 清除</button>
+            )}
+          </div>
           <label className="flex items-center gap-2 text-sm font-semibold">
-            月份：<input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="border rounded px-2 py-1" />
+            狀態：
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+              <option value="">全部狀態</option>
+              <option value="RED">逾期</option>
+              <option value="YELLOW">即將到期</option>
+              <option value="GREEN">正常</option>
+              <option value="GRAY">未排定/已完成</option>
+              <option value="LOST">已流標</option>
+            </select>
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold">
             階段：
-            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
               <option value="ACTIVE">進行中案件 (預設，排除已流標/已立帳)</option>
               <option value="">全部案件</option>
               <option value="DEVELOP">第一階段：案件開發</option>

@@ -7,22 +7,139 @@
   --foreground: #0f172a;
 }
 
+/* ==========================================================================
+   主題色彩體系 (全站整體配色更換，而非僅更換背景)
+   ========================================================================== */
+
+/* 1. 翡翠森林綠 (Emerald) */
 body.theme-emerald,
 html.theme-emerald {
   --background: #f0fdf4;
 }
+.theme-emerald .bg-blue-600 { background-color: #059669 !important; }
+.theme-emerald .hover\:bg-blue-700:hover { background-color: #047857 !important; }
+.theme-emerald .text-blue-600,
+.theme-emerald .text-blue-700,
+.theme-emerald .text-blue-800 { color: #047857 !important; }
+.theme-emerald .bg-blue-50,
+.theme-emerald .bg-blue-100 { background-color: #ecfdf5 !important; color: #065f46 !important; }
+.theme-emerald .border-blue-200,
+.theme-emerald .border-blue-300,
+.theme-emerald .border-blue-600 { border-color: #10b981 !important; }
+.theme-emerald .ring-blue-500\/20 { --tw-ring-color: rgba(16, 185, 129, 0.25) !important; }
+.theme-emerald header { border-bottom-color: #d1fae5 !important; }
+
+/* 2. 溫潤暖木褐 (Amber / Warm Wood) */
 body.theme-amber,
 html.theme-amber {
-  --background: #fffbeb;
+  --background: #fefdf9;
 }
+.theme-amber .bg-blue-600 { background-color: #d97706 !important; }
+.theme-amber .hover\:bg-blue-700:hover { background-color: #b45309 !important; }
+.theme-amber .text-blue-600,
+.theme-amber .text-blue-700,
+.theme-amber .text-blue-800 { color: #b45309 !important; }
+.theme-amber .bg-blue-50,
+.theme-amber .bg-blue-100 { background-color: #fef3c7 !important; color: #78350f !important; }
+.theme-amber .border-blue-200,
+.theme-amber .border-blue-300,
+.theme-amber .border-blue-600 { border-color: #f59e0b !important; }
+.theme-amber .ring-blue-500\/20 { --tw-ring-color: rgba(245, 158, 11, 0.25) !important; }
+.theme-amber header { border-bottom-color: #fde68a !important; }
+
+/* 3. 專業極簡灰 (Slate / Neutral Steel) */
 body.theme-slate,
 html.theme-slate {
-  --background: #f1f5f9;
+  --background: #f8fafc;
 }
+.theme-slate .bg-blue-600 { background-color: #475569 !important; }
+.theme-slate .hover\:bg-blue-700:hover { background-color: #334155 !important; }
+.theme-slate .text-blue-600,
+.theme-slate .text-blue-700,
+.theme-slate .text-blue-800 { color: #1e293b !important; }
+.theme-slate .bg-blue-50,
+.theme-slate .bg-blue-100 { background-color: #f1f5f9 !important; color: #334155 !important; }
+.theme-slate .border-blue-200,
+.theme-slate .border-blue-300,
+.theme-slate .border-blue-600 { border-color: #64748b !important; }
+.theme-slate .ring-blue-500\/20 { --tw-ring-color: rgba(100, 116, 139, 0.25) !important; }
+.theme-slate header { border-bottom-color: #e2e8f0 !important; }
+
+/* 4. 夜間深色模式 (Dark Theme - 全站沉浸式深色) */
 body.theme-dark,
 html.theme-dark {
-  --background: #0f172a;
+  --background: #0b1120;
   --foreground: #f8fafc;
+  background-color: #0b1120 !important;
+  color: #f8fafc !important;
+}
+.theme-dark header {
+  background-color: #0f172a !important;
+  border-bottom-color: #1e293b !important;
+}
+.theme-dark .bg-white {
+  background-color: #151e32 !important;
+  color: #f8fafc !important;
+  border-color: #22304a !important;
+}
+.theme-dark .bg-slate-50,
+.theme-dark .bg-slate-100 {
+  background-color: #1a253c !important;
+  color: #f1f5f9 !important;
+}
+.theme-dark .bg-slate-50\/50,
+.theme-dark .bg-slate-50\/60,
+.theme-dark .bg-slate-50\/80 {
+  background-color: #1a253c !important;
+}
+.theme-dark .text-slate-900,
+.theme-dark .text-slate-800,
+.theme-dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+.theme-dark .text-slate-600,
+.theme-dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+.theme-dark .text-slate-400 {
+  color: #64748b !important;
+}
+.theme-dark .border,
+.theme-dark .border-b,
+.theme-dark .border-t,
+.theme-dark .border-slate-200,
+.theme-dark .border-slate-100 {
+  border-color: #22304a !important;
+}
+.theme-dark .divide-y > * + * {
+  border-color: #22304a !important;
+}
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  background-color: #0b1120 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+.theme-dark tr:hover,
+.theme-dark tr.hover\:bg-slate-50:hover {
+  background-color: #1c2944 !important;
+}
+.theme-dark thead.bg-slate-100,
+.theme-dark tr.bg-slate-50 {
+  background-color: #1a253c !important;
+  color: #94a3b8 !important;
+}
+.theme-dark .bg-blue-50,
+.theme-dark .bg-blue-100 {
+  background-color: #1e2d4d !important;
+  color: #93c5fd !important;
+  border-color: #1e3a8a !important;
+}
+.theme-dark .text-blue-600,
+.theme-dark .text-blue-700,
+.theme-dark .text-blue-800 {
+  color: #60a5fa !important;
 }
 body.density-compact,
 html.density-compact {

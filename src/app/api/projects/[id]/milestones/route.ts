@@ -191,8 +191,9 @@ export async function PUT(
     const targetMilestone = initialMilestones.find((item) => item.id === milestoneId);
 
     if (action === "rollback") {
-      if (!isManager) {
-        return NextResponse.json({ error: "僅主管可回退已完成的里程碑" }, { status: 403 });
+      const canRollback = isManager || user.id === project.salesRepId;
+      if (!canRollback) {
+        return NextResponse.json({ error: "僅主管或主責業務可回退已完成的進度" }, { status: 403 });
       }
       const milestones = await DataService.rollbackMilestone(projectId, milestoneId, initialMilestones);
       const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);

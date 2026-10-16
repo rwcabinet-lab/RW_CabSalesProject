@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const monthFilter = searchParams.get("month"); // 格式 "2026-09"
+    const startMonth = searchParams.get("startMonth");
+    const endMonth = searchParams.get("endMonth");
     const user = await getUserFromRequest(req);
     if (!user) {
       const hasCookie = Boolean(req.cookies.get("cab_sales_user_id")?.value);
@@ -56,13 +58,11 @@ export async function GET(req: NextRequest) {
               milestones.find((m) => m.status === "PENDING") ||
               milestones[milestones.length - 1];
 
-        // 月份篩選：若指定月份，比對 activeMilestone.plannedDueDate
-        if (monthFilter && activeMilestone?.plannedDueDate) {
-          const dueMonth = activeMilestone.plannedDueDate.slice(0, 7);
-          if (dueMonth !== monthFilter) return null;
-        } else if (monthFilter && !activeMilestone?.plannedDueDate) {
-          return null;
-        }
+        // 月份篩選：比對 activeMilestone.plannedDueDate
+        const dueMonth = activeMilestone?.plannedDueDate ? activeMilestone.plannedDueDate.slice(0, 7) : null;
+        if (startMonth && (!dueMonth || dueMonth < startMonth)) return null;
+        if (endMonth && (!dueMonth || dueMonth > endMonth)) return null;
+        if (monthFilter && dueMonth !== monthFilter) return null;
 
         const trafficLight = p.currentStage === "LOST"
           ? { color: "RED" as const, label: "流標", daysDiff: 0 }

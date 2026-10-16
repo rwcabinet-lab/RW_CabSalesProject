@@ -26,7 +26,8 @@ export const QUERY_KEYS = {
   customers: ["customers"] as const,
   columnConfig: ["projects", "columns-config"] as const,
   workbench: ["dashboard", "workbench"] as const,
-  managerDashboard: (month?: string) => ["dashboard", "manager", month || "all"] as const,
+  managerDashboard: (startMonth?: string, endMonth?: string) =>
+    ["dashboard", "manager", startMonth || "all", endMonth || "all"] as const,
   managerCustomerStats: ["dashboard", "manager", "customers"] as const,
   viewsData: ["views", "data"] as const,
 };
@@ -118,13 +119,17 @@ export function useWorkbenchQuery() {
 }
 
 /**
- * 主管監控室營運儀表板資料（依月份篩選，快取 30 秒）
+ * 主管監控室營運儀表板資料（依月份區間篩選，快取 30 秒）
  */
-export function useManagerDashboardQuery(monthFilter?: string) {
+export function useManagerDashboardQuery(startMonth?: string, endMonth?: string) {
   return useQuery({
-    queryKey: QUERY_KEYS.managerDashboard(monthFilter),
+    queryKey: QUERY_KEYS.managerDashboard(startMonth, endMonth),
     queryFn: async (): Promise<ManagerDashboardDTO> => {
-      const res = await fetch(`/api/dashboard/manager${monthFilter ? `?month=${monthFilter}` : ""}`);
+      const params = new URLSearchParams();
+      if (startMonth) params.set("startMonth", startMonth);
+      if (endMonth) params.set("endMonth", endMonth);
+      const queryStr = params.toString();
+      const res = await fetch(`/api/dashboard/manager${queryStr ? `?${queryStr}` : ""}`);
       const json = (await res.json()) as ApiResponse<ManagerDashboardDTO>;
       if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview) || !Array.isArray(json.assignedTasks)) {
         throw new Error(json.error || "無法取得主管看板資料");

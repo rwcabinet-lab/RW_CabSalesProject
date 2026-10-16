@@ -23,7 +23,8 @@ export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
 
   // 過濾條件：預設排除已流標與已立帳 (進行中)
-  const [monthFilter, setMonthFilter] = useState("");
+  const [startMonth, setStartMonth] = useState("");
+  const [endMonth, setEndMonth] = useState("");
   const [stageFilter, setStageFilter] = useState("ACTIVE");
   const [businessFilter, setBusinessFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -35,7 +36,7 @@ export default function ManagerDashboardPage() {
     data: dashboardData,
     isLoading: dashboardLoading,
     error: dashboardError,
-  } = useManagerDashboardQuery(monthFilter);
+  } = useManagerDashboardQuery(startMonth, endMonth);
   const { data: users = [] } = useUsersQuery();
   const { data: sessionUser } = useSessionQuery();
   const { data: columnsData = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
@@ -179,6 +180,10 @@ export default function ManagerDashboardPage() {
     if (businessFilter && p.salesRepName !== businessFilter) return false;
     const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
     if (statusFilter && projectStatus !== statusFilter) return false;
+    const projectMonth = (p.expectedDate || "").slice(0, 7);
+    if (startMonth && projectMonth && projectMonth < startMonth) return false;
+    if (endMonth && projectMonth && projectMonth > endMonth) return false;
+    if ((startMonth || endMonth) && !projectMonth) return false;
     return true;
   });
 
@@ -295,18 +300,28 @@ export default function ManagerDashboardPage() {
       {/* 圖表區塊 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h3 className="text-base font-bold flex items-center gap-2 mb-6">
-            <Users className="w-5 h-5 text-blue-600" />
-            人員案場負載與異常分佈
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-600" />
+              人員案場負載與異常分佈
+            </h3>
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-blue-400 inline-block"></span> 藍外柱：總案場數
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-3.5 rounded bg-red-500 inline-block"></span> 紅內柱：延誤案場數
+              </span>
+            </div>
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barGap="-100%">
                 <XAxis dataKey="salesRepName" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                <Bar dataKey="totalProjects" name="總案場數" fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
-                <Bar dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
+                <Bar dataKey="totalProjects" name="總案場數" fill="#60a5fa" radius={[4, 4, 0, 0]} barSize={32} />
+                <Bar dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -339,9 +354,15 @@ export default function ManagerDashboardPage() {
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 所有案件狀態總覽</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
-            <label className="flex items-center gap-2">
-              月份：<input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="border rounded px-2 py-1" />
-            </label>
+            <div className="flex items-center gap-1.5">
+              <span>月份：</span>
+              <input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
+              <span className="text-slate-400">至</span>
+              <input type="month" value={endMonth} onChange={(e) => setEndMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
+              {(startMonth || endMonth) && (
+                <button type="button" onClick={() => { setStartMonth(""); setEndMonth(""); }} className="text-xs text-slate-400 hover:text-slate-600">✕ 清除</button>
+              )}
+            </div>
             <label className="flex items-center gap-2">
               狀態：
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
