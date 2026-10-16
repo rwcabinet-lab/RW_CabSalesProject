@@ -204,6 +204,43 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     fetchData();
   }, [projectId]);
 
+  const applyMilestonesData = (data: { project?: ProjectDTO; milestones?: MilestoneWithLight[] }) => {
+    if (data.project) {
+      setProject(data.project);
+      const msList = Array.isArray(data.milestones) ? data.milestones : [];
+      const activeMs = msList.find((m) => m.status === "IN_PROGRESS" || m.status === "OVERDUE");
+      if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
+        setActivePhase("EXTRA");
+      } else if (activeMs && STAGE_CODE_TO_PHASE[activeMs.stageCode]) {
+        setActivePhase(STAGE_CODE_TO_PHASE[activeMs.stageCode]);
+      } else if (PHASE_ORDER.includes(data.project.currentStage as MilestonePhaseDTO)) {
+        setActivePhase(data.project.currentStage as MilestonePhaseDTO);
+      } else {
+        setActivePhase("DEVELOP");
+      }
+    }
+    setMilestones(Array.isArray(data.milestones) ? data.milestones : []);
+  };
+
+  const refreshMilestonesOnly = async () => {
+    try {
+      const [milestonesRes, tasksRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" }),
+        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" }),
+      ]);
+      if (milestonesRes.ok) {
+        const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
+        applyMilestonesData(data);
+      }
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
+        if (Array.isArray(tasksData)) setTasks(tasksData);
+      }
+    } catch (err) {
+      console.error("更新里程碑資料失敗:", err);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -235,22 +272,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
       if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
 
-      if (data.project) {
-        setProject(data.project);
-        const msList = Array.isArray(data.milestones) ? data.milestones : [];
-        const activeMs = msList.find((m) => m.status === "IN_PROGRESS" || m.status === "OVERDUE");
-        if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
-          setActivePhase("EXTRA");
-        } else if (activeMs && STAGE_CODE_TO_PHASE[activeMs.stageCode]) {
-          setActivePhase(STAGE_CODE_TO_PHASE[activeMs.stageCode]);
-        } else if (PHASE_ORDER.includes(data.project.currentStage as MilestonePhaseDTO)) {
-          setActivePhase(data.project.currentStage as MilestonePhaseDTO);
-        } else {
-          setActivePhase("DEVELOP");
-        }
-      }
-
-      setMilestones(Array.isArray(data.milestones) ? data.milestones : []);
+      applyMilestonesData(data);
 
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
@@ -318,7 +340,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setNewRecordForm(null);
       // 若有填寫實際完成日，重新整理里程碑列表
       if (newRecordForm.actualDueDate) {
-        await fetchData();
+        await refreshMilestonesOnly();
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "新增失敗");
@@ -375,11 +397,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "更新順序失敗");
-      await fetchData();
+      if (result.project && result.milestones) {
+        applyMilestonesData(result);
+      } else {
+        await refreshMilestonesOnly();
+      }
     } catch (error) {
       console.error("更新順序失敗", error);
       alert(error instanceof Error ? error.message : "更新順序失敗");
-      await fetchData();
+      await refreshMilestonesOnly();
     }
   };
 
@@ -399,7 +425,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (!response.ok) throw new Error(result.error || "提交審核失敗");
       alert(`已將【${MILESTONE_STAGE_LABELS[milestone.stageCode]}】提交審核，待辦已發送給主責人員。`);
       setSubmitAuditModal(null);
-      await fetchData();
+      await refreshMilestonesOnly();
     } catch (err) {
       alert(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
@@ -426,7 +452,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "推進失敗");
       setCompletionModal(null);
-      await fetchData();
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+        // 背景非同步更新未完成任務，不卡住 UI
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => tRes.ok ? tRes.json() : null)
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "完成推進失敗");
     } finally {
@@ -455,7 +490,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存失敗");
       setEditingId(null);
-      await fetchData();
+      await refreshMilestonesOnly();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -481,7 +516,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (!res.ok) throw new Error(data.error || "推進至額外階段失敗");
       setSpecialAdvanceModal(null);
       setActivePhase("EXTRA");
-      await fetchData();
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+      } else {
+        await refreshMilestonesOnly();
+      }
     } catch (err) {
       setSpecialAdvanceError(err instanceof Error ? err.message : "操作失敗");
     } finally {
