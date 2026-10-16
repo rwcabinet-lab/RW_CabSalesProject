@@ -387,7 +387,7 @@ export default function CustomerStatsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-900 tabular-nums">
-                    {c.totalQuoteAmount > 0 ? `NT$ ${c.totalQuoteAmount.toLocaleString()}` : "-"}
+                    {c.totalQuoteAmount > 0 ? formatTenThousands(c.totalQuoteAmount) : "-"}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500">
                     {c.latestProjectName ? (
