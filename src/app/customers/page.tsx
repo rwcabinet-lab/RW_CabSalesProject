@@ -55,6 +55,13 @@ export default function CustomersPage() {
       });
       const result = await res.json() as ApiResponse<CustomerDTO>;
       if (res.ok) {
+        if (result && "id" in result) {
+          queryClient.setQueryData<CustomerDTO[]>(QUERY_KEYS.customers, (old = []) =>
+            editingCustomerId
+              ? old.map((item) => (item.id === editingCustomerId ? result : item))
+              : [result, ...old]
+          );
+        }
         setShowModal(false);
         setFormData({
           name: "",
@@ -67,8 +74,8 @@ export default function CustomersPage() {
           salesRepId: salesReps[0]?.id || "",
         });
         setEditingCustomerId(null);
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
       } else {
         setSubmitError(result.error || "新增客戶失敗，請確認資料後重試。");
       }
@@ -111,8 +118,11 @@ export default function CustomersPage() {
         window.alert(result.error || "刪除客戶失敗");
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
+      queryClient.setQueryData<CustomerDTO[]>(QUERY_KEYS.customers, (old = []) =>
+        old.filter((item) => item.id !== customer.id)
+      );
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
     } catch (err) {
       console.error("Failed to delete customer:", err);
       window.alert("刪除客戶時發生錯誤，請稍後重試");

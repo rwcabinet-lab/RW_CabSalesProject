@@ -40,7 +40,7 @@ export default function VisualViewsPage() {
         setProjects((prev) =>
           prev.map((p) => (p.id === projectId ? { ...p, currentStage: newStage } : p))
         );
-        await Promise.all([
+        void Promise.all([
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData }),
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench }),
           queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] }),

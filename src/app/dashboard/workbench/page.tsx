@@ -119,7 +119,7 @@ export default function SalesWorkbenchPage() {
 
       setTaskToComplete(null);
       setCompletionNotes("");
-      await invalidateWorkbench();
+      void invalidateWorkbench();
     } catch (err) {
       console.error("Failed to complete task:", err);
       setTasks((current) => current.map((task) =>
@@ -148,9 +148,13 @@ export default function SalesWorkbenchPage() {
         }),
       });
       if (res.ok) {
+        const createdTask = await res.json() as TaskDTO;
+        if (createdTask && createdTask.id) {
+          setTasks((current) => [createdTask, ...current]);
+        }
         setShowTaskModal(false);
         setNewTaskData({ projectId: "", subject: "", taskType: "SITE_VISIT", dueDatetime: getDefaultTaskDueDatetime(), priority: "HIGH" });
-        await invalidateWorkbench();
+        void invalidateWorkbench();
       }
     } finally { setCreatingTask(false); }
   };
@@ -166,14 +170,40 @@ export default function SalesWorkbenchPage() {
         cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
         quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
       };
-      await fetch("/api/projects", {
+      const res = await fetch("/api/projects", {
         method: editingProjectId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingProjectId ? { id: editingProjectId, ...payload } : payload),
       });
+      if (res.ok) {
+        const result = await res.json();
+        const savedProject = result?.project;
+        if (savedProject && editingProjectId) {
+          setProjects((current) =>
+            current.map((p) =>
+              p.id === editingProjectId
+                ? {
+                    ...p,
+                    projectName: savedProject.projectName ?? p.projectName,
+                    customerId: savedProject.customerId ?? p.customerId,
+                    customerName: savedProject.customerName ?? p.customerName,
+                    customerType: savedProject.customerType ?? p.customerType,
+                    defaultDiscount: savedProject.defaultDiscount ?? p.defaultDiscount,
+                    siteAddress: savedProject.siteAddress ?? p.siteAddress,
+                    siteCondition: savedProject.siteCondition ?? p.siteCondition,
+                    expectedDate: savedProject.expectedDate ?? p.expectedDate,
+                    unitCount: savedProject.unitCount ?? p.unitCount,
+                    cost: savedProject.cost ?? p.cost,
+                    quoteAmount: savedProject.quoteAmount ?? p.quoteAmount,
+                  }
+                : p
+            )
+          );
+        }
+      }
       setIsProjectPanelOpen(false);
       setEditingProjectId(null);
-      await invalidateWorkbench();
+      void invalidateWorkbench();
     } finally { setSavingProject(false); }
   };
 
@@ -278,7 +308,8 @@ export default function SalesWorkbenchPage() {
         window.alert(result.error || "刪除待辦失敗");
         return;
       }
-      await invalidateWorkbench();
+      setTasks((current) => current.filter((item) => item.id !== task.id));
+      void invalidateWorkbench();
     } catch (err) {
       console.error("Failed to delete task:", err);
       window.alert("刪除待辦時發生錯誤，請稍後重試");
@@ -298,7 +329,8 @@ export default function SalesWorkbenchPage() {
         window.alert(result.error || "刪除案件失敗");
         return;
       }
-      await invalidateWorkbench();
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      void invalidateWorkbench();
     } catch (err) {
       console.error("Failed to delete project:", err);
       window.alert("刪除案件時發生錯誤，請稍後重試");

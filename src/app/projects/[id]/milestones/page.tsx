@@ -195,7 +195,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存案場資料失敗");
       setProjectEditOpen(false);
-      await fetchData();
+      if (data.project) {
+        setProject(data.project);
+        setProjects((prev) => prev.map((item) => (item.id === data.project.id ? data.project : item)));
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
     } catch (err) {
       setProjectEditError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -249,13 +257,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoading(true);
       setLoadError("");
 
-      const [milestonesRes, usersRes, sessionRes, projectsRes, tasksRes, completedTasksRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" }),
-        fetch("/api/auth/users"),
-        fetch("/api/auth/session", { cache: "no-store" }),
-        fetch("/api/projects", { cache: "no-store" }),
-        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" }),
-        fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`, { cache: "no-store" }),
+      const milestonesPromise = fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" });
+      const usersPromise = fetch("/api/auth/users");
+      const sessionPromise = fetch("/api/auth/session", { cache: "no-store" });
+      const projectsPromise = fetch("/api/projects", { cache: "no-store" });
+      const tasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" });
+      const completedTasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`, { cache: "no-store" });
+
+      const [milestonesRes, usersRes, sessionRes] = await Promise.all([
+        milestonesPromise,
+        usersPromise,
+        sessionPromise,
       ]);
 
       if (usersRes.ok) {
@@ -267,30 +279,36 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         setCurrentUserId(s.user?.id || "");
         setCanManageMilestones(["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(s.user?.role));
       }
-      if (projectsRes.ok) {
-        const p = await projectsRes.json();
-        if (Array.isArray(p)) setProjects(p);
-      }
 
       const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
       if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
 
       applyMilestonesData(data);
+      setLoading(false);
 
-      if (tasksRes.ok) {
-        const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
-        if (Array.isArray(tasksData)) setTasks(tasksData);
-      }
-      if (completedTasksRes.ok) {
-        const completedTasksData = await completedTasksRes.json() as ApiResponse<TaskDTO[]>;
-        if (Array.isArray(completedTasksData)) {
-          setCompletedTasks(completedTasksData.filter((task) => !task.milestoneId));
-        }
-      }
+      void Promise.all([projectsPromise, tasksPromise, completedTasksPromise])
+        .then(async ([projectsRes, tasksRes, completedTasksRes]) => {
+          if (projectsRes.ok) {
+            const p = await projectsRes.json();
+            if (Array.isArray(p)) setProjects(p);
+          }
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
+            if (Array.isArray(tasksData)) setTasks(tasksData);
+          }
+          if (completedTasksRes.ok) {
+            const completedTasksData = await completedTasksRes.json() as ApiResponse<TaskDTO[]>;
+            if (Array.isArray(completedTasksData)) {
+              setCompletedTasks(completedTasksData.filter((task) => !task.milestoneId));
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("載入附屬資料失敗:", err);
+        });
     } catch (err) {
       console.error(err);
       setLoadError(err instanceof Error ? err.message : "載入失敗");
-    } finally {
       setLoading(false);
     }
   };
@@ -336,14 +354,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
       // 更新前端記錄
       const mid = newRecordForm.milestoneId;
+      const hadActualDueDate = Boolean(newRecordForm.actualDueDate);
       setRecordsMap((prev) => ({
         ...prev,
         [mid]: [...(prev[mid] || []), json.record],
       }));
       setNewRecordForm(null);
-      // 若有填寫實際完成日，重新整理里程碑列表
-      if (newRecordForm.actualDueDate) {
-        await refreshMilestonesOnly();
+      // 若有填寫實際完成日，背景更新里程碑列表
+      if (hadActualDueDate) {
+        void refreshMilestonesOnly();
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "新增失敗");

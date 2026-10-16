@@ -7,13 +7,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const projectId = params.id;
-  const project = await DataService.getProjectById(projectId);
+  const [project, versions] = await Promise.all([
+    DataService.getProjectById(projectId, { evaluateSchedule: false }),
+    DataService.getQuotesByProjectId(projectId),
+  ]);
 
   if (!project) {
     return NextResponse.json({ error: "找不到此案件" }, { status: 404 });
   }
 
-  const versions = await DataService.getQuotesByProjectId(projectId);
   const latest = versions[0] ?? null; // 已是倒序，第一筆即最新版
 
   return NextResponse.json({
@@ -29,7 +31,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const projectId = params.id;
-  const project = await DataService.getProjectById(projectId);
+  const project = await DataService.getProjectById(projectId, { evaluateSchedule: false });
 
   if (!project) {
     return NextResponse.json({ error: "找不到此案件" }, { status: 404 });

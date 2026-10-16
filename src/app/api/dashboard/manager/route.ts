@@ -27,11 +27,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const monthFilter = searchParams.get("month");
 
-    const projects = await DataService.getProjects();
-    const projectIds = projects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject, assignedTasks] = await Promise.all([
-      DataService.getMilestonesByProjectIds(projectIds),
-      DataService.getLatestQuotesByProjectIds(projectIds),
+    const [projects, milestonesByProject, latestQuotesByProject, assignedTasks] = await Promise.all([
+      DataService.getProjects(),
+      DataService.getMilestonesByProjectIds(),
+      DataService.getLatestQuotesByProjectIds(),
       DataService.getTasks({ assignedById: user.id }),
     ]);
 

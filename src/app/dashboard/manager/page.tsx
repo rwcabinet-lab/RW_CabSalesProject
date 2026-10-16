@@ -86,7 +86,7 @@ export default function ManagerDashboardPage() {
         ...current,
         assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
       } : current);
-      await invalidateManager();
+      void invalidateManager();
     } catch (err) {
       console.error("Failed to delete assigned task:", err);
       window.alert("刪除任務時發生錯誤，請稍後重試");
@@ -104,9 +104,18 @@ export default function ManagerDashboardPage() {
       });
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) throw new Error(result.error || "刪除案件失敗");
-      await invalidateManager();
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              allProjectsOverview: current.allProjectsOverview.filter((item) => item.id !== project.id),
+              alertList: current.alertList.filter((item) => item.id !== project.id),
+            }
+          : current
+      );
+      void invalidateManager();
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
     } catch (error) {
       console.error("Failed to delete project:", error);
       window.alert(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
@@ -119,11 +128,12 @@ export default function ManagerDashboardPage() {
     e.preventDefault();
     setAssigning(true);
     try {
+      const isEditingTask = Boolean(assignModal.taskId);
       const res = await fetch("/api/dashboard/manager", {
-        method: assignModal.taskId ? "PATCH" : "POST",
+        method: isEditingTask ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(assignModal.taskId ? { taskId: assignModal.taskId } : { projectId: assignModal.projectId }),
+          ...(isEditingTask ? { taskId: assignModal.taskId } : { projectId: assignModal.projectId }),
           assignedToId: assignModal.userId,
           subject: assignModal.subject,
           priority: assignModal.priority,
@@ -132,9 +142,21 @@ export default function ManagerDashboardPage() {
       });
       const result = await res.json() as ApiResponse<{ task: TaskDTO }>;
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
+      if (result.task) {
+        setData((current) =>
+          current
+            ? {
+                ...current,
+                assignedTasks: isEditingTask
+                  ? current.assignedTasks.map((t) => (t.id === result.task.id ? result.task : t))
+                  : [result.task, ...current.assignedTasks],
+              }
+            : current
+        );
+      }
       setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
-      await invalidateManager();
-      alert(assignModal.taskId ? "任務已更新！" : "指派成功！");
+      void invalidateManager();
+      alert(isEditingTask ? "任務已更新！" : "指派成功！");
     } catch (err) {
       alert(err instanceof Error ? err.message : "指派任務失敗");
     } finally {

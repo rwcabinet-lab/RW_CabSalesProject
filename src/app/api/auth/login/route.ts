@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DataService } from "@/lib/data-service";
-import { cacheUserAccessProfile, getRolePages } from "@/lib/access-control";
+import { loadUserAccessProfile } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
 
 const LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
@@ -12,22 +11,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "使用者或密碼不正確" }, { status: 401 });
     }
 
-    const user = await DataService.getUserById(userId);
-    if (!user) {
+    const profile = await loadUserAccessProfile(userId);
+    if (!profile || profile.email.startsWith("preview-")) {
       return NextResponse.json({ error: "找不到此使用者" }, { status: 404 });
     }
 
-    const accessiblePages = await getRolePages(user.role);
-    cacheUserAccessProfile(user.id, {
-      role: user.role,
-      email: user.email,
-      pages: accessiblePages,
-    });
     const response = NextResponse.json({
-      user: { id: user.id, name: user.name, role: user.role },
-      redirectTo: getRoleLandingPath(user.role, accessiblePages),
+      user: { id: profile.id || userId, name: profile.name || "", role: profile.role },
+      redirectTo: getRoleLandingPath(profile.role, profile.pages),
     });
-    response.cookies.set("cab_sales_user_id", user.id, {
+    response.cookies.set("cab_sales_user_id", profile.id || userId, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

@@ -26,14 +26,12 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
-    const [projectRecord, rawInitialMilestones] = await Promise.all([
-      DataService.getProjectById(projectId, { evaluateSchedule: false }),
-      DataService.getMilestonesByProjectId(projectId),
-    ]);
-    if (!projectRecord) {
+    const combined = await DataService.getProjectWithMilestones(projectId);
+    if (!combined) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
-    let initialMilestones = rawInitialMilestones;
+    const { project: projectRecord } = combined;
+    let initialMilestones = combined.milestones;
     if (projectRecord.currentStage !== "LOST") {
       const existingCodes = new Set(initialMilestones.map((m) => m.stageCode));
       const hasMissing = STANDARD_MILESTONE_STAGE_CODES.some((code) => !existingCodes.has(code));
@@ -42,7 +40,10 @@ export async function GET(
         initialMilestones = await DataService.getMilestonesByProjectId(projectId);
       }
     }
-    const milestones = projectRecord.currentStage === "WRAP_UP"
+    const hasLegacyWrapUp =
+      projectRecord.currentStage === "WRAP_UP" &&
+      initialMilestones.some((m) => m.stageCode === "X-1" && m.status === "COMPLETED" && !m.plannedDueDate);
+    const milestones = hasLegacyWrapUp
       ? await DataService.activateLegacyWrapUpMilestone(projectId)
       : initialMilestones;
     const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
@@ -67,17 +68,17 @@ export async function PUT(
     const body = await req.json();
     const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted } = body;
 
-    const [user, project, initialMilestones] = await Promise.all([
+    const [user, combined] = await Promise.all([
       getUserFromRequest(req),
-      DataService.getProjectById(projectId, { evaluateSchedule: false }),
-      DataService.getMilestonesByProjectId(projectId),
+      DataService.getProjectWithMilestones(projectId),
     ]);
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
-    if (!project) {
+    if (!combined) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
+    const { project, milestones: initialMilestones } = combined;
     if (project.currentStage === "LOST") {
       return NextResponse.json({ error: "此案件已流標，階段項目不可編輯或推進" }, { status: 409 });
     }
@@ -106,8 +107,16 @@ export async function PUT(
         user.id,
         project.salesRepId,
         notes,
+        initialMilestones,
       );
-      return NextResponse.json({ success: true });
+      const updatedMilestones = initialMilestones.map((m) =>
+        m.id === milestoneId ? { ...m, auditSubmitted: true } : m
+      );
+      return NextResponse.json({
+        success: true,
+        project,
+        milestones: attachTrafficLights(updatedMilestones),
+      });
     }
 
     if (action === "returnToProduction") {
@@ -139,9 +148,15 @@ export async function PUT(
         return NextResponse.json({ error: "請填寫推進原因" }, { status: 400 });
       }
 
-      const milestones = await DataService.advanceProjectToSpecialStage(projectId, stageCode, reason.trim());
-      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
       const nextStageCode: "X-1" | "X-2" = stageCode;
+      const milestones = await DataService.advanceProjectToSpecialStage(
+        projectId,
+        nextStageCode,
+        reason.trim(),
+        project,
+        initialMilestones,
+      );
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
       const updatedProject = {
         ...project,
         currentStage: STAGE_CODE_TO_PROJECT_STAGE[nextStageCode] || project.currentStage,
@@ -215,7 +230,8 @@ export async function PUT(
         milestoneId,
         isCompleted,
         isCompleted ? actualDueDate || new Date().toISOString().slice(0, 10) : "",
-        typeof notes === "string" ? notes : undefined
+        typeof notes === "string" ? notes : undefined,
+        initialMilestones,
       );
       const firstIncomplete = milestones.find((m) => m.status !== "COMPLETED");
       const currentStage = firstIncomplete
@@ -274,10 +290,16 @@ export async function PUT(
           return NextResponse.json({ error: "收尾階段僅可完成收尾項目" }, { status: 409 });
         }
 
-        const milestones = await DataService.completeWrapUpMilestone(projectId, milestoneId, {
-          notes: typeof notes === "string" ? notes : undefined,
-          completedDate: actualDueDate || new Date().toISOString().slice(0, 10),
-        });
+        const milestones = await DataService.completeWrapUpMilestone(
+          projectId,
+          milestoneId,
+          {
+            notes: typeof notes === "string" ? notes : undefined,
+            completedDate: actualDueDate || new Date().toISOString().slice(0, 10),
+          },
+          project,
+          initialMilestones,
+        );
         const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
         const updatedProject = { ...project, isDelayed };
         return NextResponse.json({
@@ -333,7 +355,16 @@ export async function PUT(
         updates.notes = updates.notes.trim();
       }
     }
-    const updated = await DataService.updateMilestone(projectId, milestoneId, updates || {});
+    const updated = await DataService.updateMilestone(
+      projectId,
+      milestoneId,
+      updates || {},
+      initialMilestones,
+      {
+        id: project.customerSalesRepId || project.salesRepId,
+        name: project.customerSalesRepName || project.salesRepName,
+      },
+    );
     const updatedMilestones = initialMilestones.map((m) => (m.id === milestoneId && updated ? updated : m));
     const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
     const updatedProject = { ...project, isDelayed };

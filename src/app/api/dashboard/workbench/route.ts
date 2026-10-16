@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
+import { getUserFromRequest } from "@/lib/access-control";
 
 export const dynamic = "force-dynamic";
 
@@ -9,40 +10,40 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const requestedUserId = req.cookies.get("cab_sales_user_id")?.value;
     const monthFilter = searchParams.get("month"); // 格式 "2026-09"
-    if (!requestedUserId) {
-      return NextResponse.json({ error: "請先登入" }, { status: 401 });
-    }
-
-    const user = await DataService.getUserById(requestedUserId);
+    const user = await getUserFromRequest(req);
     if (!user) {
-      return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
+      const hasCookie = Boolean(req.cookies.get("cab_sales_user_id")?.value);
+      return NextResponse.json(
+        { error: hasCookie ? "登入已失效，請重新登入" : "請先登入" },
+        { status: 401 }
+      );
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
-    const myProjects = await DataService.getProjects({
-      where: {
-        OR: [
-          { salesRepId: currentUser.id },
-          { salesAssistantId: currentUser.id },
-          { customer: { salesRepId: currentUser.id } },
-          { milestones: { some: { assignedToId: currentUser.id } } },
-          { tasks: { some: { assignedToId: currentUser.id } } },
-        ],
-      },
-    });
-
-    const projectIds = myProjects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject, tasks] = await Promise.all([
-      DataService.getMilestonesByProjectIds(projectIds),
-      DataService.getLatestQuotesByProjectIds(projectIds),
+    const [myProjects, tasks] = await Promise.all([
+      DataService.getProjects({
+        where: {
+          OR: [
+            { salesRepId: currentUser.id },
+            { salesAssistantId: currentUser.id },
+            { customer: { salesRepId: currentUser.id } },
+            { milestones: { some: { assignedToId: currentUser.id } } },
+            { tasks: { some: { assignedToId: currentUser.id } } },
+          ],
+        },
+      }),
       DataService.getTasks({ assignedToId: currentUser.id }),
     ]);
 
+    const projectIds = myProjects.map((p) => p.id);
+    const [milestonesByProject, latestQuotesByProject] = await Promise.all([
+      DataService.getMilestonesByProjectIds(projectIds),
+      DataService.getLatestQuotesByProjectIds(projectIds),
+    ]);
+
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
-    const projectsWithDetails = await Promise.all(
-      myProjects.map(async (p) => {
+    const projectsWithDetails = myProjects.map((p) => {
         const milestones = milestonesByProject[p.id] || [];
 
         const specialStageCode = p.currentStage === "WRAP_UP" ? "X-1" : null;
@@ -100,8 +101,7 @@ export async function GET(req: NextRequest) {
             : null,
           trafficLight,
         };
-      })
-    );
+      });
 
     const filteredProjects = projectsWithDetails.filter(Boolean);
 
