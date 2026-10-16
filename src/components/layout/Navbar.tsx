@@ -36,14 +36,20 @@ export function Navbar() {
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-sm no-print">
       <div className="max-w-7xl mx-auto flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white shadow-md">
-            <HardHat className="w-5 h-5" />
-          </div>
-          <Link href="/" className="font-black text-base text-slate-900 tracking-tight flex items-center gap-2">
-            系統櫃工廠
-            <span className="text-[11px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-medium">
-              業務時程追蹤系統
-            </span>
+          <Link href="/" className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="正道工業系統櫃事業部"
+              className="w-9 h-9 object-contain rounded-md"
+            />
+            <div className="flex flex-col">
+              <span className="font-black text-sm sm:text-base text-slate-900 tracking-tight leading-tight">
+                正道工業系統櫃事業部
+              </span>
+              <span className="text-[11px] text-blue-700 font-semibold tracking-wide leading-none mt-0.5">
+                業務時程追蹤系統
+              </span>
+            </div>
           </Link>
         </div>
 

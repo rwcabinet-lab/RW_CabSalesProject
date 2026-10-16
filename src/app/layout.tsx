@@ -4,8 +4,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "系統櫃工廠前段業務報價與案件時程追蹤系統",
-  description: "Cabinet Factory Sales & Project Tracking System (Next.js + Prisma)",
+  title: "正道工業系統櫃事業部 - 業務時程追蹤系統",
+  description: "正道工業系統櫃事業部 業務時程追蹤系統 (Next.js + Prisma)",
 };
 
 export default function RootLayout({

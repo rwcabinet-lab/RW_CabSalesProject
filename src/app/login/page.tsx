@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Building2, KeyRound, LogIn } from "lucide-react";
+import { KeyRound, LogIn } from "lucide-react";
 import type { ApiResponse, UserDTO } from "@/types/dto";
 
 type LoginUser = UserDTO;
@@ -55,10 +55,10 @@ export default function LoginPage() {
     <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
       <section className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div className="bg-slate-900 px-8 py-8 text-white">
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
-            <Building2 className="h-6 w-6" />
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-white p-1.5 shadow-md">
+            <img src="/logo.png" alt="正道工業系統櫃事業部" className="h-full w-full object-contain" />
           </div>
-          <p className="text-xs font-semibold uppercase text-blue-300">Cabinet Factory</p>
+          <p className="text-xs font-semibold text-blue-300 tracking-wider">正道工業系統櫃事業部</p>
           <h1 className="mt-1 text-2xl font-bold">業務時程追蹤系統</h1>
           <p className="mt-2 text-sm text-slate-300">登入以繼續使用工作台</p>
         </div>
