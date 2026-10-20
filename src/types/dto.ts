@@ -79,6 +79,7 @@ export interface CustomerStatItemDTO {
   closedProjects: number;
   lostProjects: number;
   totalQuoteAmount: number;
+  totalSignedAmount: number;
   latestProjectName: string;
   latestProjectStage: string;
 }
@@ -88,6 +89,7 @@ export interface CustomerStatsDashboardDTO {
     totalCustomers: number;
     activeCustomerCount: number;
     totalQuoteSum: number;
+    totalSignedSum: number;
   };
   customerTypeDistribution: Array<{
     type: string;

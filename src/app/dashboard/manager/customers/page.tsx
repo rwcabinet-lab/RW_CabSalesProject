@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown } from "lucide-react";
+import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2 } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
@@ -39,7 +39,7 @@ export default function CustomerStatsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [salesFilter, setSalesFilter] = useState("");
-  const [sortBy, setSortBy] = useState<"projects" | "amount" | "name">("projects");
+  const [sortBy, setSortBy] = useState<"projects" | "amount" | "signedAmount" | "name">("projects");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const salesOptions = useMemo(() => {
@@ -68,6 +68,8 @@ export default function CustomerStatsPage() {
       let comparison = 0;
       if (sortBy === "projects") {
         comparison = a.totalProjects - b.totalProjects;
+      } else if (sortBy === "signedAmount") {
+        comparison = (a.totalSignedAmount || 0) - (b.totalSignedAmount || 0);
       } else if (sortBy === "amount") {
         comparison = a.totalQuoteAmount - b.totalQuoteAmount;
       } else {
@@ -81,7 +83,7 @@ export default function CustomerStatsPage() {
     return sortedCustomers.reduce((sum, c) => sum + c.totalQuoteAmount, 0);
   }, [sortedCustomers]);
 
-  const toggleSort = (field: "projects" | "amount" | "name") => {
+  const toggleSort = (field: "projects" | "amount" | "signedAmount" | "name") => {
     if (sortBy === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -134,7 +136,7 @@ export default function CustomerStatsPage() {
       </div>
 
       {/* KPI 卡片 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border shadow-sm">
           <div className="text-slate-500 text-xs font-bold mb-1 flex items-center gap-1.5">
             <Users className="w-4 h-4 text-blue-500" />
@@ -145,14 +147,24 @@ export default function CustomerStatsPage() {
 
         <div className="bg-white p-5 rounded-2xl border shadow-sm">
           <div className="text-slate-500 text-xs font-bold mb-1 flex items-center gap-1.5">
-            <Building2 className="w-4 h-4 text-emerald-500" />
+            <Building2 className="w-4 h-4 text-blue-600" />
             合作進行中客戶
           </div>
-          <div className="text-3xl font-black text-emerald-600">
+          <div className="text-3xl font-black text-blue-600">
             {data.kpi.activeCustomerCount}
             <span className="text-xs text-slate-400 font-normal ml-2">
               (佔比 {Math.round((data.kpi.activeCustomerCount / (data.kpi.totalCustomers || 1)) * 100)}%)
             </span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border shadow-sm">
+          <div className="text-slate-500 text-xs font-bold mb-1 flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            累計成交總額
+          </div>
+          <div className="text-3xl font-black text-emerald-600 tabular-nums">
+            {formatTenThousands(data.kpi.totalSignedSum || 0)}
           </div>
         </div>
 
@@ -293,8 +305,20 @@ export default function CustomerStatsPage() {
                   className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition-colors"
                   onClick={() => toggleSort("projects")}
                 >
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-1">
+                      案場統計
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-400">總數(進度/結案/流標)</span>
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => toggleSort("signedAmount")}
+                >
                   <div className="flex items-center justify-end gap-1">
-                    案場統計 (總/進/結/流)
+                    累計成交總額
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </div>
                 </th>
@@ -332,13 +356,16 @@ export default function CustomerStatsPage() {
                   </td>
                   <td className="px-4 py-4 text-right font-semibold">
                     <span className="text-slate-900">{c.totalProjects}</span>
-                    <span className="text-xs text-slate-400 ml-1">
+                    <span className="text-xs text-slate-400 block sm:inline sm:ml-1">
                       (
                       <span className="text-blue-600">{c.activeProjects}</span>/
                       <span className="text-emerald-600">{c.closedProjects}</span>/
                       <span className="text-red-500">{c.lostProjects}</span>
                       )
                     </span>
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-emerald-600 tabular-nums">
+                    {c.totalSignedAmount > 0 ? formatTenThousands(c.totalSignedAmount) : "-"}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-900 tabular-nums">
                     {c.totalQuoteAmount > 0 ? formatTenThousands(c.totalQuoteAmount) : "-"}
@@ -356,7 +383,7 @@ export default function CustomerStatsPage() {
               ))}
               {sortedCustomers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400 text-sm">
                     沒有符合篩選條件的客戶資料
                   </td>
                 </tr>

@@ -702,6 +702,7 @@ export const DataService = {
         !orig ||
         orig.status !== milestone.status ||
         orig.actualDueDate !== milestone.actualDueDate ||
+        orig.plannedDueDate !== milestone.plannedDueDate ||
         orig.notes !== milestone.notes ||
         orig.attachments !== milestone.attachments;
       if (hasChanged) {
@@ -709,11 +710,20 @@ export const DataService = {
           where: { id: milestone.id },
           data: {
             status: milestone.status,
+            plannedDueDate: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : null,
             actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
             notes: milestone.notes,
             attachments: milestone.attachments,
           },
         }));
+        if (orig && orig.plannedDueDate !== milestone.plannedDueDate && milestone.plannedDueDate) {
+          operations.push(prisma.salesTask.updateMany({
+            where: { milestoneId: milestone.id, isCompleted: false },
+            data: {
+              dueDatetime: new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`),
+            },
+          }));
+        }
       }
       if (milestone.id === milestoneId) {
         operations.push(prisma.salesTask.updateMany({
@@ -743,29 +753,58 @@ export const DataService = {
     existingMilestones?: ProjectMilestoneItem[]
   ) {
     const milestones = existingMilestones ?? await this.getMilestonesByProjectId(projectId);
-    const target = milestones.find((milestone) => milestone.id === milestoneId);
-    if (!target) {
+    const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
+    if (targetIndex < 0) {
       throw new NotFoundError("找不到此里程碑");
     }
+    const target = milestones[targetIndex];
 
     const targetStatus = isCompleted ? MilestoneStatus.COMPLETED : MilestoneStatus.IN_PROGRESS;
     const targetChanged = target.status !== targetStatus;
     const nextNotes = isCompleted && notes?.trim() ? notes.trim() : target.notes;
 
-    const nextMilestones = milestones.map((milestone) =>
-      milestone.id === milestoneId
-        ? {
-            ...milestone,
-            actualDueDate: targetChanged
-              ? isCompleted
-                ? completedDate
-                : null
-              : milestone.actualDueDate,
-            status: targetStatus,
-            notes: nextNotes,
-          }
-        : milestone
-    );
+    // 若正規進度實際完成日早於預定完成日，計算提前天數
+    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+    let daysSaved = 0;
+    if (isCompleted && targetChanged && isRegularStage && target.plannedDueDate && completedDate) {
+      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+      const [ay, am, ad] = completedDate.slice(0, 10).split("-").map(Number);
+      const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        daysSaved = diffDays;
+      }
+    }
+
+    const nextMilestones = milestones.map((milestone, idx) => {
+      if (milestone.id === milestoneId) {
+        return {
+          ...milestone,
+          actualDueDate: targetChanged
+            ? isCompleted
+              ? completedDate
+              : null
+            : milestone.actualDueDate,
+          status: targetStatus,
+          notes: nextNotes,
+        };
+      }
+      if (
+        daysSaved > 0 &&
+        idx > targetIndex &&
+        milestone.status !== MilestoneStatus.COMPLETED &&
+        !["X-1", "X-2"].includes(milestone.stageCode) &&
+        milestone.plannedDueDate
+      ) {
+        const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
+        const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
+        nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
+        return {
+          ...milestone,
+          plannedDueDate: nextPlanned.toISOString().slice(0, 10),
+        };
+      }
+      return milestone;
+    });
 
     const firstIncomplete = nextMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
     const currentStage = firstIncomplete
@@ -798,6 +837,28 @@ export const DataService = {
           },
         })
       );
+      if (daysSaved > 0) {
+        for (let i = targetIndex + 1; i < nextMilestones.length; i++) {
+          const m = nextMilestones[i];
+          const orig = milestones[i];
+          if (m.plannedDueDate !== orig.plannedDueDate && m.plannedDueDate) {
+            operations.push(
+              prisma.projectMilestone.update({
+                where: { id: m.id, projectId },
+                data: {
+                  plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                },
+              }),
+              prisma.salesTask.updateMany({
+                where: { milestoneId: m.id, isCompleted: false },
+                data: {
+                  dueDatetime: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                },
+              })
+            );
+          }
+        }
+      }
     }
 
     await Promise.all(operations);
@@ -817,12 +878,38 @@ export const DataService = {
     const next = milestones[targetIndex + 1];
     const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
+    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+    let daysToRestore = 0;
+    if (isRegularStage && target.plannedDueDate && target.actualDueDate) {
+      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+      const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
+      const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        daysToRestore = diffDays;
+      }
+    }
+
     const updatedList = milestones.map((m, idx) => {
       if (idx === targetIndex) {
         return { ...m, status: MilestoneStatus.IN_PROGRESS, actualDueDate: null };
       }
       if (idx === targetIndex + 1 && m.status !== "COMPLETED") {
         return { ...m, status: MilestoneStatus.PENDING };
+      }
+      if (
+        daysToRestore > 0 &&
+        idx > targetIndex &&
+        m.status !== "COMPLETED" &&
+        !["X-1", "X-2"].includes(m.stageCode) &&
+        m.plannedDueDate
+      ) {
+        const [iy, im, id] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
+        const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
+        nextPlanned.setUTCDate(nextPlanned.getUTCDate() + daysToRestore);
+        return {
+          ...m,
+          plannedDueDate: nextPlanned.toISOString().slice(0, 10),
+        };
       }
       return m;
     });
@@ -850,6 +937,28 @@ export const DataService = {
           data: { status: MilestoneStatus.PENDING },
         })
       );
+    }
+    if (daysToRestore > 0) {
+      for (let i = targetIndex + 1; i < updatedList.length; i++) {
+        const m = updatedList[i];
+        const orig = milestones[i];
+        if (m.plannedDueDate !== orig.plannedDueDate && m.plannedDueDate) {
+          operations.push(
+            prisma.projectMilestone.update({
+              where: { id: m.id, projectId },
+              data: {
+                plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+              },
+            }),
+            prisma.salesTask.updateMany({
+              where: { milestoneId: m.id, isCompleted: false },
+              data: {
+                dueDatetime: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+              },
+            })
+          );
+        }
+      }
     }
 
     await Promise.all(operations);

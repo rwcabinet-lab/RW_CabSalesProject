@@ -114,6 +114,22 @@ export const ScheduleEngine = {
       throw new Error("只能完成目前進行中的里程碑");
     }
 
+    const target = sorted[targetIndex];
+
+    // 若正規進度實際完成日早於預定完成日，計算提前天數
+    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+    let daysSaved = 0;
+    if (isRegularStage && target.plannedDueDate) {
+      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+      const [ay, am, ad] = nowDate.slice(0, 10).split("-").map(Number);
+      const plannedTime = Date.UTC(py, pm - 1, pd);
+      const actualTime = Date.UTC(ay, am - 1, ad);
+      const diffDays = Math.round((plannedTime - actualTime) / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        daysSaved = diffDays;
+      }
+    }
+
     // 1. 標記當前進度為已完成
     sorted[targetIndex] = {
       ...sorted[targetIndex],
@@ -122,6 +138,22 @@ export const ScheduleEngine = {
       notes: options?.notes || sorted[targetIndex].notes,
       attachments: options?.attachments || sorted[targetIndex].attachments,
     };
+
+    // 若有提前完成天數，將後續尚未完成之正規項目預定完成日自動提前
+    if (daysSaved > 0) {
+      for (let i = targetIndex + 1; i < sorted.length; i++) {
+        const item = sorted[i];
+        if (item.status !== "COMPLETED" && !["X-1", "X-2"].includes(item.stageCode) && item.plannedDueDate) {
+          const [iy, im, id] = item.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
+          nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
+          sorted[i] = {
+            ...item,
+            plannedDueDate: nextPlanned.toISOString().slice(0, 10),
+          };
+        }
+      }
+    }
 
     let newCurrentStage = STAGE_CODE_TO_PROJECT_STAGE[sorted[targetIndex].stageCode] || "CONTACT";
 
