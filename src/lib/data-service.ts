@@ -1603,22 +1603,98 @@ export const DataService = {
     ) {
       throw new BadRequestError("排序清單必須包含此案件的所有里程碑且不可重複");
     }
+
+    // 方案 A 防護：鎖定已完成、進行中與已逾期進度，禁止變更其先後順序
+    const sortedCurrent = [...currentMilestones].sort((a, b) => a.stageOrder - b.stageOrder);
+    for (let i = 0; i < sortedCurrent.length; i++) {
+      const currentItem = sortedCurrent[i];
+      if (
+        currentItem.status === MilestoneStatus.COMPLETED ||
+        currentItem.status === MilestoneStatus.IN_PROGRESS ||
+        currentItem.status === MilestoneStatus.OVERDUE
+      ) {
+        if (orderedMilestoneIds[i] !== currentItem.id) {
+          throw new BadRequestError("已完成與進行中之進度不可調整順序，僅可調整尚未開始之進度");
+        }
+      }
+    }
+
     const byId = new Map(currentMilestones.map((m) => [m.id, m]));
+    const defaultDays = await this.getMilestoneDefaultDays();
     const updates: Promise<unknown>[] = [];
     const reordered: ProjectMilestoneItem[] = [];
+
+    let prevPlanned: Date | null = null;
+
     orderedMilestoneIds.forEach((id, index) => {
       const item = byId.get(id)!;
       const newOrder = index + 1;
-      if (item.stageOrder !== newOrder) {
-        updates.push(
-          prisma.projectMilestone.update({
-            where: { id, projectId },
-            data: { stageOrder: newOrder },
-          })
-        );
+
+      if (
+        item.status === MilestoneStatus.COMPLETED ||
+        item.status === MilestoneStatus.IN_PROGRESS ||
+        item.status === MilestoneStatus.OVERDUE
+      ) {
+        if (item.plannedDueDate) {
+          prevPlanned = new Date(`${item.plannedDueDate.slice(0, 10)}T00:00:00.000Z`);
+        }
+        if (item.stageOrder !== newOrder) {
+          updates.push(
+            prisma.projectMilestone.update({
+              where: { id },
+              data: { stageOrder: newOrder },
+            })
+          );
+        }
+        reordered.push({ ...item, stageOrder: newOrder });
+      } else {
+        // PENDING 項目：依照新的排序重新計算預定完成日，確保間隔嚴格符合預設天數
+        let newPlannedDate: Date | null = item.plannedDueDate
+          ? new Date(`${item.plannedDueDate.slice(0, 10)}T00:00:00.000Z`)
+          : null;
+        if (prevPlanned) {
+          const days =
+            Number(defaultDays[item.stageCode]) ||
+            MILESTONE_DEFAULT_DAYS[item.stageCode as MilestoneStageCode] ||
+            3;
+          const targetDate = new Date(prevPlanned);
+          targetDate.setUTCDate(targetDate.getUTCDate() + days);
+          newPlannedDate = targetDate;
+          prevPlanned = targetDate;
+        }
+
+        const dateStr = newPlannedDate ? newPlannedDate.toISOString().slice(0, 10) : item.plannedDueDate;
+        const dateChanged = dateStr !== item.plannedDueDate;
+        const orderChanged = item.stageOrder !== newOrder;
+
+        if (orderChanged || dateChanged) {
+          updates.push(
+            prisma.projectMilestone.update({
+              where: { id },
+              data: {
+                stageOrder: newOrder,
+                ...(dateChanged && newPlannedDate ? { plannedDueDate: newPlannedDate } : {}),
+              },
+            })
+          );
+          if (dateChanged && newPlannedDate) {
+            updates.push(
+              prisma.salesTask.updateMany({
+                where: { milestoneId: id, isCompleted: false },
+                data: { dueDatetime: newPlannedDate },
+              })
+            );
+          }
+        }
+
+        reordered.push({
+          ...item,
+          stageOrder: newOrder,
+          plannedDueDate: dateStr,
+        });
       }
-      reordered.push({ ...item, stageOrder: newOrder });
     });
+
     if (updates.length > 0) {
       await Promise.all(updates);
     }

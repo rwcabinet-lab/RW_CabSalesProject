@@ -399,6 +399,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     const sourceIndex = reorderedPhase.findIndex(({ id }) => id === sourceId);
     const targetIndex = reorderedPhase.findIndex(({ id }) => id === targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
+
+    // 方案 A 檢查：僅允許未開始 (PENDING) 項目相互調整順序
+    const sourceMilestone = reorderedPhase[sourceIndex];
+    const targetMilestone = reorderedPhase[targetIndex];
+    if (sourceMilestone.status !== "PENDING" || targetMilestone.status !== "PENDING") {
+      alert("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
+      return;
+    }
+
     const [movedMilestone] = reorderedPhase.splice(sourceIndex, 1);
     reorderedPhase.splice(targetIndex, 0, movedMilestone);
 
@@ -834,18 +843,20 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
+              const canDrag = canManageMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
 
               return (
                 <div
                   key={m.id}
-                  draggable={!isProjectLost && !isEditing}
+                  draggable={canDrag}
                   onDragStart={(event) => {
+                    if (!canDrag) return;
                     setDraggedMilestoneId(m.id);
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", m.id);
                   }}
                   onDragOver={(event) => {
-                    if (draggedMilestoneId) {
+                    if (draggedMilestoneId && m.status === "PENDING") {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }
@@ -854,7 +865,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     event.preventDefault();
                     const sourceId = event.dataTransfer.getData("text/plain") || draggedMilestoneId;
                     setDraggedMilestoneId(null);
-                    if (sourceId) void handleReorderMilestones(activePhase, sourceId, m.id);
+                    if (sourceId && m.status === "PENDING") void handleReorderMilestones(activePhase, sourceId, m.id);
                   }}
                   onDragEnd={() => setDraggedMilestoneId(null)}
                   className={`rounded-xl border p-4 transition ${
@@ -938,7 +949,21 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3">
                           {!isProjectLost && (
-                            <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-slate-400" aria-label="拖曳調整順序" />
+                            canDrag ? (
+                              <span title="拖曳調整未開始進度順序">
+                                <GripVertical
+                                  className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-slate-400 hover:text-slate-600 active:cursor-grabbing"
+                                  aria-label="拖曳調整順序"
+                                />
+                              </span>
+                            ) : (
+                              <span title={m.status === "COMPLETED" ? "已完成進度已鎖定工序" : "進行中進度不可調整順序"}>
+                                <Lock
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300"
+                                  aria-label="工序已鎖定"
+                                />
+                              </span>
+                            )
                           )}
 
                           <div>
