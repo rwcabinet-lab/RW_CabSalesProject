@@ -185,9 +185,9 @@ export async function GET(req: NextRequest) {
         currentStageLabel: p.currentStage === "LOST" ? "已流標" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.customerSalesRepName || p.salesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
-        isDelayed,
+        isDelayed: p.currentStage === "LOST" ? false : isDelayed,
         trafficLight: p.currentStage === "LOST"
-          ? { color: "RED" as const, label: "已流標", daysDiff: 0 }
+          ? { color: "GRAY" as const, label: "已流標", daysDiff: 0 }
           : trafficLight,
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,

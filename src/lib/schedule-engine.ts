@@ -36,7 +36,15 @@ export const ScheduleEngine = {
    * 計算特定里程碑的時程燈號
    * 🔴 逾期卡關  🟡 3天內到期  🟢 正常進行中  ⚪ 已完成/未啟動
    */
-  getTrafficLight(milestone: ProjectMilestoneItem, currentDate: Date = new Date()): TrafficLightStatus {
+  getTrafficLight(
+    milestone: ProjectMilestoneItem,
+    currentDate: Date = new Date(),
+    isProjectLost: boolean = false,
+  ): TrafficLightStatus {
+    if (isProjectLost || milestone.stageCode === "X-2") {
+      return { color: "GRAY", label: milestone.status === "COMPLETED" ? "已完成" : "已流標", daysDiff: 0 };
+    }
+
     if (milestone.status === "COMPLETED") {
       return { color: "GRAY", label: "已完成", daysDiff: 0 };
     }
@@ -67,10 +75,27 @@ export const ScheduleEngine = {
   /**
    * 重新評估整份里程碑清單，標記逾期項目
    */
-  evaluateMilestones(milestones: ProjectMilestoneItem[], currentDate: Date = new Date()): {
+  evaluateMilestones(
+    milestones: ProjectMilestoneItem[],
+    currentDate: Date = new Date(),
+    isProjectLost: boolean = false,
+  ): {
     milestones: ProjectMilestoneItem[];
     isDelayed: boolean;
   } {
+    const lost = isProjectLost || milestones.some((m) => m.stageCode === "X-2" && m.status === "COMPLETED");
+
+    if (lost) {
+      // 流標案件：各進度不再顯示逾期，時程狀態亦不標示逾期
+      const sanitized = milestones.map((m) => {
+        if (m.status === "OVERDUE") {
+          return { ...m, status: "IN_PROGRESS" as const };
+        }
+        return m;
+      });
+      return { milestones: sanitized, isDelayed: false };
+    }
+
     let hasOverdue = false;
 
     const evaluated = milestones.map((m) => {

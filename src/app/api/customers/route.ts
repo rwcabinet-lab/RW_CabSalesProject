@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
+import { prisma } from "@/lib/prisma";
 
 async function requireAdmin(req: NextRequest) {
   const user = await getUserFromRequest(req);
@@ -33,6 +34,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "請填寫必要欄位 (客戶名稱、電話、客戶類型)" }, { status: 400 });
     }
 
+    const trimmedTaxId = typeof taxId === "string" ? taxId.trim() : "";
+    const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
+
+    // 1. 統一編號重複檢查
+    if (trimmedTaxId) {
+      const existingByTaxId = await prisma.customer.findFirst({
+        where: { taxId: trimmedTaxId },
+      });
+      if (existingByTaxId) {
+        return NextResponse.json(
+          { error: `統一編號重複：已存在相同統編之客戶「${existingByTaxId.name}」` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 2. 客戶電話重複檢查
+    if (trimmedPhone) {
+      const existingByPhone = await prisma.customer.findFirst({
+        where: { phone: trimmedPhone },
+      });
+      if (existingByPhone) {
+        return NextResponse.json(
+          { error: `客戶電話重複：已存在相同電話之客戶「${existingByPhone.name}」` },
+          { status: 400 }
+        );
+      }
+    }
+
     const newCustomer = await DataService.addCustomer({
       name,
       customerType,
@@ -57,6 +87,35 @@ export async function PATCH(req: NextRequest) {
     const { id, name, customerType, taxId, phone, address, defaultDiscount, paymentTerms, salesRepId } = body;
     if (!id || !name || !phone || !customerType || !salesRepId) {
       return NextResponse.json({ error: "請填寫必要欄位" }, { status: 400 });
+    }
+
+    const trimmedTaxId = typeof taxId === "string" ? taxId.trim() : "";
+    const trimmedPhone = typeof phone === "string" ? phone.trim() : "";
+
+    // 1. 統一編號重複檢查 (排除自身)
+    if (trimmedTaxId) {
+      const existingByTaxId = await prisma.customer.findFirst({
+        where: { taxId: trimmedTaxId, id: { not: id } },
+      });
+      if (existingByTaxId) {
+        return NextResponse.json(
+          { error: `統一編號重複：已存在相同統編之客戶「${existingByTaxId.name}」` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 2. 客戶電話重複檢查 (排除自身)
+    if (trimmedPhone) {
+      const existingByPhone = await prisma.customer.findFirst({
+        where: { phone: trimmedPhone, id: { not: id } },
+      });
+      if (existingByPhone) {
+        return NextResponse.json(
+          { error: `客戶電話重複：已存在相同電話之客戶「${existingByPhone.name}」` },
+          { status: 400 }
+        );
+      }
     }
     const customer = await DataService.updateCustomer(id, {
       name, customerType, taxId: taxId || undefined, phone, address: address || undefined,

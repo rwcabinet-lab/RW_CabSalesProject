@@ -160,27 +160,29 @@ export function GanttChart({ projects, tasks }: GanttProps) {
             </div>
 
             <div className="space-y-5">
-              {projectRows.map(({ project, rows }) => (
-                <section key={project.id} className="space-y-1">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2 pt-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-black text-slate-900">{project.projectName}</span>
-                      <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{project.currentStage}</span>
-                      {project.isDelayed && <span className="shrink-0 text-[10px] font-bold text-red-700">時程逾期</span>}
+              {projectRows.map(({ project, rows }) => {
+                const isProjectLost = project.currentStage === "LOST";
+                return (
+                  <section key={project.id} className="space-y-1">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2 pt-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-black text-slate-900">{project.projectName}</span>
+                        <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{project.currentStage}</span>
+                        {!isProjectLost && project.isDelayed && <span className="shrink-0 text-[10px] font-bold text-red-700">時程逾期</span>}
+                      </div>
+                      <Link
+                        href={`/projects/${project.id}/milestones`}
+                        className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
+                      >
+                        查看案場時程
+                      </Link>
                     </div>
-                    <Link
-                      href={`/projects/${project.id}/milestones`}
-                      className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
-                    >
-                      查看案場時程
-                    </Link>
-                  </div>
 
-                  {rows.length === 0 ? (
-                    <p className="py-3 text-xs text-slate-400">尚無里程碑或待辦時程。</p>
-                  ) : rows.map((row) => {
-                    const overdue = Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
-                    const color = markerColor(row);
+                    {rows.length === 0 ? (
+                      <p className="py-3 text-xs text-slate-400">尚無里程碑或待辦時程。</p>
+                    ) : rows.map((row) => {
+                      const overdue = !isProjectLost && Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
+                      const color = isProjectLost ? (row.status === "COMPLETED" ? "bg-emerald-500" : "bg-slate-400") : markerColor(row);
                     return (
                       <div key={row.id} className="grid grid-cols-[270px_minmax(0,1fr)_130px] items-center gap-3 py-1.5">
                         <div className="flex min-w-0 items-center gap-2 pl-2">
@@ -227,8 +229,9 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                       </div>
                     );
                   })}
-                </section>
-              ))}
+                  </section>
+                );
+              })}
             </div>
           </div>
         </div>

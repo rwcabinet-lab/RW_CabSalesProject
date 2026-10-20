@@ -13,11 +13,20 @@ function isValidDateOnly(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTrafficLight>[0]>(milestones: T[]) {
-  return milestones.map((m) => ({
-    ...m,
-    trafficLight: ScheduleEngine.getTrafficLight(m),
-  }));
+function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTrafficLight>[0]>(
+  milestones: T[],
+  isProjectLost = false,
+) {
+  return milestones.map((m) => {
+    const status = isProjectLost && m.status === "OVERDUE" ? ("IN_PROGRESS" as const) : m.status;
+    return {
+      ...m,
+      status,
+      trafficLight: isProjectLost
+        ? { color: "GRAY" as const, label: m.status === "COMPLETED" ? "已完成" : "已流標", daysDiff: 0 }
+        : ScheduleEngine.getTrafficLight(m),
+    };
+  });
 }
 
 export async function GET(
@@ -46,12 +55,13 @@ export async function GET(
     const milestones = hasLegacyWrapUp
       ? await DataService.activateLegacyWrapUpMilestone(projectId)
       : initialMilestones;
-    const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
-    const project = { ...projectRecord, isDelayed: projectRecord.isDelayed || isDelayed };
+    const isProjectLost = projectRecord.currentStage === "LOST";
+    const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones, new Date(), isProjectLost);
+    const project = { ...projectRecord, isDelayed: isProjectLost ? false : (projectRecord.isDelayed || isDelayed) };
 
     return NextResponse.json({
       project,
-      milestones: attachTrafficLights(milestones),
+      milestones: attachTrafficLights(milestones, isProjectLost),
     });
   } catch (error) {
     console.error("Failed to get milestones:", error);
@@ -79,10 +89,30 @@ export async function PUT(
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
     const { project, milestones: initialMilestones } = combined;
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+
+    if (action === "cancelLost") {
+      if (!isManager) {
+        return NextResponse.json({ error: "僅管理權限可取消流標狀態" }, { status: 403 });
+      }
+      if (project.currentStage !== "LOST") {
+        return NextResponse.json({ error: "此案件非流標狀態" }, { status: 400 });
+      }
+      const { restoredStage, isDelayed } = await DataService.cancelLostStatus(projectId);
+      const updatedCombined = await DataService.getProjectWithMilestones(projectId);
+      const updatedProject = updatedCombined?.project || { ...project, currentStage: restoredStage, isDelayed };
+      const updatedMilestones = updatedCombined?.milestones || [];
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(updatedMilestones, false),
+        message: "已成功取消流標狀態",
+      });
+    }
+
     if (project.currentStage === "LOST") {
       return NextResponse.json({ error: "此案件已流標，階段項目不可編輯或推進" }, { status: 409 });
     }
-    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
     const canReviewAudit = isManager || user.id === project.salesRepId;
 
     if (action === "submitAudit") {

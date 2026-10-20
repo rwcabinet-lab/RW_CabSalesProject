@@ -14,6 +14,7 @@ export const ROLE_OPTIONS = [
   { value: "SALES_MANAGER", label: "業務主管" },
   { value: "SALES", label: "業務專員" },
   { value: "ASSISTANT", label: "業務助理" },
+  { value: "SITE_ENGINEER", label: "工務人員" },
 ] as const;
 
 export type PageAccessKey = (typeof PAGE_ACCESS_OPTIONS)[number]["key"];
@@ -25,6 +26,7 @@ export const DEFAULT_ROLE_PAGES: Record<AppRole, PageAccessKey[]> = {
   SALES_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects"],
   SALES: ["home", "workbench", "views", "customers", "projects"],
   ASSISTANT: ["home", "workbench", "views", "projects"],
+  SITE_ENGINEER: ["home", "workbench", "views", "projects"],
 };
 
 const ROLE_LANDING_PREFERENCES: Record<AppRole, PageAccessKey[]> = {
@@ -33,6 +35,7 @@ const ROLE_LANDING_PREFERENCES: Record<AppRole, PageAccessKey[]> = {
   SALES_MANAGER: ["manager", "workbench", "views", "customers", "projects", "home"],
   SALES: ["workbench", "views", "customers", "projects", "home"],
   ASSISTANT: ["workbench", "views", "projects", "home"],
+  SITE_ENGINEER: ["workbench", "views", "projects", "home"],
 };
 
 export function getRoleLandingPath(role: AppRole, pages: PageAccessKey[]): string {

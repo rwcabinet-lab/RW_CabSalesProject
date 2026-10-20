@@ -173,7 +173,11 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
                                   </span>
                                 </div>
 
-                                {project.isDelayed ? (
+                                {project.currentStage === "LOST" ? (
+                                  <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded-full">
+                                    ⚪ 已流標
+                                  </span>
+                                ) : project.isDelayed ? (
                                   <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 py-0.2 rounded-full animate-pulse flex items-center gap-0.5">
                                     <ShieldAlert className="w-3 h-3" /> 逾期卡關
                                   </span>

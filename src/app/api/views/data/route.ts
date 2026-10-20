@@ -13,8 +13,8 @@ export async function GET() {
       DataService.getLoginUsers(),
     ]);
     const staff = users
-      .filter((user): user is typeof user & { role: "SALES_MANAGER" | "SALES" | "ASSISTANT" } =>
-        user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT"
+      .filter((user): user is typeof user & { role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" } =>
+        user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT" || user.role === "SITE_ENGINEER"
       )
       .map(({ id, name, role }) => ({ id, name, role }));
 

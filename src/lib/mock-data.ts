@@ -126,7 +126,7 @@ export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
   "5-1": 12, "5-2": 1, "5-3": 2,
   "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 5,
   "7-1": 99, "7-2": 5, "7-3": 30,
-  "X-1": 5, "X-2": 1,
+  "X-1": 5, "X-2": 0,
 };
 
 export const PHASE_LABELS: Record<MilestonePhase, string> = {

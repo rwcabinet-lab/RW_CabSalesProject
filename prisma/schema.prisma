@@ -290,6 +290,7 @@ enum Role {
   SALES_MANAGER
   SALES
   ASSISTANT
+  SITE_ENGINEER
 }
 
 enum CustomerType {

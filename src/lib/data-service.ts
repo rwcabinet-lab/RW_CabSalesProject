@@ -1042,7 +1042,10 @@ export const DataService = {
 
       const ops: Promise<unknown>[] = [
         milestoneOp,
-        prisma.project.update({ where: { id: projectId }, data: { currentStage } }),
+        prisma.project.update({
+          where: { id: projectId },
+          data: { currentStage, ...(stageCode === "X-2" ? { isDelayed: false } : {}) },
+        }),
       ];
       if (stageCode === "X-2") {
         ops.push(
@@ -1131,7 +1134,10 @@ export const DataService = {
         });
       }
 
-      await tx.project.update({ where: { id: projectId }, data: { currentStage } });
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStage, ...(stageCode === "X-2" ? { isDelayed: false } : {}) },
+      });
       if (stageCode === "X-2") {
         await tx.salesTask.updateMany({
           where: { projectId, isCompleted: false },
@@ -1171,6 +1177,68 @@ export const DataService = {
     });
 
     return this.getMilestonesByProjectId(projectId);
+  },
+
+  async cancelLostStatus(projectId: string) {
+    return await prisma.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, currentStage: true },
+      });
+      if (!project) throw new Error("查無此案場資料");
+      if (project.currentStage !== ProjectStage.LOST) {
+        throw new Error("此案件非流標狀態，無法取消流標");
+      }
+
+      // 1. 刪除 X-2 里程碑紀錄 (流標進度)
+      await tx.projectMilestone.deleteMany({
+        where: { projectId, stageCode: "X-2" },
+      });
+
+      // 2. 取得剩下的常規里程碑
+      const remainingMilestones = await tx.projectMilestone.findMany({
+        where: { projectId },
+        orderBy: { stageOrder: "asc" },
+      });
+
+      // 3. 找出未完成的第一個常規進度
+      const firstIncomplete = remainingMilestones
+        .filter((m) => m.stageCode !== "X-1" && m.stageCode !== "X-2")
+        .find((m) => m.status !== MilestoneStatus.COMPLETED);
+
+      const hasActive = remainingMilestones.some(
+        (m) => m.status === MilestoneStatus.IN_PROGRESS || m.status === MilestoneStatus.OVERDUE
+      );
+      if (firstIncomplete && !hasActive) {
+        await tx.projectMilestone.update({
+          where: { id: firstIncomplete.id },
+          data: { status: MilestoneStatus.IN_PROGRESS },
+        });
+        firstIncomplete.status = MilestoneStatus.IN_PROGRESS;
+      }
+
+      // 4. 計算還原後的案場階段
+      let restoredStage: ProjectStage = ProjectStage.DEVELOP;
+      if (firstIncomplete) {
+        restoredStage =
+          (STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode as keyof typeof STAGE_CODE_TO_PROJECT_STAGE] as ProjectStage) ||
+          ProjectStage.DEVELOP;
+      } else {
+        const hasWrapUp = remainingMilestones.some((m) => m.stageCode === "X-1");
+        restoredStage = hasWrapUp ? ProjectStage.WRAP_UP : ProjectStage.DONE;
+      }
+
+      // 5. 重新評估時程延誤
+      const updatedMilestones = await this.getMilestonesByProjectId(projectId);
+      const { isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones, new Date(), false);
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStage: restoredStage, isDelayed },
+      });
+
+      return { restoredStage, isDelayed };
+    });
   },
 
   async completeWrapUpMilestone(

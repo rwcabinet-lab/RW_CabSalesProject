@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,9 @@ import {
   Plus,
   Send,
   Lock,
+  Unlock,
+  Archive,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   GripVertical,
@@ -102,6 +105,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [loadError, setLoadError] = useState("");
   const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("DEVELOP");
   const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null);
+  const dragStartOrderRef = useRef<MilestoneWithLight[] | null>(null);
+  const [cancellingLost, setCancellingLost] = useState(false);
 
   // 行內編輯
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -441,6 +446,110 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const handleCancelLost = async () => {
+    if (!window.confirm("確定要取消此案件的「流標」狀態，並恢復為進行中案件嗎？")) return;
+    setCancellingLost(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancelLost" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "取消流標失敗");
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => tRes.ok ? tRes.json() : null)
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      alert("已成功取消流標狀態，案件已恢復為進行中。");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "取消流標失敗");
+    } finally {
+      setCancellingLost(false);
+    }
+  };
+
+  const handleDragStartItem = (e: React.DragEvent, id: string) => {
+    dragStartOrderRef.current = [...milestones];
+    setDraggedMilestoneId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOverItem = (targetMilestone: MilestoneWithLight) => {
+    if (!draggedMilestoneId || draggedMilestoneId === targetMilestone.id) return;
+    if (targetMilestone.status !== "PENDING") return;
+
+    const currentPhaseList = phaseGroups[activePhase];
+    const sourceIndex = currentPhaseList.findIndex((item) => item.id === draggedMilestoneId);
+    const targetIndex = currentPhaseList.findIndex((item) => item.id === targetMilestone.id);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    if (currentPhaseList[sourceIndex].status !== "PENDING" || currentPhaseList[targetIndex].status !== "PENDING") return;
+
+    // 即時預覽排序結果
+    const reorderedPhase = [...currentPhaseList];
+    const [moved] = reorderedPhase.splice(sourceIndex, 1);
+    reorderedPhase.splice(targetIndex, 0, moved);
+
+    const ordered = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+    const phaseIndexes = ordered.flatMap((item, index) =>
+      STAGE_CODE_TO_PHASE[item.stageCode] === activePhase ? [index] : []
+    );
+    phaseIndexes.forEach((idx, pIdx) => {
+      ordered[idx] = reorderedPhase[pIdx];
+    });
+
+    setMilestones(ordered.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
+  };
+
+  const commitReorderIfChanged = async () => {
+    if (!dragStartOrderRef.current) return;
+    const initial = dragStartOrderRef.current;
+    dragStartOrderRef.current = null;
+    setDraggedMilestoneId(null);
+
+    const currentOrderedIds = milestones.map((m) => m.id);
+    const initialOrderedIds = initial.map((m) => m.id);
+    const hasChanged = currentOrderedIds.some((id, idx) => id !== initialOrderedIds[idx]);
+    if (!hasChanged) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reorder", orderedMilestoneIds: currentOrderedIds }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "更新順序失敗");
+      if (result.project && result.milestones) {
+        applyMilestonesData(result);
+      } else {
+        await refreshMilestonesOnly();
+      }
+    } catch (error) {
+      console.error("更新順序失敗", error);
+      alert(error instanceof Error ? error.message : "更新順序失敗");
+      setMilestones(initial);
+    }
+  };
+
+  const handleDropItem = async (e: React.DragEvent) => {
+    e.preventDefault();
+    await commitReorderIfChanged();
+  };
+
+  const handleDragEndItem = () => {
+    void commitReorderIfChanged();
+  };
+
   // 提交審核處理
   const handleSubmitAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -736,28 +845,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <Edit3 className="w-3.5 h-3.5" /> 編輯案場資料
                 </button>
               )}
-              {!isProjectLost && (
+              {isProjectLost && canManageMilestones && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSpecialAdvanceError("");
-                    setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
-                  }}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+                  onClick={handleCancelLost}
+                  disabled={cancellingLost}
+                  className="rounded-lg border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition disabled:opacity-50 flex items-center gap-1"
                 >
-                  轉為流標
-                </button>
-              )}
-              {project.currentStage !== "WRAP_UP" && !isProjectLost && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSpecialAdvanceError("");
-                    setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
-                  }}
-                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
-                >
-                  進入收尾階段
+                  <Unlock className="w-3.5 h-3.5" /> {cancellingLost ? "處理中..." : "取消流標狀態"}
                 </button>
               )}
             </div>
@@ -770,13 +865,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">客戶主責業務：</span><span className="font-semibold text-slate-700">{project.customerSalesRepName || "—"}</span></div>
             <div><span className="text-slate-400">業務助理：</span><span className="font-semibold text-slate-700">{project.salesAssistantName || "未指派"}</span></div>
             <div><span className="text-slate-400">案件階段：</span><span className="font-bold text-blue-700">{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}</span></div>
-            <div><span className="text-slate-400">當前進度：</span><span className="font-semibold text-slate-700">{milestones.find((item) => item.status === "IN_PROGRESS" || item.status === "OVERDUE")?.stageName || "—"}</span></div>
+            <div><span className="text-slate-400">當前進度：</span><span className="font-semibold text-slate-700">{isProjectLost ? "已流標" : (milestones.find((item) => item.status === "IN_PROGRESS" || item.status === "OVERDUE")?.stageName || "—")}</span></div>
             <div><span className="text-slate-400">預計完工日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
             <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatTenThousands(project.quoteAmount) : project.totalAmount != null ? formatTenThousands(project.totalAmount) : "未填"}</span></div>
             <div><span className="text-slate-400">預算：</span><span className="font-semibold text-slate-700">{project.estimatedBudget != null ? formatTenThousands(project.estimatedBudget) : "未填"}</span></div>
             <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatTenThousands(project.cost) : "未填"}</span></div>
-            <div><span className="text-slate-400">時程狀態：</span><span className={`font-semibold ${project.isDelayed ? "text-red-700" : "text-emerald-700"}`}>{project.isDelayed ? "逾期" : "正常"}</span></div>
+            <div><span className="text-slate-400">時程狀態：</span><span className={`font-semibold ${isProjectLost ? "text-slate-600" : project.isDelayed ? "text-red-700" : "text-emerald-700"}`}>{isProjectLost ? "已流標" : project.isDelayed ? "逾期" : "正常"}</span></div>
             <div className="sm:col-span-2"><span className="text-slate-400">現況說明：</span><span className="font-semibold text-slate-700">{project.siteCondition || "未填"}</span></div>
           </div>
         </section>
@@ -788,8 +883,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           {PHASE_ORDER.map((phase) => {
             const progress = phaseProgress(phase);
             const count = phaseGroups[phase].length;
-            const hasOverdue = phaseGroups[phase].some((m) => m.status === "OVERDUE");
-            const hasInProgress = phaseGroups[phase].some((m) => m.status === "IN_PROGRESS");
+            const hasOverdue = !isProjectLost && phaseGroups[phase].some((m) => m.status === "OVERDUE");
+            const hasInProgress = !isProjectLost && phaseGroups[phase].some((m) => m.status === "IN_PROGRESS");
             const isActiveTab = activePhase === phase;
 
             return (
@@ -816,7 +911,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     style={{ width: `${progress}%` }}
-                    className={`h-full rounded-full transition-all ${hasOverdue ? "bg-red-500" : "bg-blue-600"}`}
+                    className={`h-full rounded-full transition-all ${!isProjectLost && hasOverdue ? "bg-red-500" : "bg-blue-600"}`}
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">{progress}% ({count}項)</p>
@@ -831,19 +926,80 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <h2 className="text-sm font-bold text-slate-800">
               {PHASE_LABELS[activePhase]}
             </h2>
-            <span className="text-xs text-slate-400">拖曳圖卡可調整子進度順序</span>
+            <span className="text-xs text-slate-400">拖曳圖卡可即時預覽調整未開始子進度順序</span>
           </div>
+
+          {/* 收尾與流標按鈕移到[收尾/已流標]頁面 */}
+          {activePhase === "EXTRA" && (
+            <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">收尾與流標階段操作</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {isProjectLost
+                      ? "此案件目前處於已流標狀態，所有里程碑進度與時程已停止計算。"
+                      : project?.currentStage === "WRAP_UP"
+                      ? "此案件目前處於收尾中，可記錄後續收尾項目或轉為流標。"
+                      : "案場若進入尾聲需要收尾追蹤，或未能成案需終止，可在此切換階段。"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isProjectLost && canManageMilestones && (
+                    <button
+                      type="button"
+                      onClick={handleCancelLost}
+                      disabled={cancellingLost}
+                      className="rounded-lg border border-emerald-300 bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <Unlock className="w-3.5 h-3.5" />
+                      {cancellingLost ? "處理中..." : "取消流標狀態"}
+                    </button>
+                  )}
+                  {!isProjectLost && (
+                    <>
+                      {project?.currentStage !== "WRAP_UP" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSpecialAdvanceError("");
+                            setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
+                          }}
+                          className="rounded-lg border border-amber-300 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          進入收尾階段
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSpecialAdvanceError("");
+                          setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
+                        }}
+                        className="rounded-lg border border-red-300 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        轉為流標
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             {phaseGroups[activePhase].map((m) => {
               const isEditing = editingId === m.id;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
-              const isActive = m.status === "IN_PROGRESS" || m.status === "OVERDUE";
+              const isOverdue = !isProjectLost && m.status === "OVERDUE";
+              const isActive = m.status === "IN_PROGRESS" || isOverdue;
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
               const canDrag = canManageMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
+              const isBeingDragged = draggedMilestoneId === m.id;
 
               return (
                 <div
@@ -851,33 +1007,29 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   draggable={canDrag}
                   onDragStart={(event) => {
                     if (!canDrag) return;
-                    setDraggedMilestoneId(m.id);
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", m.id);
+                    handleDragStartItem(event, m.id);
                   }}
                   onDragOver={(event) => {
                     if (draggedMilestoneId && m.status === "PENDING") {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
+                      handleDragOverItem(m);
                     }
                   }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const sourceId = event.dataTransfer.getData("text/plain") || draggedMilestoneId;
-                    setDraggedMilestoneId(null);
-                    if (sourceId && m.status === "PENDING") void handleReorderMilestones(activePhase, sourceId, m.id);
-                  }}
-                  onDragEnd={() => setDraggedMilestoneId(null)}
-                  className={`rounded-xl border p-4 transition ${
-                    isProjectLost
-                      ? "border-slate-200 bg-slate-50/80 opacity-70"
-                      : m.status === "OVERDUE"
-                        ? "border-red-200 bg-red-50/30"
-                        : m.status === "IN_PROGRESS"
-                          ? "border-blue-200 bg-blue-50/20 shadow-sm"
-                          : m.status === "COMPLETED"
-                            ? "border-emerald-100 bg-emerald-50/10"
-                            : "border-slate-200 bg-white"
+                  onDrop={handleDropItem}
+                  onDragEnd={handleDragEndItem}
+                  className={`rounded-xl border p-4 transition-all duration-150 ${
+                    isBeingDragged
+                      ? "opacity-60 ring-2 ring-blue-500 border-blue-400 bg-blue-50/40 scale-[0.99]"
+                      : isProjectLost
+                        ? "border-slate-200 bg-slate-50/80 opacity-75"
+                        : isOverdue
+                          ? "border-red-200 bg-red-50/30"
+                          : m.status === "IN_PROGRESS"
+                            ? "border-blue-200 bg-blue-50/20 shadow-xs"
+                            : m.status === "COMPLETED"
+                              ? "border-emerald-100 bg-emerald-50/10"
+                              : "border-slate-200 bg-white"
                   }`}
                 >
                   {isEditing && !isProjectLost ? (
@@ -971,18 +1123,26 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               <span className="font-bold text-sm text-slate-900">
                                 {MILESTONE_STAGE_LABELS[m.stageCode]}
                               </span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`}>
-                                {STATUS_MAP[m.status].label}
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                isProjectLost
+                                  ? m.status === "COMPLETED"
+                                    ? `${STATUS_MAP.COMPLETED.bg} ${STATUS_MAP.COMPLETED.text}`
+                                    : `${STATUS_MAP.PENDING.bg} ${STATUS_MAP.PENDING.text}`
+                                  : `${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`
+                              }`}>
+                                {isProjectLost
+                                  ? m.status === "COMPLETED" ? "已完成" : "未進行"
+                                  : STATUS_MAP[m.status].label}
                               </span>
-                              {isAuditStage && (
+                              {isAuditStage && !isProjectLost && (
                                 <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
                                   {isAuditSubmitted ? "等待審核" : "需審核"}
                                 </span>
                               )}
-                              {m.trafficLight?.color === "RED" && (
+                              {!isProjectLost && m.trafficLight?.color === "RED" && (
                                 <span className="text-[10px] text-red-600 font-black">● {m.trafficLight.label}</span>
                               )}
-                              {m.trafficLight?.color === "YELLOW" && (
+                              {!isProjectLost && m.trafficLight?.color === "YELLOW" && (
                                 <span className="text-[10px] text-amber-600 font-bold">● {m.trafficLight.label}</span>
                               )}
                             </div>

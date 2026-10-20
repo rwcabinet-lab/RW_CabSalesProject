@@ -235,7 +235,10 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                       if (event.type === "MILESTONE") {
                         const { milestone, project } = event;
                         const label = milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode;
-                        const milestoneStyle = milestone.status === "OVERDUE"
+                        const isProjectLost = project.currentStage === "LOST";
+                        const milestoneStyle = isProjectLost
+                          ? (milestone.status === "COMPLETED" ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700")
+                          : milestone.status === "OVERDUE"
                           ? "border-red-200 bg-red-100 text-red-800"
                           : milestone.status === "COMPLETED"
                             ? "border-emerald-100 bg-emerald-50 text-emerald-800"

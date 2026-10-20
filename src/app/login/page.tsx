@@ -3,6 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { KeyRound, LogIn } from "lucide-react";
 import type { ApiResponse, UserDTO } from "@/types/dto";
+import { ROLE_OPTIONS } from "@/lib/page-access";
+
+function roleLabel(role: string) {
+  return ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
+}
 
 type LoginUser = UserDTO;
 
@@ -76,7 +81,11 @@ export default function LoginPage() {
             >
               {loadingUsers && <option value="">載入使用者中...</option>}
               {!loadingUsers && users.length === 0 && <option value="">沒有可用使用者</option>}
-              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}（{roleLabel(user.role)}）
+                </option>
+              ))}
             </select>
           </div>
 

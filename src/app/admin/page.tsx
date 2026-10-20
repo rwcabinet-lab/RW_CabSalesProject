@@ -492,7 +492,9 @@ export default function AdminPage() {
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {Object.entries(MILESTONE_STAGE_LABELS).map(([code, label]) => (
+          {Object.entries(MILESTONE_STAGE_LABELS)
+            .filter(([code]) => code !== "X-2")
+            .map(([code, label]) => (
             <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
               <span className="text-xs font-bold text-slate-700 truncate" title={label}>
                 [{code}] {label}

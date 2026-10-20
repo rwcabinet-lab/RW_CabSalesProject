@@ -262,7 +262,7 @@ export interface ViewsDataDTO {
 export interface CalendarStaffDTO {
   id: string;
   name: string;
-  role: "SALES_MANAGER" | "SALES" | "ASSISTANT";
+  role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" | string;
 }
 
 export interface QuoteVersionCreateDTO {
@@ -362,7 +362,7 @@ export interface ManagerProjectOverviewDTO {
 export interface AssignableUserDTO {
   id: string;
   name: string;
-  role: "SALES_MANAGER" | "SALES" | "ASSISTANT";
+  role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" | string;
 }
 
 export type CustomerItem = CustomerDTO;
