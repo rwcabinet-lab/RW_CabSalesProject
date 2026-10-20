@@ -452,27 +452,44 @@ export const DataService = {
     });
     if (!project) throw new Error("查無此案場資料");
 
-    let dueDate = existing.reduce<Date | null>(
-      (latest, milestone) =>
-        milestone.plannedDueDate && (!latest || milestone.plannedDueDate > latest)
-          ? milestone.plannedDueDate
-          : latest,
-      null,
-    ) || new Date();
-
     const defaultDays = await this.getMilestoneDefaultDays();
 
+    // 建立現有子進度之預定完成日對照表
+    const dateByCode = new Map<string, Date>();
+    for (const m of existing) {
+      if (m.plannedDueDate) {
+        dateByCode.set(m.stageCode, new Date(m.plannedDueDate));
+      }
+    }
+
+    // 依 STANDARD_MILESTONE_STAGE_CODES 標準順序推算缺失進度的預定完成日（以前置項目的預定日為基準累加）
+    for (let i = 0; i < STANDARD_MILESTONE_STAGE_CODES.length; i++) {
+      const code = STANDARD_MILESTONE_STAGE_CODES[i];
+      if (!dateByCode.has(code)) {
+        let prevDate: Date | null = null;
+        for (let j = i - 1; j >= 0; j--) {
+          const prevCode = STANDARD_MILESTONE_STAGE_CODES[j];
+          if (dateByCode.has(prevCode)) {
+            prevDate = new Date(dateByCode.get(prevCode)!);
+            break;
+          }
+        }
+        const baseDate = prevDate || new Date();
+        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+        const targetDate = new Date(baseDate);
+        targetDate.setDate(targetDate.getDate() + days);
+        dateByCode.set(code, targetDate);
+      }
+    }
+
     const newRows = missingCodes.map((code) => {
-      dueDate = new Date(dueDate);
-      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
-      dueDate.setDate(dueDate.getDate() + days);
       const stdIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(code);
       return {
         projectId,
         stageCode: code,
         phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP",
         stageOrder: stdIndex !== -1 ? stdIndex + 1 : 99,
-        plannedDueDate: new Date(dueDate),
+        plannedDueDate: dateByCode.get(code) || new Date(),
         status: MilestoneStatus.PENDING,
         assignedToId: project.salesRepId,
       };
