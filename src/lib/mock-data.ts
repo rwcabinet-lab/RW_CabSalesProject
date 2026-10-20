@@ -77,16 +77,11 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "3-3": "提案簡報",
   "3-4": "合約擬定",
   "3-5": "送約/簽約",
-  "3-6": "提案簡報",
-  "3-7": "合約製作",
-  "3-8": "合約審核",
-  "3-9": "送約/簽約",
   // ④ 生產前確認/拆單
   "4-1": "復丈",
   "4-2": "二次場勘",
   "4-3": "施工圖",
   "4-4": "拆單並提交生產",
-  "4-5": "拆單並提交生產",
   // ⑤ 生產及派送
   "5-1": "生產",
   "5-2": "出貨",
@@ -126,8 +121,8 @@ export const QUOTE_STAGE_CODES = new Set<string>([
 export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
   "1-1": 5, "1-2": 2,
   "2-1": 3, "2-2": 3, "2-3": 2, "2-4": 2, "2-5": 2,
-  "3-1": 5, "3-2": 2, "3-3": 3, "3-4": 2, "3-5": 3, "3-6": 2, "3-7": 3, "3-8": 2, "3-9": 5,
-  "4-1": 2, "4-2": 2, "4-3": 7, "4-4": 3, "4-5": 3,
+  "3-1": 5, "3-2": 2, "3-3": 3, "3-4": 2, "3-5": 3,
+  "4-1": 2, "4-2": 2, "4-3": 7, "4-4": 3,
   "5-1": 14, "5-2": 3, "5-3": 2,
   "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 3,
   "7-1": 3, "7-2": 5, "7-3": 30,
@@ -176,8 +171,8 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "1-1": "DEVELOP", "1-2": "DEVELOP",
   "2-1": "REQUIREMENT", "2-2": "REQUIREMENT", "2-3": "REQUIREMENT", "2-4": "REQUIREMENT", "2-5": "REQUIREMENT",
-  "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL", "3-6": "PROPOSAL", "3-7": "PROPOSAL", "3-8": "PROPOSAL", "3-9": "PROPOSAL",
-  "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD", "4-5": "PRE_PROD",
+  "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL",
+  "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD",
   "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
   "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE",

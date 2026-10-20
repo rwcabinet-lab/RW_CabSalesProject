@@ -247,6 +247,10 @@ export const DataService = {
     return { project, milestones: evaluated.milestones };
   },
 
+  async getMilestoneDefaultDays(): Promise<Record<string, number>> {
+    return this.getAppConfig<Record<string, number>>("milestone_default_days", MILESTONE_DEFAULT_DAYS);
+  },
+
   async addProject(data: {
     projectName: string; customerId: string; siteAddress: string; siteCondition?: string;
     expectedDate?: string; unitCount?: number; cost?: number; quoteAmount?: number;
@@ -257,11 +261,13 @@ export const DataService = {
     });
     if (!customer) return undefined;
 
+    const defaultDays = await this.getMilestoneDefaultDays();
     const allCodes = STANDARD_MILESTONE_STAGE_CODES;
     let cursorDate = new Date();
     const milestoneRows = allCodes.map((code, index) => {
       const planned = new Date(cursorDate);
-      planned.setDate(planned.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
+      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+      planned.setDate(planned.getDate() + days);
       cursorDate = planned;
       return {
         stageCode: code,
@@ -454,9 +460,12 @@ export const DataService = {
       null,
     ) || new Date();
 
+    const defaultDays = await this.getMilestoneDefaultDays();
+
     const newRows = missingCodes.map((code) => {
       dueDate = new Date(dueDate);
-      dueDate.setDate(dueDate.getDate() + (MILESTONE_DEFAULT_DAYS[code] || 3));
+      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+      dueDate.setDate(dueDate.getDate() + days);
       const stdIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(code);
       return {
         projectId,
@@ -972,10 +981,12 @@ export const DataService = {
     existingProject?: ProjectDetail,
     existingMilestones?: ProjectMilestoneItem[],
   ) {
+    const defaultDays = await this.getMilestoneDefaultDays();
     const currentStage = STAGE_CODE_TO_PROJECT_STAGE[stageCode] as ProjectStage;
     const actualDueDate = new Date();
     const plannedDueDate = new Date(actualDueDate);
-    plannedDueDate.setDate(plannedDueDate.getDate() + MILESTONE_DEFAULT_DAYS[stageCode]);
+    const days = Number(defaultDays[stageCode]) || MILESTONE_DEFAULT_DAYS[stageCode] || (stageCode === "X-1" ? 14 : 0);
+    plannedDueDate.setDate(plannedDueDate.getDate() + days);
     const isWrapUp = stageCode === "X-1";
 
     if (existingProject && existingMilestones) {
@@ -1124,8 +1135,10 @@ export const DataService = {
       });
       if (!milestone) return;
 
+      const defaultDays = await this.getMilestoneDefaultDays();
       const plannedDueDate = new Date();
-      plannedDueDate.setDate(plannedDueDate.getDate() + MILESTONE_DEFAULT_DAYS["X-1"]);
+      const days = Number(defaultDays["X-1"]) || MILESTONE_DEFAULT_DAYS["X-1"] || 14;
+      plannedDueDate.setDate(plannedDueDate.getDate() + days);
       await tx.projectMilestone.update({
         where: { id: milestone.id },
         data: {

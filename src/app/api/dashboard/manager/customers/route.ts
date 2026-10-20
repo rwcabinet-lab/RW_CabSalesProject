@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       const ms = milestonesByProject[p.id] || [];
       const hasSignedMilestone = ms.some(
         (m) =>
-          (m.stageCode === "3-5" || m.stageCode === "3-9" || (m.stageCode as string) === "1-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "").includes("簽約")) &&
+          (m.stageCode === "3-5" || (m.stageCode as string) === "1-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "").includes("簽約")) &&
           m.status === "COMPLETED"
       );
       const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED", "BILLED"].includes(p.currentStage);
