@@ -16,6 +16,33 @@ export type {
   TaskDTO as SalesTaskItem,
 } from "@/types/dto";
 
+/** 客戶類型中文對照表 */
+export const CUSTOMER_TYPE_LABELS: Record<string, string> = {
+  LONGMEI_STORE: "隆美門市",
+  CABINET_FACTORY: "櫥櫃工廠",
+  DESIGN_COMPANY: "設計公司",
+  DEALER_COMPANY: "經銷公司",
+  CONSTRUCTION: "建設／營造",
+  LABOR_MATERIAL: "連工帶料",
+  INDIVIDUAL: "一般消費者",
+  DESIGNER: "設計師",
+  CONTRACTOR: "統包／營造",
+  PR: "公關客戶",
+  DEALER: "經銷商",
+  HOMEOWNER: "一般消費者",
+  DIRECT: "直接業主",
+};
+
+/** 判斷案件階段是否符合特定欄位/階段（含歷史向下相容） */
+export function matchesStage(projectStage: string, columnId: string): boolean {
+  if (projectStage === columnId) return true;
+  if (columnId === "DEVELOP" && ["CONTACT", "INQUIRY", "MEASUREMENT", "QUOTE", "CONTRACT"].includes(projectStage)) return true;
+  if (columnId === "PROPOSAL" && projectStage === "DESIGN") return true;
+  if (columnId === "PROD_SHIP" && (projectStage === "PRODUCTION" || projectStage === "HANDOFF")) return true;
+  if (columnId === "CLOSED" && projectStage === "DONE") return true;
+  return false;
+}
+
 /** 各子進度的顯示名稱 (7大階段 + 額外階段) */
 export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ① 案件開發

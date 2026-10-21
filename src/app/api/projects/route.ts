@@ -73,6 +73,20 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, ...data } = body;
     if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    if (!isManager) {
+      const existing = await DataService.getProjectById(id, { evaluateSchedule: false });
+      if (!existing) return NextResponse.json({ error: "找不到案場" }, { status: 404 });
+      const canEdit =
+        existing.salesRepId === user.id ||
+        existing.salesAssistantId === user.id ||
+        existing.customerSalesRepId === user.id;
+      if (!canEdit) {
+        return NextResponse.json({ error: "僅主管或負責業務/業助可修改此案場資料" }, { status: 403 });
+      }
+    }
+
     const updated = await DataService.updateProject(id, data);
     if (!updated) return NextResponse.json({ error: "找不到案場" }, { status: 404 });
     return NextResponse.json({ project: updated });

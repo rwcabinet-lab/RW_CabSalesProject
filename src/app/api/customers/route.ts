@@ -84,10 +84,30 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const body = await req.json();
     const { id, name, customerType, taxId, phone, address, defaultDiscount, paymentTerms, salesRepId } = body;
     if (!id || !name || !phone || !customerType || !salesRepId) {
       return NextResponse.json({ error: "請填寫必要欄位" }, { status: 400 });
+    }
+
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    const currentCustomer = await prisma.customer.findUnique({
+      where: { id },
+      select: { salesRepId: true, defaultDiscount: true },
+    });
+    if (!currentCustomer) {
+      return NextResponse.json({ error: "找不到該客戶" }, { status: 404 });
+    }
+
+    if (!isManager && currentCustomer.salesRepId !== user.id) {
+      return NextResponse.json({ error: "僅主管或該客戶主責業務可修改客戶資料" }, { status: 403 });
+    }
+
+    if (!isManager && defaultDiscount !== undefined && Number(defaultDiscount) !== Number(currentCustomer.defaultDiscount)) {
+      return NextResponse.json({ error: "僅主管有權調整客戶預設折數" }, { status: 403 });
     }
 
     const trimmedTaxId = typeof taxId === "string" ? taxId.trim() : "";

@@ -1,8 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Calendar, CheckCircle2, Clock } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+} from "lucide-react";
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 
@@ -52,6 +60,27 @@ function addDays(key: string, days: number): string {
 
 export function GanttChart({ projects, tasks }: GanttProps) {
   const todayKey = getDateKey(new Date().toISOString())!;
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+
+  const toggleCollapse = (projectId: string) => {
+    setCollapsedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
+
+  const collapseAll = () => {
+    setCollapsedProjects(new Set(projects.map((p) => p.id)));
+  };
+
+  const expandAll = () => {
+    setCollapsedProjects(new Set());
+  };
 
   const { projectRows, ticks, positionOf, startKey, endKey } = useMemo(() => {
     const taskByProject = new Map<string, TaskDTO[]>();
@@ -138,24 +167,50 @@ export function GanttChart({ projects, tasks }: GanttProps) {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-        <span className="font-bold text-slate-800">時間軸標記：</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />里程碑期限</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />待辦期限</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />已完成／實際日期</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />預計完工日</span>
-        <span className="ml-auto text-slate-500">時間範圍：{formatDate(startKey)} – {formatDate(endKey)}</span>
+    <div className="space-y-4">
+      {/* 圖例與展開/收合控制列 */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="font-bold text-slate-800">時程標記：</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />里程碑期限</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />待辦期限</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />已完成／實際日期</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />預計完工日</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={expandAll}
+            className="flex items-center gap-1 rounded bg-white px-2 py-1 text-slate-600 border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+            title="全部展開"
+          >
+            <ChevronsDown className="w-3.5 h-3.5" />
+            <span>全部展開</span>
+          </button>
+          <button
+            type="button"
+            onClick={collapseAll}
+            className="flex items-center gap-1 rounded bg-white px-2 py-1 text-slate-600 border border-slate-200 hover:bg-slate-100 transition shadow-2xs"
+            title="全部收合"
+          >
+            <ChevronsUp className="w-3.5 h-3.5" />
+            <span>全部收合</span>
+          </button>
+          <span className="text-slate-400 hidden sm:inline">|</span>
+          <span className="text-slate-500 text-[11px] hidden sm:inline">時間範圍：{formatDate(startKey)} – {formatDate(endKey)}</span>
+        </div>
       </div>
 
       {projects.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
-          目前沒有可顯示的案場時程。
+          目前沒有符合篩選條件的案場時程。請調整上方篩選條件或點擊重設。
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="min-w-[1050px] p-5">
-            <div className="mb-3 grid grid-cols-[270px_minmax(0,1fr)_130px] items-end gap-3 border-b border-slate-200 pb-2">
+            {/* 時間軸刻度標頭 */}
+            <div className="mb-3 grid grid-cols-[280px_minmax(0,1fr)_130px] items-end gap-3 border-b border-slate-200 pb-2">
               <div className="text-xs font-bold text-slate-500">案場 / 時程項目</div>
               <div className="relative h-7 text-[11px] font-semibold text-slate-500">
                 {ticks.map((tick, index) => (
@@ -171,76 +226,139 @@ export function GanttChart({ projects, tasks }: GanttProps) {
               <div className="text-right text-xs font-bold text-slate-500">期限 / 負責人</div>
             </div>
 
-            <div className="space-y-5">
+            {/* 案場清單區塊 */}
+            <div className="space-y-4">
               {projectRows.map(({ project, rows }) => {
                 const isProjectLost = project.currentStage === "LOST";
+                const isCollapsed = collapsedProjects.has(project.id);
+
                 return (
-                  <section key={project.id} className="space-y-1">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2 pt-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-black text-slate-900">{project.projectName}</span>
-                        <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{project.currentStage}</span>
-                        {!isProjectLost && project.isDelayed && <span className="shrink-0 text-[10px] font-bold text-red-700">時程逾期</span>}
-                      </div>
-                      <Link
-                        href={`/projects/${project.id}/milestones`}
-                        className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
+                  <section
+                    key={project.id}
+                    className="rounded-xl border border-slate-100 bg-white p-2.5 shadow-2xs hover:border-slate-200 transition"
+                  >
+                    {/* 案場標頭：點擊可切換展開/收合 */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleCollapse(project.id)}
+                        className="flex min-w-0 items-center gap-2 text-left hover:opacity-80 transition"
                       >
-                        查看案場時程
-                      </Link>
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                        )}
+                        <span className="truncate text-sm font-black text-slate-900">{project.projectName}</span>
+                        <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                          {project.currentStage}
+                        </span>
+                        {!isProjectLost && project.isDelayed && (
+                          <span className="shrink-0 rounded bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                            時程逾期
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          ({rows.length} 項時程{isCollapsed ? "・已收合" : ""})
+                        </span>
+                      </button>
+
+                      <div className="flex items-center gap-3">
+                        {project.salesRepName && (
+                          <span className="text-xs text-slate-500 hidden sm:inline">
+                            業務：{project.salesRepName}
+                          </span>
+                        )}
+                        <Link
+                          href={`/projects/${project.id}/milestones`}
+                          className="shrink-0 text-xs font-semibold text-blue-600 hover:underline"
+                        >
+                          查看案場時程
+                        </Link>
+                      </div>
                     </div>
 
-                    {rows.length === 0 ? (
-                      <p className="py-3 text-xs text-slate-400">尚無里程碑或待辦時程。</p>
-                    ) : rows.map((row) => {
-                      const overdue = !isProjectLost && Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
-                      const color = isProjectLost ? (row.status === "COMPLETED" ? "bg-emerald-500" : "bg-slate-400") : markerColor(row);
-                    return (
-                      <div key={row.id} className="grid grid-cols-[270px_minmax(0,1fr)_130px] items-center gap-3 py-1.5">
-                        <div className="flex min-w-0 items-center gap-2 pl-2">
-                          {row.kind === "PROJECT" ? <Calendar className="h-3.5 w-3.5 shrink-0 text-violet-500" /> : row.status === "COMPLETED" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
-                          <span className={`truncate text-xs ${row.kind === "PROJECT" ? "font-bold text-violet-700" : "font-medium text-slate-700"}`}>{row.label}</span>
-                          {row.kind === "TASK" && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">待辦</span>}
-                        </div>
+                    {/* 時程項目列表 (未收合時顯示) */}
+                    {!isCollapsed && (
+                      <div className="pt-1">
+                        {rows.length === 0 ? (
+                          <p className="py-3 text-xs text-slate-400 pl-6">尚無里程碑或待辦時程。</p>
+                        ) : (
+                          rows.map((row) => {
+                            const overdue = !isProjectLost && Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
+                            const color = isProjectLost ? (row.status === "COMPLETED" ? "bg-emerald-500" : "bg-slate-400") : markerColor(row);
 
-                        <div
-                          className="relative h-7 rounded bg-slate-50"
-                          style={{
-                            backgroundImage: "linear-gradient(to right, #e2e8f0 1px, transparent 1px)",
-                            backgroundSize: `${100 / 6}% 100%`,
-                          }}
-                        >
-                          <div
-                            className="absolute bottom-0 top-0 z-10 w-px bg-sky-400/80"
-                            style={{ left: `${positionOf(todayKey)}%` }}
-                            title="今日"
-                          />
-                          {row.dateKey && (
-                            <span
-                              className={`absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${color}`}
-                              style={{ left: `${positionOf(row.dateKey)}%` }}
-                              title={`期限：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
-                            />
-                          )}
-                          {row.actualDateKey && row.actualDateKey !== row.dateKey && (
-                            <span
-                              className="absolute top-1/2 z-20 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500"
-                              style={{ left: `${positionOf(row.actualDateKey)}%` }}
-                              title={`實際完成：${row.actualDateKey}`}
-                            />
-                          )}
-                        </div>
+                            return (
+                              <div
+                                key={row.id}
+                                className="grid grid-cols-[280px_minmax(0,1fr)_130px] items-center gap-3 py-1.5 hover:bg-slate-50/70 rounded px-1 transition"
+                              >
+                                <div className="flex min-w-0 items-center gap-2 pl-4">
+                                  {row.kind === "PROJECT" ? (
+                                    <Calendar className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                                  ) : row.status === "COMPLETED" ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                  ) : (
+                                    <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                  )}
+                                  <span className={`truncate text-xs ${row.kind === "PROJECT" ? "font-bold text-violet-700" : "font-medium text-slate-700"}`}>
+                                    {row.label}
+                                  </span>
+                                  {row.kind === "TASK" && (
+                                    <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">
+                                      待辦
+                                    </span>
+                                  )}
+                                </div>
 
-                        <div className="text-right text-[10px]">
-                          <div className={overdue ? "font-bold text-red-600" : "font-semibold text-slate-600"}>
-                            {row.dateKey ? formatDate(row.dateKey) : "未排定"}
-                            {overdue && "・逾期"}
-                          </div>
-                          <div className="truncate text-slate-400">{row.assignedToName || (row.kind === "PROJECT" ? "案場" : "未指定")}</div>
-                        </div>
+                                <div
+                                  className="relative h-7 rounded bg-slate-50"
+                                  style={{
+                                    backgroundImage: "linear-gradient(to right, #e2e8f0 1px, transparent 1px)",
+                                    backgroundSize: `${100 / 6}% 100%`,
+                                  }}
+                                >
+                                  {/* 今日指示線 */}
+                                  <div
+                                    className="absolute bottom-0 top-0 z-10 w-px bg-sky-400/80"
+                                    style={{ left: `${positionOf(todayKey)}%` }}
+                                    title="今日"
+                                  />
+
+                                  {/* 期限點 */}
+                                  {row.dateKey && (
+                                    <span
+                                      className={`absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${color}`}
+                                      style={{ left: `${positionOf(row.dateKey)}%` }}
+                                      title={`期限：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
+                                    />
+                                  )}
+
+                                  {/* 實際完成點 */}
+                                  {row.actualDateKey && row.actualDateKey !== row.dateKey && (
+                                    <span
+                                      className="absolute top-1/2 z-20 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500"
+                                      style={{ left: `${positionOf(row.actualDateKey)}%` }}
+                                      title={`實際完成：${row.actualDateKey}`}
+                                    />
+                                  )}
+                                </div>
+
+                                <div className="text-right text-[10px]">
+                                  <div className={overdue ? "font-bold text-red-600" : "font-semibold text-slate-600"}>
+                                    {row.dateKey ? formatDate(row.dateKey) : "未排定"}
+                                    {overdue && "・逾期"}
+                                  </div>
+                                  <div className="truncate text-slate-400">
+                                    {row.assignedToName || (row.kind === "PROJECT" ? "案場" : "未指定")}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
-                    );
-                  })}
+                    )}
                   </section>
                 );
               })}

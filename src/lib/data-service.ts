@@ -1577,68 +1577,6 @@ export const DataService = {
   },
 
 
-  async updateProjectStage(projectId: string, currentStage: ProjectStage) {
-    return await prisma.$transaction(async (tx) => {
-      const milestones = await tx.projectMilestone.findMany({
-        where: { projectId },
-        orderBy: { stageOrder: "asc" },
-      });
-
-      const stagePhaseOrder = ["DEVELOP", "REQUIREMENT", "PROPOSAL", "PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE"];
-      const targetPhaseIndex = stagePhaseOrder.indexOf(currentStage);
-
-      if (targetPhaseIndex !== -1 && milestones.length > 0) {
-        for (const m of milestones) {
-          const phaseIdx = stagePhaseOrder.indexOf(m.phase);
-          if (phaseIdx !== -1 && phaseIdx < targetPhaseIndex && m.status !== "COMPLETED") {
-            await tx.projectMilestone.update({
-              where: { id: m.id },
-              data: { status: MilestoneStatus.COMPLETED, actualDueDate: m.actualDueDate || new Date() },
-            });
-            await tx.salesTask.updateMany({
-              where: { milestoneId: m.id, isCompleted: false },
-              data: { isCompleted: true, completedAt: new Date() },
-            });
-          }
-        }
-        const targetPhaseMilestones = milestones.filter((m) => m.phase === currentStage);
-        if (targetPhaseMilestones.length > 0) {
-          const firstIncomplete = targetPhaseMilestones.find((m) => m.status !== "COMPLETED");
-          if (firstIncomplete && firstIncomplete.status === "PENDING") {
-            await tx.projectMilestone.update({
-              where: { id: firstIncomplete.id },
-              data: { status: MilestoneStatus.IN_PROGRESS },
-            });
-          }
-        }
-      }
-
-      const updatedMilestones = await tx.projectMilestone.findMany({
-        where: { projectId },
-        orderBy: { stageOrder: "asc" },
-      });
-      const evaluated = ScheduleEngine.evaluateMilestones(
-        updatedMilestones.map((m) => ({
-          id: m.id,
-          projectId: m.projectId,
-          stageCode: m.stageCode as MilestoneStageCode,
-          phase: m.phase as MilestonePhaseDTO,
-          stageOrder: m.stageOrder,
-          plannedDueDate: dateOnlyValue(m.plannedDueDate),
-          actualDueDate: dateOnlyValue(m.actualDueDate),
-          status: m.status,
-        })),
-        new Date(),
-        currentStage === "LOST",
-      );
-
-      return tx.project.update({
-        where: { id: projectId },
-        data: { currentStage, isDelayed: evaluated.isDelayed },
-      });
-    });
-  },
-
   async evaluateAllSchedules() {
     return { alerts: [] }; // Mock for now
   },

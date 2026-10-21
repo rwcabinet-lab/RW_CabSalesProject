@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const key = req.nextUrl.searchParams.get("key");
     if (key === "columns") {
       const savedColumns = await DataService.getAppConfig<unknown>("project_columns", []);

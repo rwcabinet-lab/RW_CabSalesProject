@@ -54,10 +54,6 @@ export async function verifySessionToken(cookieValue: string | null | undefined)
 
   const parts = cookieValue.split(".");
   if (parts.length !== 2) {
-    // 過渡相容：若為既有登入的標準 cuid 格式 (c 開頭接英數字)，暫時允許通過
-    if (/^c[a-z0-9]{20,32}$/.test(cookieValue)) {
-      return { userId: cookieValue };
-    }
     return null;
   }
 

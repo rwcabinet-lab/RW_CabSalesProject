@@ -31,6 +31,10 @@ export async function middleware(request: NextRequest) {
       if (isApiRequest) return NextResponse.json({ error: "沒有權限存取此頁面" }, { status: 403 });
       return NextResponse.redirect(new URL("/forbidden", request.url));
     }
+  } else {
+    // 若已登入但 Session Payload 缺少有效角色，視為無效憑據，強制重新登入
+    if (isApiRequest) return NextResponse.json({ error: "登入憑據無效，請重新登入" }, { status: 401 });
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();
