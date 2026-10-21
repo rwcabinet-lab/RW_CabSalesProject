@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
-import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
+import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 
 interface CalendarProps {
   projects: ProjectWithMilestonesDTO[];

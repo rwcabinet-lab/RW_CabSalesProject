@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Users, ArrowRight, Sparkles, Building2 } from "lucide-react";
 import { DataService } from "@/lib/data-service";
-import { PROJECT_STAGE_LABELS } from "@/lib/mock-data";
+import { PROJECT_STAGE_LABELS } from "@/lib/constants";
 
 const COMPLETED_STAGES = new Set(["DONE", "CLOSED", "BILLED", "LOST"]);
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
-import { QUOTE_STAGE_CODES } from "@/lib/mock-data";
+import { QUOTE_STAGE_CODES } from "@/lib/constants";
 
 export async function GET(
   req: NextRequest,

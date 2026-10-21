@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
-import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
+import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 
 interface GanttProps {
   projects: ProjectWithMilestonesDTO[];

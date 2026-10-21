@@ -19,7 +19,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
-import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS, normalizeProjectColumns } from "@/lib/mock-data";
+import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS, normalizeProjectColumns } from "@/lib/constants";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO } from "@/types/dto";
 
 type ManagedUser = { id: string; name: string; email: string; role: AppRole };

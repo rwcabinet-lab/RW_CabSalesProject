@@ -57,7 +57,6 @@ const PAGE_PATHS: Array<{ prefix: string; key: PageAccessKey }> = [
   { prefix: "/projects", key: "projects" },
   { prefix: "/api/tasks", key: "workbench" },
   { prefix: "/api/schedule", key: "workbench" },
-  { prefix: "/api/catalog", key: "projects" },
 ];
 
 export function getPageAccessKey(pathname: string, method?: string): PageAccessKey {

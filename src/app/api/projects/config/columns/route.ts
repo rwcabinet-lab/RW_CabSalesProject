@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { normalizeProjectColumns } from "@/lib/mock-data";
+import { normalizeProjectColumns } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 

@@ -3,7 +3,7 @@ import {
   MilestoneStageCode,
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
-} from "./mock-data";
+} from "./constants";
 
 export interface TrafficLightStatus {
   color: "RED" | "YELLOW" | "GREEN" | "GRAY";

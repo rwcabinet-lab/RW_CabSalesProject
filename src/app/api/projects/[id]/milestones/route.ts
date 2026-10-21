@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
-import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/mock-data";
+import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
 import { AppError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";

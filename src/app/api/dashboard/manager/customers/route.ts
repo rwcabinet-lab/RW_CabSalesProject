@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
-import { MILESTONE_STAGE_LABELS } from "@/lib/mock-data";
+import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import type { CustomerStatsDashboardDTO } from "@/types/dto";
 
 export const dynamic = "force-dynamic";

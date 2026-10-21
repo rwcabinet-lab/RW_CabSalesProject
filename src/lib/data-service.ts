@@ -10,14 +10,12 @@ import type {
   MilestonePhaseDTO,
   MilestoneStageCodeDTO as MilestoneStageCode,
   ProjectDTO as ProjectDetail,
-  QuoteVersionCreateDTO,
   TaskDTO as SalesTaskItem,
 } from "@/types/dto";
 import {
-  MasterBoardItem, MasterHardwareItem, MasterProcessingItem, QuotationData,
   AUDIT_STAGE_CODES, MILESTONE_DEFAULT_DAYS, MILESTONE_STAGE_LABELS,
   STANDARD_MILESTONE_STAGE_CODES, STAGE_CODE_TO_PHASE
-} from "./mock-data";
+} from "./constants";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
 import { NotFoundError, BadRequestError, ConflictError } from "./errors";
 
@@ -67,18 +65,6 @@ const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerTyp
 const customerTypeForDatabase = (type: CustomerTypeDTO): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
 
 export const DataService = {
-  async getCatalog(): Promise<{ boards: MasterBoardItem[]; hardware: MasterHardwareItem[]; processing: MasterProcessingItem[] }> {
-    const [boards, hardware, processing] = await Promise.all([
-      prisma.masterBoard.findMany({ orderBy: { brand: "asc" } }),
-      prisma.masterHardware.findMany({ orderBy: { brand: "asc" } }),
-      prisma.masterProcessing.findMany({ orderBy: { processName: "asc" } }),
-    ]);
-    return {
-      boards: boards.map(item => ({ ...item, retailPrice: Number(item.retailPrice), colorCode: item.colorCode, thicknessMm: item.thicknessMm })),
-      hardware: hardware.map(item => ({ ...item, retailPrice: Number(item.retailPrice), modelName: item.modelName })),
-      processing: processing.map(item => ({ ...item, retailPrice: Number(item.retailPrice), processName: item.processName })),
-    };
-  },
 
   async getCustomers(): Promise<CustomerItem[]> {
     const customers = await prisma.customer.findMany({
@@ -376,31 +362,6 @@ export const DataService = {
     };
   },
 
-  async getQuotesByProjectId(projectId: string): Promise<QuotationData[]> {
-    const quotes = await prisma.quotation.findMany({ where: { projectId }, orderBy: [{ createdAt: "desc" }, { version: "desc" }] });
-    return quotes.map(q => ({
-      id: q.id, projectId: q.projectId, version: q.version, externalQuoteNo: q.externalQuoteNo || undefined, quoteFileUrl: q.quoteFileUrl || undefined,
-      notes: q.notes || undefined, totalAmount: Number(q.totalAmount), status: q.status as QuotationData["status"],
-      createdAt: q.createdAt.toISOString(), updatedAt: q.updatedAt.toISOString(),
-    }));
-  },
-
-  async getLatestQuotesByProjectIds(projectIds?: string[]): Promise<Record<string, QuotationData>> {
-    if (projectIds && projectIds.length === 0) return {};
-    const quotes = await prisma.quotation.findMany({
-      ...(projectIds ? { where: { projectId: { in: projectIds } } } : {}),
-      orderBy: [{ createdAt: "desc" }, { version: "desc" }],
-    });
-    const result: Record<string, QuotationData> = {};
-    for (const q of quotes) {
-      if (!result[q.projectId]) result[q.projectId] = {
-        id: q.id, projectId: q.projectId, version: q.version, externalQuoteNo: q.externalQuoteNo || undefined, quoteFileUrl: q.quoteFileUrl || undefined,
-        notes: q.notes || undefined, totalAmount: Number(q.totalAmount), status: q.status as QuotationData["status"],
-        createdAt: q.createdAt.toISOString(), updatedAt: q.updatedAt.toISOString(),
-      };
-    }
-    return result;
-  },
 
   async getMilestonesByProjectIds(projectIds?: string[]): Promise<Record<string, ProjectMilestoneItem[]>> {
     if (projectIds && projectIds.length === 0) return {};
@@ -1587,9 +1548,6 @@ export const DataService = {
     return result.count > 0;
   },
 
-  async addQuoteVersion(projectId: string, data: QuoteVersionCreateDTO) {
-    return prisma.quotation.create({ data: { projectId, ...data } });
-  },
 
   async updateProjectStage(projectId: string, currentStage: ProjectStage) {
     return prisma.project.update({ where: { id: projectId }, data: { currentStage } });

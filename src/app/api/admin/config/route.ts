@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/mock-data";
+import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
 
 export const dynamic = "force-dynamic";

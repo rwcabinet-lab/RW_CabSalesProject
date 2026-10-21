@@ -33,7 +33,7 @@ import {
   STAGE_CODE_TO_PHASE,
   AUDIT_STAGE_CODES,
   QUOTE_STAGE_CODES,
-} from "@/lib/mock-data";
+} from "@/lib/constants";
 import type {
   ApiResponse,
   MilestoneDTO,

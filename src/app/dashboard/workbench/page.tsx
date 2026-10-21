@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/mock-data";
+import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
 import type {
   ApiResponse,
