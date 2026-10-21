@@ -207,6 +207,31 @@ export const DataService = {
       };
     });
     const evaluated = ScheduleEngine.evaluateMilestones(rawMilestones);
+    const correctIsDelayed = p.currentStage === "LOST" ? false : evaluated.isDelayed;
+
+    if (p.isDelayed !== correctIsDelayed) {
+      prisma.project
+        .update({
+          where: { id },
+          data: { isDelayed: correctIsDelayed },
+        })
+        .catch((err) => console.error("Failed to auto-sync project isDelayed:", err));
+    }
+    const statusChanged = evaluated.milestones.filter((m) => {
+      const orig = rawMilestones.find((r) => r.id === m.id);
+      return orig && orig.status !== m.status;
+    });
+    if (statusChanged.length > 0) {
+      Promise.all(
+        statusChanged.map((m) =>
+          prisma.projectMilestone.update({
+            where: { id: m.id },
+            data: { status: m.status },
+          })
+        )
+      ).catch((err) => console.error("Failed to auto-sync milestone status:", err));
+    }
+
     const project: ProjectDetail = {
       id: p.id,
       projectName: p.projectName,
@@ -223,7 +248,7 @@ export const DataService = {
       salesAssistantId: p.salesAssistantId || undefined,
       salesAssistantName: p.salesAssistant?.name,
       currentStage: p.currentStage,
-      isDelayed: p.isDelayed || evaluated.isDelayed,
+      isDelayed: correctIsDelayed,
       expectedDate: dateValue(p.expectedDate),
       estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
       unitCount: p.unitCount ?? undefined,
@@ -576,12 +601,27 @@ export const DataService = {
       throw new ConflictError("已完成的里程碑不可編輯");
     }
 
+    let targetStatus = updates.status;
+    if (targetStatus === undefined && updates.plannedDueDate !== undefined) {
+      const newDue = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
+      const today = new Date().toISOString().slice(0, 10);
+      if (currentMilestone.status === MilestoneStatus.OVERDUE) {
+        if (newDue && newDue >= today) {
+          targetStatus = MilestoneStatus.IN_PROGRESS;
+        }
+      } else if (currentMilestone.status === MilestoneStatus.IN_PROGRESS) {
+        if (newDue && newDue < today) {
+          targetStatus = MilestoneStatus.OVERDUE;
+        }
+      }
+    }
+
     const milestonePromise = prisma.projectMilestone.update({
       where: { id: milestoneId, projectId },
       data: {
         plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
         actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
-        status: updates.status,
+        status: targetStatus,
         priority: updates.priority,
         assignedToId: updates.assignedToId,
         attachments: updates.attachments,
@@ -650,27 +690,37 @@ export const DataService = {
 
     const [updatedRow] = await Promise.all([milestonePromise, taskPromise]);
 
+    const currentList = existingMilestones
+      ? existingMilestones.map((m) =>
+          m.id === milestoneId
+            ? {
+                ...m,
+                plannedDueDate: dateOnlyValue(updatedRow.plannedDueDate),
+                actualDueDate: dateOnlyValue(updatedRow.actualDueDate),
+                status: updatedRow.status,
+                priority: updatedRow.priority,
+                assignedToId: updatedRow.assignedToId || (customerSalesRep ? customerSalesRep.id : m.assignedToId),
+                assignedToName: updatedRow.assignedTo?.name || (customerSalesRep ? customerSalesRep.name : m.assignedToName),
+                attachments: updatedRow.attachments,
+                notes: updatedRow.notes,
+              }
+            : m
+        )
+      : await this.getMilestonesByProjectId(projectId);
+
+    const evaluated = ScheduleEngine.evaluateMilestones(currentList);
+    await prisma.project
+      .update({
+        where: { id: projectId },
+        data: { isDelayed: evaluated.isDelayed },
+      })
+      .catch((err) => console.error("Failed to sync project isDelayed on milestone update:", err));
+
     if (existingMilestones && customerSalesRep) {
-      const updatedList = existingMilestones.map((m) =>
-        m.id === milestoneId
-          ? {
-              ...m,
-              plannedDueDate: dateOnlyValue(updatedRow.plannedDueDate),
-              actualDueDate: dateOnlyValue(updatedRow.actualDueDate),
-              status: updatedRow.status,
-              priority: updatedRow.priority,
-              assignedToId: updatedRow.assignedToId || customerSalesRep.id,
-              assignedToName: updatedRow.assignedTo?.name || customerSalesRep.name,
-              attachments: updatedRow.attachments,
-              notes: updatedRow.notes,
-            }
-          : m
-      );
-      const evaluated = ScheduleEngine.evaluateMilestones(updatedList).milestones;
-      return evaluated.find((m) => m.id === milestoneId);
+      return evaluated.milestones.find((m) => m.id === milestoneId);
     }
 
-    return (await this.getMilestonesByProjectId(projectId)).find(m => m.id === milestoneId);
+    return (await this.getMilestonesByProjectId(projectId)).find((m) => m.id === milestoneId);
   },
 
   async advanceMilestone(

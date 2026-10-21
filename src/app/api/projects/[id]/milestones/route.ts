@@ -56,12 +56,12 @@ export async function GET(
       ? await DataService.activateLegacyWrapUpMilestone(projectId)
       : initialMilestones;
     const isProjectLost = projectRecord.currentStage === "LOST";
-    const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones, new Date(), isProjectLost);
-    const project = { ...projectRecord, isDelayed: isProjectLost ? false : (projectRecord.isDelayed || isDelayed) };
+    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(milestones, new Date(), isProjectLost);
+    const project = { ...projectRecord, isDelayed: isProjectLost ? false : isDelayed };
 
     return NextResponse.json({
       project,
-      milestones: attachTrafficLights(milestones, isProjectLost),
+      milestones: attachTrafficLights(evaluatedMilestones, isProjectLost),
     });
   } catch (error) {
     console.error("Failed to get milestones:", error);

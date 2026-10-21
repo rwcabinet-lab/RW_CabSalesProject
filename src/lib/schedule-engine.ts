@@ -53,15 +53,17 @@ export const ScheduleEngine = {
       return { color: "GRAY", label: "未排定時程", daysDiff: 999 };
     }
 
-    const dueDate = new Date(milestone.plannedDueDate);
-    const diffTime = dueDate.getTime() - currentDate.getTime();
-    const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const [dy, dm, dd] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
+    const dueDateUtc = Date.UTC(dy, dm - 1, dd);
+    const [cy, cm, cd] = currentDate.toISOString().slice(0, 10).split("-").map(Number);
+    const curDateUtc = Date.UTC(cy, cm - 1, cd);
+    const daysDiff = Math.round((dueDateUtc - curDateUtc) / (1000 * 60 * 60 * 24));
 
     if (daysDiff < 0) {
       return { color: "RED", label: `逾期 ${Math.abs(daysDiff)} 天`, daysDiff };
     }
 
-    if (daysDiff === 0 || milestone.status === "OVERDUE") {
+    if (daysDiff === 0) {
       return { color: "RED", label: "已到期", daysDiff: 0 };
     }
 
@@ -97,15 +99,18 @@ export const ScheduleEngine = {
     }
 
     let hasOverdue = false;
+    const curDateOnly = currentDate.toISOString().slice(0, 10);
 
     const evaluated = milestones.map((m) => {
       if (m.status === "COMPLETED") return m;
 
       if (m.plannedDueDate && m.status !== "PENDING") {
-        const due = new Date(m.plannedDueDate);
-        if (due.getTime() < currentDate.getTime()) {
+        const dueDateOnly = m.plannedDueDate.slice(0, 10);
+        if (dueDateOnly < curDateOnly) {
           hasOverdue = true;
           return { ...m, status: "OVERDUE" as const };
+        } else if (m.status === "OVERDUE") {
+          return { ...m, status: "IN_PROGRESS" as const };
         }
       }
 
@@ -139,22 +144,6 @@ export const ScheduleEngine = {
       throw new Error("只能完成目前進行中的里程碑");
     }
 
-    const target = sorted[targetIndex];
-
-    // 若正規進度實際完成日早於預定完成日，計算提前天數
-    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
-    let daysSaved = 0;
-    if (isRegularStage && target.plannedDueDate) {
-      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
-      const [ay, am, ad] = nowDate.slice(0, 10).split("-").map(Number);
-      const plannedTime = Date.UTC(py, pm - 1, pd);
-      const actualTime = Date.UTC(ay, am - 1, ad);
-      const diffDays = Math.round((plannedTime - actualTime) / (1000 * 60 * 60 * 24));
-      if (diffDays > 0) {
-        daysSaved = diffDays;
-      }
-    }
-
     // 1. 標記當前進度為已完成
     sorted[targetIndex] = {
       ...sorted[targetIndex],
@@ -163,22 +152,6 @@ export const ScheduleEngine = {
       notes: options?.notes || sorted[targetIndex].notes,
       attachments: options?.attachments || sorted[targetIndex].attachments,
     };
-
-    // 若有提前完成天數，將後續尚未完成之正規項目預定完成日自動提前
-    if (daysSaved > 0) {
-      for (let i = targetIndex + 1; i < sorted.length; i++) {
-        const item = sorted[i];
-        if (item.status !== "COMPLETED" && !["X-1", "X-2"].includes(item.stageCode) && item.plannedDueDate) {
-          const [iy, im, id] = item.plannedDueDate.slice(0, 10).split("-").map(Number);
-          const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
-          nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
-          sorted[i] = {
-            ...item,
-            plannedDueDate: nextPlanned.toISOString().slice(0, 10),
-          };
-        }
-      }
-    }
 
     let newCurrentStage = STAGE_CODE_TO_PROJECT_STAGE[sorted[targetIndex].stageCode] || "CONTACT";
 
