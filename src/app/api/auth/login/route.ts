@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
 import { DataService } from "@/lib/data-service";
+import { SESSION_COOKIE_NAME, signSessionUserId } from "@/lib/session";
 
 const DEFAULT_LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
 
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest) {
       user: { id: profile.id || userId, name: profile.name || "", role: profile.role },
       redirectTo: getRoleLandingPath(profile.role, profile.pages),
     });
-    response.cookies.set("cab_sales_user_id", profile.id || userId, {
+    const signedToken = await signSessionUserId(profile.id || userId, profile.role);
+    response.cookies.set(SESSION_COOKIE_NAME, signedToken, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySessionToken } from "@/lib/session";
+import { canRoleAccessPath } from "@/lib/page-access";
 
 export async function middleware(request: NextRequest) {
-  const userId = request.cookies.get("cab_sales_user_id")?.value;
+  const rawCookie = request.cookies.get("cab_sales_user_id")?.value;
+  const session = await verifySessionToken(rawCookie);
+  const userId = session?.userId;
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isApiRequest = request.nextUrl.pathname.startsWith("/api/");
   const pathname = request.nextUrl.pathname;
@@ -20,32 +24,13 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/api/auth/")) return NextResponse.next();
 
-  try {
-    const accessTarget = `${pathname}${request.nextUrl.search}`;
-    const authorization = await fetch(
-      new URL(
-        `/api/auth/authorize?path=${encodeURIComponent(accessTarget)}&method=${encodeURIComponent(request.method)}`,
-        request.url,
-      ),
-      {
-        headers: { cookie: request.headers.get("cookie") || "" },
-        cache: "no-store",
-      },
-    );
-    if (authorization.status === 401) {
-      if (isApiRequest) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    if (authorization.status === 403) {
+  // 透過已簽署之 Session Token 直接進行 Edge 權限查核，消除 Middleware 自呼叫 Loopback API 造成的延遲與死結風險
+  if (session?.role) {
+    const allowed = canRoleAccessPath(session.role, pathname, request.method);
+    if (!allowed) {
       if (isApiRequest) return NextResponse.json({ error: "沒有權限存取此頁面" }, { status: 403 });
       return NextResponse.redirect(new URL("/forbidden", request.url));
     }
-    if (!authorization.ok) {
-      return NextResponse.json({ error: "無法確認頁面權限，請稍後重試" }, { status: 503 });
-    }
-  } catch (error) {
-    console.error("Page access check failed:", error);
-    return NextResponse.json({ error: "無法確認頁面權限，請稍後重試" }, { status: 503 });
   }
 
   return NextResponse.next();

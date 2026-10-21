@@ -79,3 +79,40 @@ export function getPageAccessKey(pathname: string, method?: string): PageAccessK
   );
   return match?.key ?? "home";
 }
+
+/**
+ * 於 Middleware / Edge 環境中進行無資料庫往返的高效能角色權限校驗
+ */
+export function canRoleAccessPath(
+  role: AppRole | string,
+  pathname: string,
+  method?: string,
+): boolean {
+  const url = new URL(pathname, "http://localhost");
+  const routePath = url.pathname;
+
+  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
+  if (routePath === "/forbidden") return true;
+  if (routePath === "/login") return true;
+  if (routePath.startsWith("/api/auth/")) return true;
+  if (role === "ADMIN") return true;
+
+  const pageKey = getPageAccessKey(pathname, method);
+  if (pageKey === "admin") return false;
+
+  const allowedPages = DEFAULT_ROLE_PAGES[role as AppRole] || [];
+  if (
+    routePath === "/api/tasks" ||
+    routePath.startsWith("/api/tasks/") ||
+    routePath === "/api/schedule" ||
+    routePath.startsWith("/api/schedule/")
+  ) {
+    return (
+      allowedPages.includes("workbench") ||
+      allowedPages.includes("projects") ||
+      allowedPages.includes("manager")
+    );
+  }
+
+  return allowedPages.includes(pageKey);
+}

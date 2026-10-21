@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { AUDIT_STAGE_CODES } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
+import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    const sessionUserId = await getVerifiedUserIdFromRequest(req);
     if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();

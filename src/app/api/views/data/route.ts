@@ -6,12 +6,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [projects, milestonesByProject, tasks, users] = await Promise.all([
+    const [projects, tasks, users] = await Promise.all([
       DataService.getProjects(),
-      DataService.getMilestonesByProjectIds(),
       DataService.getTasks(),
       DataService.getLoginUsers(),
     ]);
+    const projectIds = projects.map((p) => p.id);
+    const milestonesByProject = await DataService.getMilestonesByProjectIds(projectIds);
     const staff = users
       .filter((user): user is typeof user & { role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" } =>
         user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT" || user.role === "SITE_ENGINEER"

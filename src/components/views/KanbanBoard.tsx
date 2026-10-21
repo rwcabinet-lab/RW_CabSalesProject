@@ -26,14 +26,28 @@ interface KanbanProps {
 }
 
 const STAGES = [
-  { id: "CONTACT", label: "接洽階段", color: "bg-blue-100 text-blue-800" },
-  { id: "DESIGN", label: "設計確認階段", color: "bg-indigo-100 text-indigo-800" },
-  { id: "PRODUCTION", label: "生產施工階段", color: "bg-amber-100 text-amber-800" },
+  { id: "DEVELOP", label: "案件開發", color: "bg-blue-100 text-blue-800" },
+  { id: "REQUIREMENT", label: "現況及需求確認", color: "bg-sky-100 text-sky-800" },
+  { id: "PROPOSAL", label: "提案/報價/簽約", color: "bg-indigo-100 text-indigo-800" },
+  { id: "PRE_PROD", label: "生產前確認/拆單", color: "bg-purple-100 text-purple-800" },
+  { id: "PROD_SHIP", label: "生產及派送", color: "bg-amber-100 text-amber-800" },
+  { id: "INSTALL", label: "安裝及驗收", color: "bg-orange-100 text-orange-800" },
+  { id: "CLOSURE", label: "結案/售後", color: "bg-teal-100 text-teal-800" },
   { id: "CLOSED", label: "已結案", color: "bg-emerald-100 text-emerald-800" },
   { id: "BILLED", label: "已立帳", color: "bg-cyan-100 text-cyan-800" },
-  { id: "WRAP_UP", label: "收尾", color: "bg-amber-100 text-amber-800" },
-  { id: "LOST", label: "流標", color: "bg-slate-200 text-slate-800" },
+  { id: "WRAP_UP", label: "收尾", color: "bg-rose-100 text-rose-800" },
+  { id: "LOST", label: "已流標", color: "bg-slate-200 text-slate-800" },
 ];
+
+function matchesStage(projectStage: string, columnId: string): boolean {
+  if (projectStage === columnId) return true;
+  // 向下相容歷史階段常數
+  if (columnId === "DEVELOP" && ["CONTACT", "INQUIRY", "MEASUREMENT", "QUOTE", "CONTRACT"].includes(projectStage)) return true;
+  if (columnId === "PROPOSAL" && projectStage === "DESIGN") return true;
+  if (columnId === "PROD_SHIP" && (projectStage === "PRODUCTION" || projectStage === "HANDOFF")) return true;
+  if (columnId === "CLOSED" && projectStage === "DONE") return true;
+  return false;
+}
 
 export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
   const [items, setItems] = useState(projects);
@@ -109,7 +123,7 @@ export function KanbanBoard({ projects, onProjectStageChange }: KanbanProps) {
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-6 min-h-[650px] pt-1">
           {STAGES.map((col) => {
-            const columnProjects = items.filter((p) => p.currentStage === col.id);
+            const columnProjects = items.filter((p) => matchesStage(p.currentStage, col.id));
 
             return (
               <div

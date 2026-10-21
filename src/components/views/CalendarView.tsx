@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -92,34 +92,43 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
   const leadingBlanks = firstDay.getDay();
   const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
   const todayKey = keyFromDate(new Date());
-  const eventsByDate = new Map<string, CalendarEvent[]>();
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    const addEvent = (dateKey: string | null, event: CalendarEvent) => {
+      if (!dateKey) return;
+      const events = map.get(dateKey) || [];
+      events.push(event);
+      map.set(dateKey, events);
+    };
 
-  const addEvent = (dateKey: string | null, event: CalendarEvent) => {
-    if (!dateKey) return;
-    const events = eventsByDate.get(dateKey) || [];
-    events.push(event);
-    eventsByDate.set(dateKey, events);
-  };
-
-  for (const project of projects) {
-    for (const milestone of project.milestones) {
-      if (milestone.assignedToId && hiddenStaffIds.has(milestone.assignedToId)) continue;
-      addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });
+    for (const project of projects) {
+      for (const milestone of project.milestones) {
+        if (milestone.assignedToId && hiddenStaffIds.has(milestone.assignedToId)) continue;
+        addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });
+      }
     }
-  }
-  for (const task of tasks) {
-    if (hiddenStaffIds.has(task.assignedToId)) continue;
-    addEvent(toDateKey(task.dueDatetime), { type: "TASK", task });
-  }
+    for (const task of tasks) {
+      if (hiddenStaffIds.has(task.assignedToId)) continue;
+      addEvent(toDateKey(task.dueDatetime), { type: "TASK", task });
+    }
+    return map;
+  }, [projects, tasks, hiddenStaffIds]);
 
   const changeMonth = (offset: number) => {
     const date = new Date(month.year, month.month + offset, 1);
     setMonth({ year: date.getFullYear(), month: date.getMonth() });
   };
 
-  const currentMonthEvents = Array.from(eventsByDate.entries())
-    .filter(([dateKey]) => dateKey.startsWith(`${month.year}-${String(month.month + 1).padStart(2, "0")}`))
-    .reduce((total, [, dayEvents]) => total + dayEvents.length, 0);
+  const currentMonthEvents = useMemo(() => {
+    const prefix = `${month.year}-${String(month.month + 1).padStart(2, "0")}`;
+    let total = 0;
+    for (const [dateKey, dayEvents] of eventsByDate.entries()) {
+      if (dateKey.startsWith(prefix)) {
+        total += dayEvents.length;
+      }
+    }
+    return total;
+  }, [eventsByDate, month.year, month.month]);
 
   return (
     <div className="space-y-5">

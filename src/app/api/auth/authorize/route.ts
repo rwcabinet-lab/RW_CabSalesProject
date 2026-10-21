@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canUserAccessPath } from "@/lib/access-control";
+import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const userId = request.cookies.get("cab_sales_user_id")?.value;
+  const userId = await getVerifiedUserIdFromRequest(request);
   if (!userId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
   const pathname = request.nextUrl.searchParams.get("path");

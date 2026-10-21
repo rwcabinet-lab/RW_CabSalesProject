@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { DataService } from "@/lib/data-service";
+import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { oldPassword, newPassword, confirmPassword, targetUserId, userId: bodyUserId } = body;
-    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value || bodyUserId;
+    const sessionUserId = await getVerifiedUserIdFromRequest(req);
     if (!sessionUserId) {
       return NextResponse.json({ error: "未登入或操作逾時，請重新登入" }, { status: 401 });
     }

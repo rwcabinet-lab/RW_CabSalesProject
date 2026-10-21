@@ -36,6 +36,9 @@ export async function GET(req: NextRequest) {
 // POST /api/projects — 新增案場
 export async function POST(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const body = await req.json();
     const { projectName, customerId, siteAddress, siteCondition, expectedDate, unitCount, cost, quoteAmount } = body;
 

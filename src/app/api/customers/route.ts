@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
+import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 async function requireAdmin(req: NextRequest) {
   const user = await getUserFromRequest(req);
@@ -24,7 +25,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const sessionUserId = req.cookies.get("cab_sales_user_id")?.value;
+    const sessionUserId = await getVerifiedUserIdFromRequest(req);
     if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();

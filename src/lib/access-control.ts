@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { AppRole, DEFAULT_ROLE_PAGES, getPageAccessKey, PageAccessKey } from "@/lib/page-access";
+import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 export interface UserAccessProfile {
   id?: string;
@@ -99,7 +100,7 @@ export async function getUserByIdCached(userId: string) {
 }
 
 export async function getUserFromRequest(request: NextRequest) {
-  const userId = request.cookies.get("cab_sales_user_id")?.value;
+  const userId = await getVerifiedUserIdFromRequest(request);
   if (!userId) return null;
   return getUserByIdCached(userId);
 }

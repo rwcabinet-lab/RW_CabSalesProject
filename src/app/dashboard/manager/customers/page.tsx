@@ -7,6 +7,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
+import { formatTenThousands } from "@/lib/currency";
 
 const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   LONGMEI_STORE: "隆美",
@@ -24,15 +25,6 @@ const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   DIRECT: "直接業主",
   OTHER: "其他",
 };
-
-function formatTenThousands(amount: number) {
-  if (!amount) return "$0";
-  const inTenThousands = amount / 10000;
-  return `$${inTenThousands.toLocaleString("zh-TW", {
-    minimumFractionDigits: inTenThousands % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 1,
-  })} 萬`;
-}
 
 export default function CustomerStatsPage() {
   const { data, isLoading: loading } = useManagerCustomerStatsQuery();

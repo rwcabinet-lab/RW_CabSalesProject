@@ -207,9 +207,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       setProjectEditError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -466,9 +466,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
       alert("已成功取消流標狀態，案件已恢復為進行中。");
     } catch (err) {
       alert(err instanceof Error ? err.message : "取消流標失敗");
@@ -575,9 +575,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
@@ -614,9 +614,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "完成推進失敗");
     } finally {
@@ -654,9 +654,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "儲存失敗");
     } finally {
@@ -687,9 +687,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       setSpecialAdvanceError(err instanceof Error ? err.message : "操作失敗");
     } finally {
@@ -722,9 +722,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       } else {
         await refreshMilestonesOnly();
       }
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"] });
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "回退失敗");
     } finally {

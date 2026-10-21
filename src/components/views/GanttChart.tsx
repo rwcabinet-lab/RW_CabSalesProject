@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
@@ -51,70 +52,81 @@ function addDays(key: string, days: number): string {
 
 export function GanttChart({ projects, tasks }: GanttProps) {
   const todayKey = getDateKey(new Date().toISOString())!;
-  const taskByProject = new Map<string, TaskDTO[]>();
-  for (const task of tasks) {
-    const projectTasks = taskByProject.get(task.projectId) || [];
-    projectTasks.push(task);
-    taskByProject.set(task.projectId, projectTasks);
-  }
 
-  const projectRows = projects.map((project) => {
-    const rows: TimelineRow[] = project.milestones.map((milestone) => ({
-      id: `milestone-${milestone.id}`,
-      label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
-      kind: "MILESTONE",
-      dateKey: getDateKey(milestone.plannedDueDate),
-      actualDateKey: getDateKey(milestone.actualDueDate),
-      status: milestone.status,
-      assignedToName: milestone.assignedToName,
-      projectId: project.id,
-    }));
-
-    const projectTasks = taskByProject.get(project.id) || [];
-    for (const task of projectTasks) {
-      rows.push({
-        id: `task-${task.id}`,
-        label: task.subject,
-        kind: "TASK",
-        dateKey: getDateKey(task.dueDatetime),
-        actualDateKey: getDateKey(task.completedAt),
-        status: task.isCompleted ? "COMPLETED" : undefined,
-        assignedToName: task.assignedToName,
-        projectId: project.id,
-      });
+  const { projectRows, ticks, positionOf, startKey, endKey } = useMemo(() => {
+    const taskByProject = new Map<string, TaskDTO[]>();
+    for (const task of tasks) {
+      const projectTasks = taskByProject.get(task.projectId) || [];
+      projectTasks.push(task);
+      taskByProject.set(task.projectId, projectTasks);
     }
 
-    const expectedDate = getDateKey(project.expectedDate);
-    if (expectedDate) {
-      rows.push({
-        id: `expected-${project.id}`,
-        label: "預計完工",
-        kind: "PROJECT",
-        dateKey: expectedDate,
+    const rowsData = projects.map((project) => {
+      const rows: TimelineRow[] = project.milestones.map((milestone) => ({
+        id: `milestone-${milestone.id}`,
+        label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
+        kind: "MILESTONE",
+        dateKey: getDateKey(milestone.plannedDueDate),
+        actualDateKey: getDateKey(milestone.actualDueDate),
+        status: milestone.status,
+        assignedToName: milestone.assignedToName,
         projectId: project.id,
-      });
-    }
+      }));
 
-    return { project, rows };
-  });
+      const projectTasks = taskByProject.get(project.id) || [];
+      for (const task of projectTasks) {
+        rows.push({
+          id: `task-${task.id}`,
+          label: task.subject,
+          kind: "TASK",
+          dateKey: getDateKey(task.dueDatetime),
+          actualDateKey: getDateKey(task.completedAt),
+          status: task.isCompleted ? "COMPLETED" : undefined,
+          assignedToName: task.assignedToName,
+          projectId: project.id,
+        });
+      }
 
-  const dateKeys = [
-    todayKey,
-    ...projectRows.flatMap(({ rows }) =>
-      rows.flatMap((row) => [row.dateKey, row.actualDateKey].filter((key): key is string => Boolean(key)))
-    ),
-  ];
-  const earliest = Math.min(...dateKeys.map(utcFromKey));
-  const latest = Math.max(...dateKeys.map(utcFromKey));
-  const startKey = addDays(new Date(earliest).toISOString().slice(0, 10), -7);
-  const endKey = addDays(new Date(latest).toISOString().slice(0, 10), 7);
-  const startTime = utcFromKey(startKey);
-  const range = utcFromKey(endKey) - startTime;
-  const positionOf = (key: string) => Math.max(0, Math.min(100, ((utcFromKey(key) - startTime) / range) * 100));
-  const ticks = Array.from({ length: 7 }, (_, index) => {
-    const key = addDays(startKey, Math.round((range / (24 * 60 * 60 * 1000) / 6) * index));
-    return { key, position: (index / 6) * 100 };
-  });
+      const expectedDate = getDateKey(project.expectedDate);
+      if (expectedDate) {
+        rows.push({
+          id: `expected-${project.id}`,
+          label: "預計完工",
+          kind: "PROJECT",
+          dateKey: expectedDate,
+          projectId: project.id,
+        });
+      }
+
+      return { project, rows };
+    });
+
+    const dateKeys = [
+      todayKey,
+      ...rowsData.flatMap(({ rows }) =>
+        rows.flatMap((row) => [row.dateKey, row.actualDateKey].filter((key): key is string => Boolean(key)))
+      ),
+    ];
+    const earliest = Math.min(...dateKeys.map(utcFromKey));
+    const latest = Math.max(...dateKeys.map(utcFromKey));
+    const computedStartKey = addDays(new Date(earliest).toISOString().slice(0, 10), -7);
+    const computedEndKey = addDays(new Date(latest).toISOString().slice(0, 10), 7);
+    const startTime = utcFromKey(computedStartKey);
+    const range = Math.max(24 * 60 * 60 * 1000, utcFromKey(computedEndKey) - startTime);
+    const posFn = (key: string) => Math.max(0, Math.min(100, ((utcFromKey(key) - startTime) / range) * 100));
+    const computedTicks = Array.from({ length: 7 }, (_, index) => {
+      const key = addDays(computedStartKey, Math.round((range / (24 * 60 * 60 * 1000) / 6) * index));
+      return { key, position: (index / 6) * 100 };
+    });
+
+    return {
+      projectRows: rowsData,
+      ticks: computedTicks,
+      positionOf: posFn,
+      startKey: computedStartKey,
+      endKey: computedEndKey,
+    };
+  }, [projects, tasks, todayKey]);
 
   const markerColor = (row: TimelineRow) => {
     if (row.kind === "PROJECT") return "bg-violet-500";

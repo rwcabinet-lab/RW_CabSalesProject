@@ -11,6 +11,17 @@ export interface TrafficLightStatus {
   daysDiff: number;
 }
 
+/** 取得台灣時區 (Asia/Taipei, UTC+8) 之 YYYY-MM-DD 日期字串，解決 UTC 換日造成的清晨 8 小時偏差 */
+export function getTaiwanDateString(date: Date = new Date()): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date);
+}
+
 /** 里程碑子進度代碼 → 專案大階段對應 */
 export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   // ① 案件開發
@@ -55,7 +66,7 @@ export const ScheduleEngine = {
 
     const [dy, dm, dd] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
     const dueDateUtc = Date.UTC(dy, dm - 1, dd);
-    const [cy, cm, cd] = currentDate.toISOString().slice(0, 10).split("-").map(Number);
+    const [cy, cm, cd] = getTaiwanDateString(currentDate).split("-").map(Number);
     const curDateUtc = Date.UTC(cy, cm - 1, cd);
     const daysDiff = Math.round((dueDateUtc - curDateUtc) / (1000 * 60 * 60 * 24));
 
@@ -99,7 +110,7 @@ export const ScheduleEngine = {
     }
 
     let hasOverdue = false;
-    const curDateOnly = currentDate.toISOString().slice(0, 10);
+    const curDateOnly = getTaiwanDateString(currentDate);
 
     const evaluated = milestones.map((m) => {
       if (m.status === "COMPLETED") return m;
@@ -132,7 +143,7 @@ export const ScheduleEngine = {
     newCurrentStage: string;
     isProjectDelayed: boolean;
   } {
-    const nowDate = (options?.completedDate || new Date().toISOString()).split("T")[0];
+    const nowDate = (options?.completedDate || getTaiwanDateString(new Date())).slice(0, 10);
     const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
     const targetIndex = sorted.findIndex((m) => m.id === targetMilestoneId);
 

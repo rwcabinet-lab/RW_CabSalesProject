@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
-import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
+import { prisma } from "@/lib/prisma";
 import type { CustomerStatsDashboardDTO } from "@/types/dto";
 
 export const dynamic = "force-dynamic";
@@ -13,32 +12,42 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const [customers, projects, milestonesByProject] = await Promise.all([
-      DataService.getCustomers(),
-      DataService.getProjects(),
-      DataService.getMilestonesByProjectIds(),
+    // 利用 SQL 關聯查詢一次性取得客戶與案場摘要，並僅單獨撈取簽約里程碑 ID，徹底消除全資料表里程碑載入至記憶體的 OOM 隱患
+    const [customers, signedMilestoneRows] = await Promise.all([
+      prisma.customer.findMany({
+        relationLoadStrategy: "join",
+        include: {
+          salesRep: { select: { id: true, name: true } },
+          projects: {
+            select: {
+              id: true,
+              projectName: true,
+              currentStage: true,
+              quoteAmount: true,
+              estimatedBudget: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.projectMilestone.findMany({
+        where: {
+          stageCode: { in: ["3-5", "1-5"] },
+          status: "COMPLETED",
+        },
+        select: { projectId: true },
+      }),
     ]);
 
-    // Helper to check if project has contract signed / won
-    const isProjectContractSigned = (p: (typeof projects)[0]) => {
-      const ms = milestonesByProject[p.id] || [];
-      const hasSignedMilestone = ms.some(
-        (m) =>
-          (m.stageCode === "3-5" || (m.stageCode as string) === "1-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "").includes("簽約")) &&
-          m.status === "COMPLETED"
-      );
-      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED", "BILLED"].includes(p.currentStage);
-      return hasSignedMilestone || isPastContractStage;
-    };
+    const signedProjectIds = new Set(signedMilestoneRows.map((m) => m.projectId));
 
-    // Group projects by customerId
-    const projectsByCustomer: Record<string, typeof projects> = {};
-    for (const p of projects) {
-      if (!projectsByCustomer[p.customerId]) {
-        projectsByCustomer[p.customerId] = [];
-      }
-      projectsByCustomer[p.customerId].push(p);
-    }
+    // Helper to check if project has contract signed / won
+    const isProjectContractSigned = (p: { id: string; currentStage: string }) => {
+      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED", "BILLED"].includes(p.currentStage);
+      return signedProjectIds.has(p.id) || isPastContractStage;
+    };
 
     const customerTypeLabels: Record<string, string> = {
       LONGMEI_STORE: "隆美",
@@ -58,7 +67,7 @@ export async function GET(req: NextRequest) {
     };
 
     const customerList = customers.map((c) => {
-      const cProjects = projectsByCustomer[c.id] || [];
+      const cProjects = c.projects;
       const totalProjects = cProjects.length;
       const activeProjects = cProjects.filter(
         (p) => p.currentStage !== "LOST" && p.currentStage !== "CLOSED" && p.currentStage !== "BILLED"
@@ -68,12 +77,12 @@ export async function GET(req: NextRequest) {
       ).length;
       const lostProjects = cProjects.filter((p) => p.currentStage === "LOST").length;
       const totalQuoteAmount = cProjects.reduce(
-        (sum, p) => sum + (p.quoteAmount || p.estimatedBudget || 0),
+        (sum, p) => sum + (Number(p.quoteAmount) || Number(p.estimatedBudget) || 0),
         0
       );
       const signedProjects = cProjects.filter(isProjectContractSigned);
       const totalSignedAmount = signedProjects.reduce(
-        (sum, p) => sum + (p.quoteAmount || p.estimatedBudget || 0),
+        (sum, p) => sum + (Number(p.quoteAmount) || Number(p.estimatedBudget) || 0),
         0
       );
       const latestProject = cProjects[0]; // ordered by createdAt desc
@@ -81,15 +90,15 @@ export async function GET(req: NextRequest) {
       return {
         id: c.id,
         name: c.name,
-        customerType: c.customerType,
+        customerType: c.customerType === "CONTRACTOR" ? "PR" : c.customerType,
         customerTypeLabel: customerTypeLabels[c.customerType] || c.customerType,
         taxId: c.taxId || "",
         phone: c.phone || "",
         address: c.address || "",
-        defaultDiscount: c.defaultDiscount,
+        defaultDiscount: Number(c.defaultDiscount),
         paymentTerms: c.paymentTerms,
         salesRepId: c.salesRepId,
-        salesRepName: c.salesRepName || "",
+        salesRepName: c.salesRep?.name || "",
         totalProjects,
         activeProjects,
         closedProjects,
