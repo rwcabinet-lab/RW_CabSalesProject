@@ -30,11 +30,18 @@ export async function POST(req: NextRequest) {
       user: { id: profile.id || userId, name: profile.name || "", role: profile.role },
       redirectTo: getRoleLandingPath(profile.role, profile.pages),
     });
+
     const signedToken = await signSessionUserId(profile.id || userId, profile.role);
+
+    // 依據協議判斷是否啟用 Secure：僅在 HTTPS 環境強制 Secure，防止在 HTTP 內部網段被瀏覽器靜默丟棄
+    const isHttps =
+      req.nextUrl.protocol === "https:" ||
+      req.headers.get("x-forwarded-proto") === "https";
+
     response.cookies.set(SESSION_COOKIE_NAME, signedToken, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });

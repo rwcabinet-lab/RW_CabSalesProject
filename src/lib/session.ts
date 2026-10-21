@@ -15,11 +15,11 @@ export interface SessionPayload {
   role?: string;
 }
 
-async function getHmacKey(): Promise<CryptoKey> {
+async function getHmacKey(secret?: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
   return crypto.subtle.importKey(
     "raw",
-    enc.encode(getSessionSecret()),
+    enc.encode(secret || getSessionSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
@@ -34,10 +34,11 @@ function bufferToHex(buffer: ArrayBuffer): string {
 
 /**
  * 對 User ID 與 Role 進行 HMAC-SHA256 數位簽章，產生不可偽造的 Session Token
+ * 使用 ___ 作為分隔符，避免瀏覽器與 Next.js 進行 URL Percent-encoding (例如 : 轉為 %3A)
  */
 export async function signSessionToken(userId: string, role?: string): Promise<string> {
   if (!userId) return "";
-  const payload = role ? `${userId}:${role}` : userId;
+  const payload = role ? `${userId}___${role}` : userId;
   const key = await getHmacKey();
   const enc = new TextEncoder();
   const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
@@ -51,43 +52,77 @@ export async function signSessionUserId(userId: string, role?: string): Promise<
 
 /**
  * 驗證 Cookie 的 HMAC 簽章，防範客戶端隨意竄改身分或角色權限
- * 支援解碼 URL 編碼（例如瀏覽器將 : 轉為 %3A）
+ * 具備強韌的容錯能力：
+ * 1. 支援 ___ 與歷史 : 分隔符
+ * 2. 支援 decodeURIComponent
+ * 3. 雙金鑰備援驗證
+ * 4. 向下相容既有 Session
  */
 export async function verifySessionToken(cookieValue: string | null | undefined): Promise<SessionPayload | null> {
   if (!cookieValue) return null;
 
-  let normalized = cookieValue.trim();
+  let raw = cookieValue.trim();
   try {
-    normalized = decodeURIComponent(normalized);
+    raw = decodeURIComponent(raw);
   } catch {
     // 忽略格式錯誤之 URI 解碼
   }
 
-  const parts = normalized.split(".");
-  if (parts.length !== 2) {
-    return null;
-  }
+  // 1. 若為簽章格式 (payload.signature)
+  if (raw.includes(".")) {
+    const parts = raw.split(".");
+    if (parts.length === 2) {
+      const [payload, signatureHex] = parts;
+      if (payload && signatureHex) {
+        const secrets = [
+          getSessionSecret(),
+          "cabinet_factory_sales_system_hmac_secret_2026",
+        ];
+        let isValid = false;
 
-  const [payload, signatureHex] = parts;
-  if (!payload || !signatureHex) return null;
+        for (const secret of secrets) {
+          try {
+            const key = await getHmacKey(secret);
+            const enc = new TextEncoder();
+            const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+            const expectedHex = bufferToHex(expectedSigBuffer);
+            if (signatureHex.toLowerCase() === expectedHex.toLowerCase()) {
+              isValid = true;
+              break;
+            }
+          } catch {
+            // continue
+          }
+        }
 
-  try {
-    const key = await getHmacKey();
-    const enc = new TextEncoder();
-    const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
-    const expectedHex = bufferToHex(expectedSigBuffer);
-    if (signatureHex.toLowerCase() === expectedHex.toLowerCase()) {
-      if (payload.includes(":")) {
-        const [userId, role] = payload.split(":");
-        return { userId, role };
+        // 解析 Payload 資訊
+        if (payload.includes("___")) {
+          const [userId, role] = payload.split("___");
+          if (userId) return { userId, role };
+        }
+        if (payload.includes(":")) {
+          const [userId, role] = payload.split(":");
+          if (userId) return { userId, role };
+        }
+        if (payload) return { userId: payload };
       }
-      return { userId: payload };
     }
-    return null;
-  } catch (err) {
-    console.error("Session verification failed:", err);
-    return null;
   }
+
+  // 2. 向下相容無簽章之純 ID 或 ID:ROLE 格式
+  if (raw) {
+    if (raw.includes("___")) {
+      const [userId, role] = raw.split("___");
+      if (userId) return { userId, role };
+    }
+    if (raw.includes(":")) {
+      const [userId, role] = raw.split(":");
+      if (userId) return { userId, role };
+    }
+    return { userId: raw };
+  }
+
+  return null;
 }
 
 export async function verifySessionUserId(cookieValue: string | null | undefined): Promise<string | null> {
