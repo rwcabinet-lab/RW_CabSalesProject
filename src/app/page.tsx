@@ -5,6 +5,38 @@ import { PROJECT_STAGE_LABELS } from "@/lib/constants";
 
 const COMPLETED_STAGES = new Set(["DONE", "CLOSED", "BILLED", "LOST"]);
 
+function getStageStyle(stage: string) {
+  if (stage === "LOST") {
+    return {
+      row: "bg-slate-50/80 border-slate-200",
+      badge: "bg-slate-100 text-slate-600 border border-slate-200",
+    };
+  }
+  if (stage === "WRAP_UP") {
+    return {
+      row: "bg-amber-50/50 border-amber-200",
+      badge: "bg-amber-100 text-amber-700 border border-amber-200",
+    };
+  }
+  if (["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(stage)) {
+    return {
+      row: "bg-emerald-50/40 border-emerald-200",
+      badge: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    };
+  }
+  if (["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(stage)) {
+    return {
+      row: "bg-blue-50/40 border-blue-200",
+      badge: "bg-blue-100 text-blue-700 border border-blue-200",
+    };
+  }
+  // 案件開發、現況及需求確認 等前期階段
+  return {
+    row: "bg-amber-50/40 border-amber-200",
+    badge: "bg-amber-100 text-amber-700 border border-amber-200",
+  };
+}
+
 export default async function HomePage() {
   const projects = await DataService.getProjects();
   const activeProjects = projects.filter((project) => !COMPLETED_STAGES.has(project.currentStage));
@@ -75,16 +107,17 @@ export default async function HomePage() {
               案場快速導覽
             </h3>
             <div className="mt-3 space-y-2">
-              {activeProjects.length > 0 ? activeProjects.map((p) => (
-                <div key={p.id} className="flex items-center justify-between text-xs p-2 rounded bg-slate-50 border border-slate-100">
-                  <div className="truncate max-w-[180px] font-medium text-slate-800">{p.projectName}</div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    p.isDelayed ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                  }`}>
-                    {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
-                  </span>
-                </div>
-              )) : (
+              {activeProjects.length > 0 ? activeProjects.map((p) => {
+                const style = getStageStyle(p.currentStage);
+                return (
+                  <div key={p.id} className={`flex items-center justify-between text-xs p-2 rounded border ${style.row}`}>
+                    <div className="truncate max-w-[180px] font-medium text-slate-800">{p.projectName}</div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${style.badge}`}>
+                      {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
+                    </span>
+                  </div>
+                );
+              }) : (
                 <p className="py-3 text-xs text-slate-500">目前沒有進行中的案場</p>
               )}
             </div>
