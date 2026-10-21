@@ -40,9 +40,16 @@ export async function GET(req: NextRequest) {
     // 正規項目完成推進產生的里程碑待辦（含 milestoneId）不列入主管「已指派任務」列表
     const assignedTasks = allAssignedTasks.filter((task) => !task.milestoneId);
 
+    // Helper to evaluate if project is closed (依據 [結案] 里程碑是否完成)
+    const isProjectClosed = (p: (typeof projects)[0]) => {
+      if (p.currentStage === "CLOSED") return true;
+      const ms = milestonesByProject[p.id] || [];
+      return ms.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED");
+    };
+
     // Helper to evaluate project delayed state
     const isProjectDelayed = (p: (typeof projects)[0]) => {
-      if (p.currentStage === "LOST" || p.currentStage === "CLOSED" || p.currentStage === "BILLED") return false;
+      if (p.currentStage === "LOST" || isProjectClosed(p)) return false;
       const ms = milestonesByProject[p.id] || [];
       const activeM = ms.find((m) => m.status === "OVERDUE" || m.status === "IN_PROGRESS");
       if (activeM) {
@@ -173,6 +180,7 @@ export async function GET(req: NextRequest) {
         : { color: "GRAY" as const, label: "無進行中項目", daysDiff: 0 };
 
       const isDelayed = isProjectDelayed(p);
+      const isClosed = isProjectClosed(p);
 
       return {
         id: p.id,
@@ -182,10 +190,11 @@ export async function GET(req: NextRequest) {
         customerType: p.customerType,
         defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
-        currentStageLabel: p.currentStage === "LOST" ? "已流標" : stageLabels[p.currentStage] || p.currentStage,
+        currentStageLabel: p.currentStage === "LOST" ? "已流標" : isClosed ? "已結案" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.customerSalesRepName || p.salesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
+        isClosed,
         trafficLight: p.currentStage === "LOST"
           ? { color: "GRAY" as const, label: "已流標", daysDiff: 0 }
           : trafficLight,
@@ -224,7 +233,7 @@ export async function GET(req: NextRequest) {
       { stage: "PRE_PROD", label: "四、生產前確認/拆單", aliases: ["PRE_PROD"] },
       { stage: "PROD_SHIP", label: "五、生產及派送", aliases: ["PROD_SHIP", "PRODUCTION"] },
       { stage: "INSTALL", label: "六、安裝及驗收", aliases: ["INSTALL"] },
-      { stage: "CLOSURE", label: "七、結案/售後", aliases: ["CLOSURE", "CLOSED", "BILLED", "WRAP_UP"] },
+      { stage: "CLOSURE", label: "七、結案/售後", aliases: ["CLOSURE", "CLOSED", "WRAP_UP"] },
     ];
 
     const stageBottlenecks = sevenStages.map(({ stage, label, aliases }) => {

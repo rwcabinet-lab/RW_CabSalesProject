@@ -226,12 +226,14 @@ export default function SalesWorkbenchPage() {
   };
 
   // 預定完工日與狀態排序
-  // 過濾邏輯：預設排除已流標/已立帳 (stageFilter === "ACTIVE")
+  // 過濾邏輯：預設排除已流標/結案 (stageFilter === "ACTIVE")
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       let match = true;
       if (stageFilter === "ACTIVE") {
-        if (p.currentStage === "LOST" || p.currentStage === "BILLED") match = false;
+        if (p.currentStage === "LOST" || p.isClosed) match = false;
+      } else if (stageFilter === "CLOSED") {
+        if (!p.isClosed && p.currentStage !== "CLOSED") match = false;
       } else if (stageFilter) {
         if (p.currentStage !== stageFilter) match = false;
       }
@@ -527,7 +529,7 @@ export default function SalesWorkbenchPage() {
               onChange={(e) => setStageFilter(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             >
-              <option value="ACTIVE">進行中案件 (預設，排除已流標/已立帳)</option>
+              <option value="ACTIVE">進行中案件 (預設，排除已流標/結案)</option>
               <option value="">全部案件</option>
               <option value="DEVELOP">第一階段：案件開發</option>
               <option value="REQUIREMENT">第二階段：現況及需求確認</option>
@@ -538,7 +540,7 @@ export default function SalesWorkbenchPage() {
               <option value="CLOSURE">第七階段：結案/售後</option>
               <option value="WRAP_UP">收尾中</option>
               <option value="LOST">已流標</option>
-              <option value="BILLED">已立帳</option>
+              <option value="CLOSED">結案</option>
             </select>
           </label>
         </div>

@@ -119,7 +119,7 @@ export default function CustomerStatsPage() {
             href="/dashboard/manager"
             className="px-4 py-2 text-sm font-bold rounded-lg text-slate-600 hover:text-slate-900 transition-colors"
           >
-            營運總覽與瓶頸分析
+            營運總覽分析
           </Link>
           <div className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-blue-600 shadow-sm">
             客戶資料統計

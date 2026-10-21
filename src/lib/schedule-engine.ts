@@ -37,7 +37,7 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   // ⑥ 安裝及驗收
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
   // ⑦ 結案/售後
-  "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE",
+  "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE", "7-4": "CLOSURE",
   // 額外階段
   "X-1": "WRAP_UP", "X-2": "LOST",
 };

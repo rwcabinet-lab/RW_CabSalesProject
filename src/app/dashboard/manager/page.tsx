@@ -170,10 +170,12 @@ export default function ManagerDashboardPage() {
   if (!data) return null;
 
   // 預定完工日排序
-  // 案場總覽過濾：預設排除已流標/已立帳
+  // 案場總覽過濾：預設排除已流標/結案
   const filteredOverview = data.allProjectsOverview.filter(p => {
     if (stageFilter === "ACTIVE") {
-      if (p.currentStage === "LOST" || p.currentStage === "BILLED") return false;
+      if (p.currentStage === "LOST" || p.isClosed) return false;
+    } else if (stageFilter === "CLOSED") {
+      if (!p.isClosed && p.currentStage !== "CLOSED") return false;
     } else if (stageFilter && p.currentStage !== stageFilter) {
       return false;
     }
@@ -236,12 +238,12 @@ export default function ManagerDashboardPage() {
       <div className="flex flex-wrap justify-between items-center border-b pb-4 gap-4">
         <div>
           <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控室</span>
-          <h1 className="text-2xl font-black mt-1">營運總覽與瓶頸分析</h1>
+          <h1 className="text-2xl font-black mt-1">營運總覽分析</h1>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl">
           <div className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-blue-600 shadow-sm">
-            營運總覽與瓶頸分析
+            營運總覽分析
           </div>
           <Link
             href="/dashboard/manager/customers"
@@ -385,7 +387,7 @@ export default function ManagerDashboardPage() {
             <label className="flex items-center gap-2">
               階段：
               <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="ACTIVE">進行中案件 (預設，排除已流標/已立帳)</option>
+                <option value="ACTIVE">進行中案件 (預設，排除已流標/結案)</option>
                 <option value="">全部階段</option>
                 <option value="DEVELOP">第一階段：案件開發</option>
                 <option value="REQUIREMENT">第二階段：現況及需求確認</option>
@@ -396,7 +398,7 @@ export default function ManagerDashboardPage() {
                 <option value="CLOSURE">第七階段：結案/售後</option>
                 <option value="WRAP_UP">收尾中</option>
                 <option value="LOST">已流標</option>
-                <option value="BILLED">已立帳</option>
+                <option value="CLOSED">結案</option>
               </select>
             </label>
           </div>

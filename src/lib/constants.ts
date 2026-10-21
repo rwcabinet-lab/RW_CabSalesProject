@@ -51,7 +51,8 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ⑦ 結案/售後
   "7-1": "批價",
   "7-2": "請款",
-  "7-3": "追蹤二次回購",
+  "7-3": "結案",
+  "7-4": "追蹤二次回購",
   // 額外階段
   "X-1": "收尾",
   "X-2": "已流標",
@@ -81,7 +82,7 @@ export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
   "4-1": 2, "4-2": 2, "4-3": 5, "4-4": 3,
   "5-1": 12, "5-2": 1, "5-3": 2,
   "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 5,
-  "7-1": 99, "7-2": 5, "7-3": 30,
+  "7-1": 3, "7-2": 5, "7-3": 2, "7-4": 30,
   "X-1": 5, "X-2": 0,
 };
 
@@ -131,7 +132,7 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD",
   "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
-  "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE",
+  "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE", "7-4": "CLOSURE",
   "X-1": "EXTRA", "X-2": "EXTRA",
 };
 
@@ -142,7 +143,7 @@ export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
   "4-1", "4-2", "4-3", "4-4",
   "5-1", "5-2", "5-3",
   "6-1", "6-2", "6-3", "6-4", "6-5",
-  "7-1", "7-2", "7-3",
+  "7-1", "7-2", "7-3", "7-4",
 ];
 
 /** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */

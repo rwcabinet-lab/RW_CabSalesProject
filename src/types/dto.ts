@@ -37,7 +37,7 @@ export type MilestoneStageCodeDTO =
   | "4-1" | "4-2" | "4-3" | "4-4"
   | "5-1" | "5-2" | "5-3"
   | "6-1" | "6-2" | "6-3" | "6-4" | "6-5"
-  | "7-1" | "7-2" | "7-3"
+  | "7-1" | "7-2" | "7-3" | "7-4"
   | "X-1" | "X-2";
 
 export interface MilestoneRecordDTO {
@@ -165,6 +165,7 @@ export interface WorkbenchProjectDTO {
   currentStage: string;
   siteAddress: string;
   isDelayed: boolean;
+  isClosed?: boolean;
   salesRepId?: string;
   salesRepName?: string;
   salesAssistantName?: string | null;
@@ -346,6 +347,7 @@ export interface ManagerProjectOverviewDTO {
   salesRepName: string;
   salesAssistantName: string | null;
   isDelayed: boolean;
+  isClosed?: boolean;
   trafficLight: TrafficLightDTO;
   expectedDate: string;
   unitCount?: number;

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 利用 SQL 關聯查詢一次性取得客戶與案場摘要，並僅單獨撈取簽約里程碑 ID，徹底消除全資料表里程碑載入至記憶體的 OOM 隱患
-    const [customers, signedMilestoneRows] = await Promise.all([
+    const [customers, signedMilestoneRows, closedMilestoneRows] = await Promise.all([
       prisma.customer.findMany({
         relationLoadStrategy: "join",
         include: {
@@ -39,14 +39,27 @@ export async function GET(req: NextRequest) {
         },
         select: { projectId: true },
       }),
+      prisma.projectMilestone.findMany({
+        where: {
+          stageCode: "7-3",
+          status: "COMPLETED",
+        },
+        select: { projectId: true },
+      }),
     ]);
 
     const signedProjectIds = new Set(signedMilestoneRows.map((m) => m.projectId));
+    const closedProjectIds = new Set(closedMilestoneRows.map((m) => m.projectId));
 
     // Helper to check if project has contract signed / won
     const isProjectContractSigned = (p: { id: string; currentStage: string }) => {
-      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED", "BILLED"].includes(p.currentStage);
+      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED"].includes(p.currentStage);
       return signedProjectIds.has(p.id) || isPastContractStage;
+    };
+
+    // Helper to check if project is closed (依據 [結案] 里程碑是否完成)
+    const isProjectClosed = (p: { id: string; currentStage: string }) => {
+      return closedProjectIds.has(p.id) || p.currentStage === "CLOSED";
     };
 
     const customerTypeLabels: Record<string, string> = {
@@ -70,11 +83,9 @@ export async function GET(req: NextRequest) {
       const cProjects = c.projects;
       const totalProjects = cProjects.length;
       const activeProjects = cProjects.filter(
-        (p) => p.currentStage !== "LOST" && p.currentStage !== "CLOSED" && p.currentStage !== "BILLED"
+        (p) => p.currentStage !== "LOST" && !isProjectClosed(p)
       ).length;
-      const closedProjects = cProjects.filter(
-        (p) => p.currentStage === "CLOSED" || p.currentStage === "BILLED"
-      ).length;
+      const closedProjects = cProjects.filter(isProjectClosed).length;
       const lostProjects = cProjects.filter((p) => p.currentStage === "LOST").length;
       const totalQuoteAmount = cProjects.reduce(
         (sum, p) => sum + (Number(p.quoteAmount) || Number(p.estimatedBudget) || 0),
