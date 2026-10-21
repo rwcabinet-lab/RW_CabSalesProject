@@ -13,11 +13,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const [customers, projects, milestonesByProject, latestQuotesByProject] = await Promise.all([
+    const [customers, projects, milestonesByProject] = await Promise.all([
       DataService.getCustomers(),
       DataService.getProjects(),
       DataService.getMilestonesByProjectIds(),
-      DataService.getLatestQuotesByProjectIds(),
     ]);
 
     // Helper to check if project has contract signed / won
@@ -69,12 +68,12 @@ export async function GET(req: NextRequest) {
       ).length;
       const lostProjects = cProjects.filter((p) => p.currentStage === "LOST").length;
       const totalQuoteAmount = cProjects.reduce(
-        (sum, p) => sum + (p.quoteAmount || latestQuotesByProject[p.id]?.totalAmount || p.estimatedBudget || 0),
+        (sum, p) => sum + (p.quoteAmount || p.estimatedBudget || 0),
         0
       );
       const signedProjects = cProjects.filter(isProjectContractSigned);
       const totalSignedAmount = signedProjects.reduce(
-        (sum, p) => sum + (p.quoteAmount || latestQuotesByProject[p.id]?.totalAmount || p.estimatedBudget || 0),
+        (sum, p) => sum + (p.quoteAmount || p.estimatedBudget || 0),
         0
       );
       const latestProject = cProjects[0]; // ordered by createdAt desc

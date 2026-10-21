@@ -39,10 +39,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const projectIds = myProjects.map((p) => p.id);
-    const [milestonesByProject, latestQuotesByProject] = await Promise.all([
-      DataService.getMilestonesByProjectIds(projectIds),
-      DataService.getLatestQuotesByProjectIds(projectIds),
-    ]);
+    const milestonesByProject = await DataService.getMilestonesByProjectIds(projectIds);
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
     const projectsWithDetails = myProjects.map((p) => {
@@ -88,7 +85,7 @@ export async function GET(req: NextRequest) {
           unitCount: p.unitCount,
           cost: p.cost,
           quoteAmount: p.quoteAmount,
-          totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? null,
+          totalAmount: p.quoteAmount ?? null,
           activeMilestone: activeMilestone
             ? {
                 id: activeMilestone.id,

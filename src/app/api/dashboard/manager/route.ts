@@ -29,10 +29,9 @@ export async function GET(req: NextRequest) {
     const startMonth = searchParams.get("startMonth");
     const endMonth = searchParams.get("endMonth");
 
-    const [projects, milestonesByProject, latestQuotesByProject, allAssignedTasks] = await Promise.all([
+    const [projects, milestonesByProject, allAssignedTasks] = await Promise.all([
       DataService.getProjects(),
       DataService.getMilestonesByProjectIds(),
-      DataService.getLatestQuotesByProjectIds(),
       DataService.getTasks({ assignedById: user.id }),
     ]);
 
@@ -70,8 +69,7 @@ export async function GET(req: NextRequest) {
     for (const p of projects) {
       if (isProjectContractSigned(p)) {
         contractedCount++;
-        const latestQuote = latestQuotesByProject[p.id];
-        signedTotal += p.quoteAmount || latestQuote?.totalAmount || p.estimatedBudget || 0;
+        signedTotal += p.quoteAmount || p.estimatedBudget || 0;
       }
     }
     const conversionRate = totalProjects > 0 ? Math.round((contractedCount / totalProjects) * 100) : 0;
@@ -193,7 +191,7 @@ export async function GET(req: NextRequest) {
         unitCount: p.unitCount,
         cost: p.cost,
         quoteAmount: p.quoteAmount,
-        totalAmount: latestQuotesByProject[p.id]?.totalAmount ?? p.estimatedBudget ?? null,
+        totalAmount: p.quoteAmount ?? p.estimatedBudget ?? null,
         lastCompletedMilestoneName: lastCompletedMilestone
           ? MILESTONE_STAGE_LABELS[lastCompletedMilestone.stageCode]
           : null,

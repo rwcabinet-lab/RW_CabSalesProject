@@ -508,7 +508,7 @@ export default function ManagerDashboardPage() {
                         return (
                           <td key={col.key} className="p-3">
                             <div className="tabular-nums font-bold text-slate-900">
-                              {formatTenThousands(p.totalAmount ?? p.quoteAmount ?? 0)}
+                              {formatTenThousands(p.quoteAmount ?? p.totalAmount ?? 0)}
                             </div>
                             <div className="text-[10px] text-slate-500">
                               {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
