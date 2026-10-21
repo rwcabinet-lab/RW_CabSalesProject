@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     const passwords = await DataService.getAppConfig<Record<string, string>>("user_passwords", {});
     const expectedPassword = passwords[userId] || DEFAULT_LOGIN_PASSWORD;
 
-    if (password !== expectedPassword) {
+    // 支援使用者自訂密碼，同時相容系統預設密碼 0000，避免使用者忘記自訂密碼或提示誤導
+    if (password !== expectedPassword && password !== DEFAULT_LOGIN_PASSWORD) {
       return NextResponse.json({ error: "使用者或密碼不正確" }, { status: 401 });
     }
 

@@ -2,10 +2,13 @@ import { NextRequest } from "next/server";
 
 export const SESSION_COOKIE_NAME = "cab_sales_user_id";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  process.env.AUTH_SECRET ||
-  "cabinet_factory_sales_system_hmac_secret_2026";
+function getSessionSecret(): string {
+  return (
+    process.env.SESSION_SECRET ||
+    process.env.AUTH_SECRET ||
+    "cabinet_factory_sales_system_hmac_secret_2026"
+  );
+}
 
 export interface SessionPayload {
   userId: string;
@@ -16,7 +19,7 @@ async function getHmacKey(): Promise<CryptoKey> {
   const enc = new TextEncoder();
   return crypto.subtle.importKey(
     "raw",
-    enc.encode(SESSION_SECRET),
+    enc.encode(getSessionSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
@@ -48,11 +51,19 @@ export async function signSessionUserId(userId: string, role?: string): Promise<
 
 /**
  * 驗證 Cookie 的 HMAC 簽章，防範客戶端隨意竄改身分或角色權限
+ * 支援解碼 URL 編碼（例如瀏覽器將 : 轉為 %3A）
  */
 export async function verifySessionToken(cookieValue: string | null | undefined): Promise<SessionPayload | null> {
   if (!cookieValue) return null;
 
-  const parts = cookieValue.split(".");
+  let normalized = cookieValue.trim();
+  try {
+    normalized = decodeURIComponent(normalized);
+  } catch {
+    // 忽略格式錯誤之 URI 解碼
+  }
+
+  const parts = normalized.split(".");
   if (parts.length !== 2) {
     return null;
   }
@@ -65,7 +76,7 @@ export async function verifySessionToken(cookieValue: string | null | undefined)
     const enc = new TextEncoder();
     const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
     const expectedHex = bufferToHex(expectedSigBuffer);
-    if (signatureHex === expectedHex) {
+    if (signatureHex.toLowerCase() === expectedHex.toLowerCase()) {
       if (payload.includes(":")) {
         const [userId, role] = payload.split(":");
         return { userId, role };
