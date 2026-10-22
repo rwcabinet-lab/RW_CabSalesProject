@@ -56,18 +56,8 @@ const projectInclude = {
   salesAssistant: { select: { id: true, name: true } },
 } as const;
 const milestoneInclude = {
-  assignedTo: { select: { name: true } },
+  assignedTo: { select: { id: true, name: true } },
   salesTask: { select: { id: true, subject: true, isCompleted: true } },
-  project: {
-    select: {
-      customer: {
-        select: {
-          salesRepId: true,
-          salesRep: { select: { name: true } },
-        },
-      },
-    },
-  },
 } as const;
 const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type === "CONTRACTOR" ? "PR" : type;
 const customerTypeForDatabase = (type: CustomerTypeDTO): CustomerType => type === "PR" ? CustomerType.CONTRACTOR : type as CustomerType;
@@ -125,7 +115,6 @@ export const DataService = {
   async getProjects(filter?: { where?: Prisma.ProjectWhereInput }): Promise<ProjectDetail[]> {
     const projects = await prisma.project.findMany({
       where: filter?.where,
-      relationLoadStrategy: "join",
       include: projectInclude,
       orderBy: { createdAt: "desc" }
     });
@@ -483,7 +472,6 @@ export const DataService = {
     if (projectIds && projectIds.length === 0) return {};
     const ms = await prisma.projectMilestone.findMany({
       ...(projectIds ? { where: { projectId: { in: projectIds } } } : {}),
-      relationLoadStrategy: "join",
       include: milestoneInclude,
       orderBy: { stageOrder: "asc" },
     });
@@ -499,8 +487,8 @@ export const DataService = {
         id: m.id, projectId: m.projectId, stageCode: m.stageCode as MilestoneStageCode, phase: m.phase as MilestonePhaseDTO, stageOrder: m.stageOrder,
         plannedDueDate: dateOnlyValue(m.plannedDueDate), actualDueDate: dateOnlyValue(m.actualDueDate), status: m.status,
         priority: m.priority,
-        assignedToId: m.assignedToId || m.project.customer.salesRepId,
-        assignedToName: m.assignedTo?.name || m.project.customer.salesRep.name,
+        assignedToId: m.assignedToId || null,
+        assignedToName: m.assignedTo?.name || null,
         attachments: m.attachments, notes: m.notes,
         auditSubmitted: isAuditSubmitted,
       });

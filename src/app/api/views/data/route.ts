@@ -12,13 +12,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const [projects, tasks, users] = await Promise.all([
+    const [projects, tasks, users, milestonesByProject] = await Promise.all([
       DataService.getProjects(),
       DataService.getTasks(),
       DataService.getLoginUsers(),
+      DataService.getMilestonesByProjectIds(),
     ]);
-    const projectIds = projects.map((p) => p.id);
-    const milestonesByProject = await DataService.getMilestonesByProjectIds(projectIds);
     const staff = users
       .filter((user): user is typeof user & { role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" } =>
         user.role === "SALES_MANAGER" || user.role === "SALES" || user.role === "ASSISTANT" || user.role === "SITE_ENGINEER"

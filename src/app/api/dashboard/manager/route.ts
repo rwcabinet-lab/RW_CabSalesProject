@@ -32,13 +32,11 @@ export async function GET(req: NextRequest) {
     const startMonth = searchParams.get("startMonth");
     const endMonth = searchParams.get("endMonth");
 
-    const [projects, allAssignedTasks] = await Promise.all([
+    const [projects, allAssignedTasks, milestonesByProject] = await Promise.all([
       DataService.getProjects(),
       DataService.getTasks({ assignedById: user.id }),
+      DataService.getMilestonesByProjectIds(),
     ]);
-
-    const projectIds = projects.map((p) => p.id);
-    const milestonesByProject = await DataService.getMilestonesByProjectIds(projectIds);
 
     // 正規項目完成推進產生的里程碑待辦（含 milestoneId）不列入主管「已指派任務」列表
     const assignedTasks = allAssignedTasks.filter((task) => !task.milestoneId);

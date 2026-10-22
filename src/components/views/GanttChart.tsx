@@ -85,6 +85,8 @@ export function GanttChart({ projects, tasks }: GanttProps) {
   const { projectRows, ticks, positionOf, startKey, endKey } = useMemo(() => {
     const taskByProject = new Map<string, TaskDTO[]>();
     for (const task of tasks) {
+      // 里程碑項目已由 project.milestones 呈現完整時程與完成狀態，排除伴生待辦以避免甘特圖案件下方重複顯示已完成的項目
+      if (task.milestoneId) continue;
       const projectTasks = taskByProject.get(task.projectId) || [];
       projectTasks.push(task);
       taskByProject.set(task.projectId, projectTasks);
