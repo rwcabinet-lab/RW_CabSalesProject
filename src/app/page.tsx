@@ -53,7 +53,7 @@ export default async function HomePage() {
             系統櫃工廠業務報價與時程追蹤系統
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            整合「三層式櫃體元件拆解算價引擎」、「B2B/B2C 折率自動核算」、「五大里程碑時程警示」與「主管全局監控」，徹底告別傳統紙本手稿與 Excel 錯漏。
+            整合「全域報價與戶數資料管理」、「B2B/B2C 折率自動核算」、「7 大標準階段時程警示」與「主管全局監控」，徹底告別傳統紙本手稿與 Excel 錯漏。
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
             <Link

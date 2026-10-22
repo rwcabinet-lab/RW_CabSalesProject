@@ -6,86 +6,9 @@ import type {
   SalesTaskItem,
 } from "./constants";
 
-export interface MasterBoardItem {
-  id: string;
-  brand: string;
-  colorCode: string;
-  thicknessMm: number;
-  grade: string;
-  unit: string;
-  retailPrice: number;
-}
-
-export interface MasterHardwareItem {
-  id: string;
-  brand: string;
-  modelName: string;
-  category: "HINGE" | "SLIDE" | "PULLOUT" | "HANDLE" | "ACCESSORY";
-  retailPrice: number;
-}
-
-export interface MasterProcessingItem {
-  id: string;
-  processName: string;
-  unit: string;
-  retailPrice: number;
-}
-
-/** 簡易報價版本紀錄 — 計算已在外部系統完成，本系統僅登記結果 */
-export interface QuotationData {
-  id: string;
-  projectId: string;
-  /** 版本號，例如 "V1" / "V2" */
-  version: string;
-  /** 外部系統報價單號 */
-  externalQuoteNo?: string;
-  /** 外部報價單 PDF 連結 */
-  quoteFileUrl?: string;
-  /** 最終報價總金額 (含稅，NT$) */
-  totalAmount: number;
-  /** 備註說明 */
-  notes?: string;
-  status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
-  createdAt: string;
-  updatedAt: string;
-}
-
 // ----------------------------------------------------------------
-// 初始種子資料 (供 prisma/seed.ts 與 seed-supabase.ts 測試資料庫使用)
+// 初始種子資料 (供 prisma/seed.ts 測試資料庫使用)
 // ----------------------------------------------------------------
-export const INITIAL_BOARDS: MasterBoardItem[] = [
-  { id: "b1", brand: "EGGER", colorCode: "H3309 ST28 自然深色橡木", thicknessMm: 18, grade: "E0-V313", unit: "才", retailPrice: 85 },
-  { id: "b2", brand: "EGGER", colorCode: "H3309 ST28 自然深色橡木", thicknessMm: 25, grade: "E0-V313", unit: "才", retailPrice: 120 },
-  { id: "b3", brand: "EGGER", colorCode: "H3309 ST28 自然深色橡木", thicknessMm: 8, grade: "E0-V313", unit: "才", retailPrice: 55 },
-  { id: "b4", brand: "EGGER", colorCode: "W980 SM 珍珠暖白", thicknessMm: 18, grade: "E0-V313", unit: "才", retailPrice: 75 },
-  { id: "b5", brand: "EGGER", colorCode: "W980 SM 珍珠暖白", thicknessMm: 8, grade: "E0-V313", unit: "才", retailPrice: 50 },
-  { id: "b6", brand: "EGGER", colorCode: "F186 ST9 淺灰色清水模", thicknessMm: 18, grade: "E0-V313", unit: "才", retailPrice: 90 },
-  { id: "b7", brand: "KAINDL", colorCode: "K4325 仿清水模灰", thicknessMm: 18, grade: "E0-V313", unit: "才", retailPrice: 88 },
-  { id: "b8", brand: "國產防潮板", colorCode: "經典亞麻布紋", thicknessMm: 18, grade: "E1-V313", unit: "才", retailPrice: 60 },
-  { id: "b9", brand: "國產防潮板", colorCode: "經典亞麻布紋", thicknessMm: 8, grade: "E1-V313", unit: "才", retailPrice: 42 },
-];
-
-export const INITIAL_HARDWARE: MasterHardwareItem[] = [
-  { id: "h1", brand: "Blum", modelName: "快拆集成緩衝鉸鏈 (110度全蓋)", category: "HINGE", retailPrice: 180 },
-  { id: "h2", brand: "Blum", modelName: "快拆集成緩衝鉸鏈 (110度半蓋)", category: "HINGE", retailPrice: 180 },
-  { id: "h3", brand: "Blum", modelName: "隱藏式三節緩衝滑軌 500mm", category: "SLIDE", retailPrice: 750 },
-  { id: "h4", brand: "King Slide 川湖", modelName: "51B 隱藏式木抽緩衝滑軌 450mm", category: "SLIDE", retailPrice: 480 },
-  { id: "h5", brand: "King Slide 川湖", modelName: "3M52 鋼珠緩衝滑軌 450mm", category: "SLIDE", retailPrice: 320 },
-  { id: "h6", brand: "Blum", modelName: "TIP-ON 機械式拍門器 (長型附磁)", category: "ACCESSORY", retailPrice: 220 },
-  { id: "h7", brand: "義大利進口", modelName: "鋁擠型黑色指縫內嵌把手 (米)", category: "HANDLE", retailPrice: 350 },
-  { id: "h8", brand: "豪美", modelName: "緩衝多功能調味品側拉籃 (300寬)", category: "PULLOUT", retailPrice: 2200 },
-];
-
-export const INITIAL_PROCESSING: MasterProcessingItem[] = [
-  { id: "p1", processName: "1.0mm ABS 厚封邊加工", unit: "米", retailPrice: 45 },
-  { id: "p2", processName: "2.0mm ABS 厚封邊加工", unit: "米", retailPrice: 65 },
-  { id: "p3", processName: "門片 45 度無把手斜導角加工", unit: "米", retailPrice: 120 },
-  { id: "p4", processName: "檯面插座現場所開孔", unit: "處", retailPrice: 150 },
-  { id: "p5", processName: "檯面水槽現場所開孔", unit: "處", retailPrice: 600 },
-  { id: "p6", processName: "背板 8mm 開槽加工", unit: "米", retailPrice: 30 },
-  { id: "p7", processName: "系統櫃抽屜組裝加工費", unit: "組", retailPrice: 250 },
-];
-
 export const INITIAL_CUSTOMERS: CustomerItem[] = [
   {
     id: "c1",
@@ -203,49 +126,6 @@ export const INITIAL_PROJECTS: ProjectDetail[] = [
     estimatedBudget: 260000,
   },
 ];
-
-/** 每個 projectId 對應一組報價版本列表，index 0 為最舊版，最後一筆為最新版 */
-export const INITIAL_QUOTES: Record<string, QuotationData[]> = {
-  p2: [
-    {
-      id: "q-p2-v1",
-      projectId: "p2",
-      version: "V1",
-      externalQuoteNo: "EXT-2026-0918-001",
-      quoteFileUrl: "https://example.com/quotes/p2-v1.pdf",
-      totalAmount: 480000,
-      notes: "初版報價，含全室系統櫃 (客廳+主臥+書房)。業主需確認廚房電器尺寸後調整。",
-      status: "SENT",
-      createdAt: "2026-09-18T10:00:00Z",
-      updatedAt: "2026-09-18T10:00:00Z",
-    },
-    {
-      id: "q-p2-v2",
-      projectId: "p2",
-      version: "V2",
-      externalQuoteNo: "EXT-2026-0921-002",
-      quoteFileUrl: "https://example.com/quotes/p2-v2.pdf",
-      totalAmount: 432000,
-      notes: "V2 修訂版：業主取消書房端景展示架，廚房調味拉籃改為基本款，折減後總計 43.2萬。",
-      status: "DRAFT",
-      createdAt: "2026-09-21T09:30:00Z",
-      updatedAt: "2026-09-21T09:30:00Z",
-    },
-  ],
-  p1: [
-    {
-      id: "q-p1-v1",
-      projectId: "p1",
-      version: "V1",
-      externalQuoteNo: "EXT-2026-0920-003",
-      totalAmount: 350000,
-      notes: "丈量前初步概估報價，待現場丈量後確認。",
-      status: "DRAFT",
-      createdAt: "2026-09-20T14:00:00Z",
-      updatedAt: "2026-09-20T14:00:00Z",
-    },
-  ],
-};
 
 export const INITIAL_MILESTONES: Record<string, ProjectMilestoneItem[]> = {
   p1: [

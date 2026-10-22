@@ -258,8 +258,8 @@ export async function GET(req: NextRequest) {
       assignedTasks,
     });
   } catch (error) {
-    console.error("主管看板資料錯誤:", error);
-    return NextResponse.json({ error: "無法取得主管看板資料" }, { status: 500 });
+    console.error("主管監控室資料錯誤:", error);
+    return NextResponse.json({ error: "無法取得主管監控室資料" }, { status: 500 });
   }
 }
 

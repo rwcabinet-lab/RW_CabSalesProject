@@ -1,23 +1,17 @@
 import {
-  HardwareCategory,
   MilestoneStatus,
   PaymentTerms,
   PrismaClient,
   ProjectStage,
-  QuoteStatus,
   Role,
   TaskPriority,
   TaskType,
   CustomerType,
 } from "@prisma/client";
 import {
-  INITIAL_BOARDS,
   INITIAL_CUSTOMERS,
-  INITIAL_HARDWARE,
   INITIAL_MILESTONES,
-  INITIAL_PROCESSING,
   INITIAL_PROJECTS,
-  INITIAL_QUOTES,
   INITIAL_TASKS,
 } from "../src/lib/mock-data";
 
@@ -32,40 +26,6 @@ async function seed() {
       { id: "u4", name: "陳廷瑋", email: "sales.chen@cabsales.tw", role: Role.SALES },
       { id: "u5", name: "張育菁", email: "assistant.chang@cabsales.tw", role: Role.ASSISTANT },
     ],
-    skipDuplicates: true,
-  });
-
-  await prisma.masterBoard.createMany({
-    data: INITIAL_BOARDS.map((board) => ({
-      id: board.id,
-      brand: board.brand,
-      colorCode: board.colorCode,
-      thicknessMm: board.thicknessMm,
-      grade: board.grade,
-      unit: board.unit,
-      retailPrice: board.retailPrice,
-    })),
-    skipDuplicates: true,
-  });
-
-  await prisma.masterHardware.createMany({
-    data: INITIAL_HARDWARE.map((item) => ({
-      id: item.id,
-      brand: item.brand,
-      modelName: item.modelName,
-      category: item.category as HardwareCategory,
-      retailPrice: item.retailPrice,
-    })),
-    skipDuplicates: true,
-  });
-
-  await prisma.masterProcessing.createMany({
-    data: INITIAL_PROCESSING.map((item) => ({
-      id: item.id,
-      processName: item.processName,
-      unit: item.unit,
-      retailPrice: item.retailPrice,
-    })),
     skipDuplicates: true,
   });
 
@@ -103,20 +63,6 @@ async function seed() {
     })),
     skipDuplicates: true,
   });
-
-  const quotations = Object.entries(INITIAL_QUOTES).flatMap(([projectId, quotes]) =>
-    quotes.map((quote) => ({
-      id: quote.id,
-      projectId,
-      version: quote.version,
-      externalQuoteNo: quote.externalQuoteNo,
-      quoteFileUrl: quote.quoteFileUrl,
-      notes: quote.notes,
-      totalAmount: quote.totalAmount,
-      status: quote.status as QuoteStatus,
-    })),
-  );
-  await prisma.quotation.createMany({ data: quotations, skipDuplicates: true });
 
   const milestones = Object.values(INITIAL_MILESTONES).flatMap((items) =>
     items.map((milestone) => ({

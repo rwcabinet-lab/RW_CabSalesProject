@@ -268,7 +268,7 @@ export default function ManagerDashboardPage() {
     return [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
   }, [columns]);
 
-  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管看板中...</div>;
+  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管監控室數據中...</div>;
   if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
   if (!data) return null;
 

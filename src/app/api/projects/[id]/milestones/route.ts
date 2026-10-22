@@ -215,25 +215,6 @@ export async function PUT(
       });
     }
 
-    if (action === "reorder") {
-      const canManage = isManager || user.id === project.salesRepId;
-      if (!canManage) {
-        return NextResponse.json({ error: "僅主管或負責業務可調整里程碑順序" }, { status: 403 });
-      }
-      const { orderedMilestoneIds } = body;
-      if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.some((id) => typeof id !== "string")) {
-        return NextResponse.json({ error: "缺少 orderedMilestoneIds 陣列" }, { status: 400 });
-      }
-      const milestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds, initialMilestones);
-      const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
-      const updatedProject = { ...project, isDelayed };
-      return NextResponse.json({
-        success: true,
-        project: updatedProject,
-        milestones: attachTrafficLights(milestones),
-      });
-    }
-
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
     }

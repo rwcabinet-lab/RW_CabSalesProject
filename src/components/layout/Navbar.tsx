@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, Kanban, HardHat, LogOut, Settings, UserCog } from "lucide-react";
+import { LayoutDashboard, Users, BarChart3, HardHat, LogOut, Settings, UserCog } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "業務工作台", icon: LayoutDashboard },
-  { key: "manager", href: "/dashboard/manager", label: "主管監控室", icon: Kanban },
+  { key: "manager", href: "/dashboard/manager", label: "主管監控室", icon: BarChart3 },
   { key: "views", href: "/views", label: "多元可視化", icon: HardHat },
   { key: "customers", href: "/customers", label: "客戶主檔", icon: Users },
   { key: "admin", href: "/admin", label: "管理者設定", icon: Settings },

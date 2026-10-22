@@ -5,7 +5,6 @@ import type {
   MilestoneStatus,
   TaskPriority,
   TaskType,
-  QuoteStatus,
   Role,
 } from "@prisma/client";
 
@@ -15,7 +14,6 @@ export type ProjectStageDTO = ProjectStage;
 export type MilestoneStatusDTO = MilestoneStatus;
 export type TaskPriorityDTO = TaskPriority;
 export type TaskTypeDTO = TaskType;
-export type QuoteStatusDTO = QuoteStatus;
 
 export type MilestonePhaseDTO =
   | "DEVELOP"
@@ -266,32 +264,10 @@ export interface CalendarStaffDTO {
   role: "SALES_MANAGER" | "SALES" | "ASSISTANT" | "SITE_ENGINEER" | string;
 }
 
-export interface QuoteVersionCreateDTO {
-  totalAmount: number;
-  externalQuoteNo?: string;
-  quoteFileUrl?: string;
-  notes?: string;
-  status: QuoteStatusDTO;
-}
-
 export interface TrafficLightDTO {
   color: "RED" | "YELLOW" | "GREEN" | "GRAY";
   label: string;
   daysDiff: number;
-}
-
-export interface CalendarEventDTO {
-  id: string;
-  type: "MILESTONE" | "TASK";
-  project?: ProjectDTO;
-  title?: string;
-  subject?: string;
-  projectName?: string;
-  plannedEnd?: string | null;
-  dueDatetime?: string;
-  status?: MilestoneStatusDTO;
-  assignedToName?: string | null;
-  notes?: string | null;
 }
 
 export interface ManagerDashboardDTO {
