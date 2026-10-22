@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionQuery, useUsersQuery, useProjectsQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { toast } from "@/stores/useToastStore";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -358,8 +359,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (hadActualDueDate) {
         void refreshMilestonesOnly();
       }
+      toast.success("已成功填報執行記錄");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "新增失敗");
+      toast.error(err instanceof Error ? err.message : "新增失敗");
     } finally {
       setSavingRecord(false);
     }
@@ -377,8 +379,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         ...prev,
         [milestoneId]: (prev[milestoneId] || []).filter((r) => r.id !== recordId),
       }));
+      toast.success("已成功刪除該筆記錄");
     } catch (err) {
-      alert("刪除記錄失敗");
+      toast.error("刪除記錄失敗");
     }
   };
 
@@ -397,7 +400,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     const sourceMilestone = reorderedPhase[sourceIndex];
     const targetMilestone = reorderedPhase[targetIndex];
     if (sourceMilestone.status !== "PENDING" || targetMilestone.status !== "PENDING") {
-      alert("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
+      toast.warning("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
       return;
     }
 
@@ -429,7 +432,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       }
     } catch (error) {
       console.error("更新順序失敗", error);
-      alert(error instanceof Error ? error.message : "更新順序失敗");
+      toast.error(error instanceof Error ? error.message : "更新順序失敗");
       await refreshMilestonesOnly();
     }
   };
@@ -457,9 +460,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
-      alert("已成功取消流標狀態，案件已恢復為進行中。");
+      toast.success("已成功取消流標狀態，案件已恢復為進行中。");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "取消流標失敗");
+      toast.error(err instanceof Error ? err.message : "取消流標失敗");
     } finally {
       setCancellingLost(false);
     }
@@ -524,7 +527,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       }
     } catch (error) {
       console.error("更新順序失敗", error);
-      alert(error instanceof Error ? error.message : "更新順序失敗");
+      toast.error(error instanceof Error ? error.message : "更新順序失敗");
       setMilestones(initial);
     }
   };
@@ -552,7 +555,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "提交審核失敗");
-      alert(`已將【${MILESTONE_STAGE_LABELS[milestone.stageCode]}】提交審核，待辦已發送給主責人員。`);
+      toast.success(`已將【${MILESTONE_STAGE_LABELS[milestone.stageCode]}】提交審核，待辦已發送給主責人員。`);
       setSubmitAuditModal(null);
       if (result.project && result.milestones) {
         applyMilestonesData(result);
@@ -567,7 +570,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "提交審核失敗");
+      toast.error(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
       setSubmittingAudit(false);
     }
@@ -591,6 +594,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "推進失敗");
+      toast.success(`已完成【${MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}】並推進案件進度。`);
       setCompletionModal(null);
       if (data.project && data.milestones) {
         applyMilestonesData(data);
@@ -606,7 +610,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "完成推進失敗");
+      toast.error(err instanceof Error ? err.message : "完成推進失敗");
     } finally {
       setAdvancing(false);
     }
@@ -701,6 +705,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "回退進度失敗");
+      toast.success(`已成功回退進度至【${stageName}】。`);
       if (data.project && data.milestones) {
         applyMilestonesData(data);
         void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
@@ -714,7 +719,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "回退失敗");
+      toast.error(err instanceof Error ? err.message : "回退失敗");
     } finally {
       setRollingBack(false);
     }

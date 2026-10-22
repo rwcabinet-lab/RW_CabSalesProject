@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/stores/useToastStore";
 import { formatTenThousands } from "@/lib/currency";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
@@ -93,7 +94,7 @@ export default function ManagerDashboardPage() {
       });
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) {
-        window.alert(result.error || "刪除任務失敗");
+        toast.error(result.error || "刪除任務失敗");
         return;
       }
       queryClient.setQueryData<ManagerDashboardDTO>(
@@ -106,10 +107,11 @@ export default function ManagerDashboardPage() {
               }
             : current
       );
+      toast.success("已成功刪除該指派任務");
       void invalidateManager();
     } catch (err) {
       console.error("Failed to delete assigned task:", err);
-      window.alert("刪除任務時發生錯誤，請稍後重試");
+      toast.error("刪除任務時發生錯誤，請稍後重試");
     }
   };
 
@@ -138,9 +140,10 @@ export default function ManagerDashboardPage() {
       void invalidateManager();
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
+      toast.success(`已成功刪除案件「${project.projectName}」`);
     } catch (error) {
       console.error("Failed to delete project:", error);
-      window.alert(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
+      toast.error(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
     } finally {
       setDeletingProjectId(null);
     }
@@ -180,9 +183,9 @@ export default function ManagerDashboardPage() {
       }
       setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
       void invalidateManager();
-      alert(isEditingTask ? "任務已更新！" : "指派成功！");
+      toast.success(isEditingTask ? "任務已成功更新！" : "任務已成功指派！");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "指派任務失敗");
+      toast.error(err instanceof Error ? err.message : "指派任務失敗");
     } finally {
       setAssigning(false);
     }

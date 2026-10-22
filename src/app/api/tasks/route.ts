@@ -81,6 +81,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
     }
 
+    const targetProject = await DataService.getProjectById(projectId, { evaluateSchedule: false });
+    if (!targetProject) {
+      return NextResponse.json({ error: "找不到該案場" }, { status: 404 });
+    }
+    if (targetProject.currentStage === "LOST" || targetProject.currentStage === "CLOSED") {
+      return NextResponse.json({ error: "此案場已流標或結案，無法新增待辦任務" }, { status: 409 });
+    }
+
     const newTask = await DataService.addTask({
       projectId,
       subject,

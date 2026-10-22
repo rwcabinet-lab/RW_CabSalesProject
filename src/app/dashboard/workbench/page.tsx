@@ -25,6 +25,7 @@ import { useWorkbenchQuery, useCustomersQuery, useUsersQuery, useColumnConfigQue
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
 import { WorkbenchCreateTaskModal, WorkbenchCompleteTaskModal } from "@/components/workbench/WorkbenchModals";
+import { toast } from "@/stores/useToastStore";
 
 const EMPTY_PROJECTS: WorkbenchProjectDTO[] = [];
 const EMPTY_TASKS: TaskDTO[] = [];
@@ -231,7 +232,7 @@ export default function SalesWorkbenchPage() {
       });
       const result = (await res.json()) as ApiResponse<{ success: boolean }>;
       if (!res.ok) {
-        window.alert(result.error || "刪除待辦失敗");
+        toast.error(result.error || "刪除待辦失敗");
         return;
       }
       queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
@@ -241,10 +242,11 @@ export default function SalesWorkbenchPage() {
           tasks: old.tasks.filter((item) => item.id !== task.id),
         };
       });
+      toast.success("已成功刪除該待辦事項");
       void invalidateWorkbench({ includeViews: true });
     } catch (err) {
       console.error("Failed to delete task:", err);
-      window.alert("刪除待辦時發生錯誤，請稍後重試");
+      toast.error("刪除待辦時發生錯誤，請稍後重試");
     }
   };
 
@@ -263,7 +265,7 @@ export default function SalesWorkbenchPage() {
       });
       const result = (await res.json()) as ApiResponse<{ success: boolean }>;
       if (!res.ok) {
-        window.alert(result.error || "刪除案件失敗");
+        toast.error(result.error || "刪除案件失敗");
         return;
       }
       queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
@@ -273,10 +275,11 @@ export default function SalesWorkbenchPage() {
           myProjects: old.myProjects.filter((item) => item.id !== project.id),
         };
       });
+      toast.success(`已成功刪除案件「${project.projectName}」`);
       void invalidateWorkbench({ includeViews: true });
     } catch (err) {
       console.error("Failed to delete project:", err);
-      window.alert("刪除案件時發生錯誤，請稍後重試");
+      toast.error("刪除案件時發生錯誤，請稍後重試");
     }
   };
 

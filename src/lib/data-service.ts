@@ -16,11 +16,11 @@ import {
   AUDIT_STAGE_CODES, MILESTONE_DEFAULT_DAYS, MILESTONE_STAGE_LABELS,
   STANDARD_MILESTONE_STAGE_CODES, STAGE_CODE_TO_PHASE
 } from "./constants";
-import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "./schedule-engine";
+import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE, getTaiwanDateString } from "./schedule-engine";
 import { NotFoundError, BadRequestError, ConflictError } from "./errors";
 
 const dateValue = (value: Date | null | undefined) => value?.toISOString() || undefined;
-const dateOnlyValue = (value: Date | null | undefined) => value?.toISOString().slice(0, 10) || null;
+const dateOnlyValue = (value: Date | null | undefined) => (value ? getTaiwanDateString(value) : null);
 
 const LOGIN_USERS_TTL_MS = 5 * 60_000;
 const APP_CONFIG_TTL_MS = 10 * 60_000;
@@ -924,6 +924,19 @@ export const DataService = {
 
     // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數
     const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+
+    // 狀態機防呆：正規進度不可跳級完成，目標之前的所有進度必須已全數完成
+    if (isCompleted && isRegularStage) {
+      const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+      const sortedTargetIndex = sorted.findIndex((m) => m.id === milestoneId);
+      if (sortedTargetIndex > 0) {
+        const hasIncompletePreceding = sorted.slice(0, sortedTargetIndex).some((m) => m.status !== MilestoneStatus.COMPLETED);
+        if (hasIncompletePreceding) {
+          throw new ConflictError("無法跳級完成：前置里程碑尚未全數完成");
+        }
+      }
+    }
+
     let daysSaved = 0;
     if (isCompleted && targetChanged && isRegularStage && target.plannedDueDate && completedDate) {
       const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -964,9 +977,12 @@ export const DataService = {
         const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
         const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
         nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
+        const todayStr = getTaiwanDateString();
+        const nextPlannedStr = nextPlanned.toISOString().slice(0, 10);
+        const finalPlannedStr = nextPlannedStr < todayStr ? todayStr : nextPlannedStr;
         return {
           ...milestone,
-          plannedDueDate: nextPlanned.toISOString().slice(0, 10),
+          plannedDueDate: finalPlannedStr,
         };
       }
       return milestone;
@@ -1356,6 +1372,12 @@ export const DataService = {
           data: { status: MilestoneStatus.IN_PROGRESS },
         });
         firstIncomplete.status = MilestoneStatus.IN_PROGRESS;
+
+        // 連動復原該里程碑的待辦任務，使其重新出現在業務工作台
+        await tx.salesTask.updateMany({
+          where: { milestoneId: firstIncomplete.id, resultNotes: "流標" },
+          data: { isCompleted: false, completedAt: null, resultNotes: null },
+        });
       }
 
       // 4. 計算還原後的案場階段

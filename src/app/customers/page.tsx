@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse, CustomerDTO } from "@/types/dto";
 import { isAssignableRole } from "@/lib/page-access";
 import { useCustomersQuery, useUsersQuery, useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { toast } from "@/stores/useToastStore";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -100,6 +101,7 @@ export default function CustomersPage() {
           salesRepId: salesReps[0]?.id || "",
         });
         setEditingCustomerId(null);
+        toast.success(editingCustomerId ? "客戶資料已成功更新" : "客戶已成功新增");
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
       } else {
@@ -141,17 +143,18 @@ export default function CustomersPage() {
       });
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) {
-        window.alert(result.error || "刪除客戶失敗");
+        toast.error(result.error || "刪除客戶失敗");
         return;
       }
       queryClient.setQueryData<CustomerDTO[]>(QUERY_KEYS.customers, (old = []) =>
         old.filter((item) => item.id !== customer.id)
       );
+      toast.success(`已刪除客戶「${customer.name}」`);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
     } catch (err) {
       console.error("Failed to delete customer:", err);
-      window.alert("刪除客戶時發生錯誤，請稍後重試");
+      toast.error("刪除客戶時發生錯誤，請稍後重試");
     }
   };
 

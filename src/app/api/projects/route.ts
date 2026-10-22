@@ -70,15 +70,19 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
 
     const body = await req.json();
     const { id, ...data } = body;
     if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
 
-    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    const existing = await DataService.getProjectById(id, { evaluateSchedule: false });
+    if (!existing) return NextResponse.json({ error: "找不到案場" }, { status: 404 });
+    if (existing.currentStage === "LOST" && !isManager) {
+      return NextResponse.json({ error: "此案場已流標，僅主管可調整資料" }, { status: 409 });
+    }
+
     if (!isManager) {
-      const existing = await DataService.getProjectById(id, { evaluateSchedule: false });
-      if (!existing) return NextResponse.json({ error: "找不到案場" }, { status: 404 });
       const canEdit =
         existing.salesRepId === user.id ||
         existing.salesAssistantId === user.id ||

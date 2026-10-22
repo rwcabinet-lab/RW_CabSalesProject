@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { ToastContainer } from "@/components/ui/ToastContainer";
 
 export const metadata: Metadata = {
   title: "正道工業系統櫃事業部 - 業務時程追蹤系統",
@@ -35,6 +36,7 @@ export default function RootLayout({
           <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
             {children}
           </main>
+          <ToastContainer />
         </QueryProvider>
       </body>
     </html>
