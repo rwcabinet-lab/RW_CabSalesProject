@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse, CustomerDTO } from "@/types/dto";
+import { isAssignableRole } from "@/lib/page-access";
 import { useCustomersQuery, useUsersQuery, useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 export default function CustomersPage() {
@@ -16,7 +17,9 @@ export default function CustomersPage() {
   const loadError = queryError instanceof Error ? queryError.message : "";
 
   const salesReps = useMemo(() => {
-    return users.filter((user) => user.role === "SALES_MANAGER" || user.role === "SALES");
+    return users.filter(
+      (user) => isAssignableRole(user.role) && (user.role === "SALES_MANAGER" || user.role === "SALES")
+    );
   }, [users]);
 
   const [showModal, setShowModal] = useState(false);

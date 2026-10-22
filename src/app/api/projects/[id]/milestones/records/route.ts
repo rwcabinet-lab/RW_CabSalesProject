@@ -8,6 +8,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
     const milestoneId = req.nextUrl.searchParams.get("milestoneId");
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
@@ -49,6 +54,12 @@ export async function POST(
       (assignedToId !== undefined && assignedToId !== null && typeof assignedToId !== "string")
     ) {
       return NextResponse.json({ error: "歷次紀錄欄位格式無效" }, { status: 400 });
+    }
+    if (assignedToId) {
+      const assignee = await DataService.getUserById(assignedToId);
+      if (!assignee || assignee.role === "ADMIN" || assignee.role === "LEVEL_MANAGER") {
+        return NextResponse.json({ error: "負責人員不可為管理者或理級主管" }, { status: 400 });
+      }
     }
     const record = await DataService.addMilestoneRecord(milestoneId, {
       plannedDueDate,

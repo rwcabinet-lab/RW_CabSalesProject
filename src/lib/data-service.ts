@@ -273,6 +273,16 @@ export const DataService = {
     });
     if (!customer) return undefined;
 
+    if (data.salesRepId) {
+      const rep = await prisma.user.findUnique({
+        where: { id: data.salesRepId },
+        select: { role: true },
+      });
+      if (rep && (rep.role === "ADMIN" || rep.role === "LEVEL_MANAGER")) {
+        throw new BadRequestError("不可指派管理者或理級主管為主責業務");
+      }
+    }
+
     const assignedSalesRepId = data.salesRepId || customer.salesRepId;
 
     const defaultDays = await this.getMilestoneDefaultDays();
@@ -364,6 +374,16 @@ export const DataService = {
     expectedDate?: string; unitCount?: number | null; cost?: number | null; quoteAmount?: number | null;
     salesAssistantId?: string | null; salesRepId?: string; estimatedBudget?: number | null;
   }): Promise<ProjectDetail | undefined> {
+    if (data.salesRepId) {
+      const rep = await prisma.user.findUnique({
+        where: { id: data.salesRepId },
+        select: { role: true },
+      });
+      if (rep && (rep.role === "ADMIN" || rep.role === "LEVEL_MANAGER")) {
+        throw new BadRequestError("不可指派管理者或理級主管為主責業務");
+      }
+    }
+
     const existing = data.salesRepId
       ? await prisma.project.findUnique({
           where: { id },
@@ -786,7 +806,10 @@ export const DataService = {
     options?: { notes?: string; attachments?: string; completedDate?: string },
     existingMilestones?: ProjectMilestoneItem[]
   ) {
-    const list = existingMilestones ?? await this.getMilestonesByProjectId(projectId);
+    const [list, projectRecord] = await Promise.all([
+      existingMilestones ? Promise.resolve(existingMilestones) : this.getMilestonesByProjectId(projectId),
+      prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } }),
+    ]);
     const originalById = new Map(list.map((m) => [m.id, m]));
     const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
     const operations: Prisma.PrismaPromise<unknown>[] = [];
@@ -835,26 +858,29 @@ export const DataService = {
           milestone.phase === "PRE_PROD" ||
           milestone.stageCode.startsWith("3-") ||
           milestone.stageCode.startsWith("4-");
-        operations.push(
-          prisma.salesTask.upsert({
-            where: { milestoneId: milestone.id },
-            update: {
-              assignedToId: milestone.assignedToId || undefined,
-              dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
-              isCompleted: false,
-            },
-            create: {
-              projectId,
-              milestoneId: milestone.id,
-              assignedToId: milestone.assignedToId!,
-              taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
-              subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode] || "里程碑任務",
-              dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
-              priority: milestone.priority || TaskPriority.MEDIUM,
-              isCompleted: false,
-            },
-          })
-        );
+        const targetAssigneeId = milestone.assignedToId || orig?.assignedToId || projectRecord?.salesRepId;
+        if (targetAssigneeId) {
+          operations.push(
+            prisma.salesTask.upsert({
+              where: { milestoneId: milestone.id },
+              update: {
+                assignedToId: targetAssigneeId,
+                dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                isCompleted: false,
+              },
+              create: {
+                projectId,
+                milestoneId: milestone.id,
+                assignedToId: targetAssigneeId,
+                taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode] || "里程碑任務",
+                dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                priority: milestone.priority || TaskPriority.MEDIUM,
+                isCompleted: false,
+              },
+            })
+          );
+        }
       }
     }
     operations.push(prisma.project.update({
@@ -1071,6 +1097,14 @@ export const DataService = {
               ...(statusChanged ? { status: m.status } : {}),
               ...(dateChanged ? { plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`) } : {}),
             },
+          })
+        );
+      }
+      if (statusChanged && m.status === MilestoneStatus.PENDING) {
+        // 里程碑回退至待開始狀態時，清理先前推進自動產生之未完成任務，防止幽靈待辦殘留
+        operations.push(
+          prisma.salesTask.deleteMany({
+            where: { milestoneId: m.id, isCompleted: false },
           })
         );
       }

@@ -13,8 +13,13 @@ async function requireAdmin(req: NextRequest) {
   return null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
     const customers = await DataService.getCustomers();
     return NextResponse.json(customers);
   } catch (error) {

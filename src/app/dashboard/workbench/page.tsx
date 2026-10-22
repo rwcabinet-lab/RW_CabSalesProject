@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
+import { isAssignableRole } from "@/lib/page-access";
 import { formatTenThousands, fromTenThousands } from "@/lib/currency";
 import type {
   ApiResponse,
@@ -33,6 +34,11 @@ export default function SalesWorkbenchPage() {
   const { data: customers = [] } = useCustomersQuery();
   const { data: users = [] } = useUsersQuery();
   const { data: columnConfig = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
+
+  const selectableUsers = useMemo(
+    () => users.filter((u) => isAssignableRole(u.role)),
+    [users]
+  );
 
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制)
   const {
@@ -476,7 +482,10 @@ export default function SalesWorkbenchPage() {
             <button
               onClick={() => {
                 const firstCust = customers[0];
-                openAddProject(firstCust?.id || "", firstCust?.salesRepId || "");
+                const defaultRepId = selectableUsers.some((u) => u.id === firstCust?.salesRepId)
+                  ? firstCust.salesRepId
+                  : selectableUsers[0]?.id || "";
+                openAddProject(firstCust?.id || "", defaultRepId);
               }}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"
             >
@@ -586,11 +595,16 @@ export default function SalesWorkbenchPage() {
                   onChange={(e) => {
                     const nextCustId = e.target.value;
                     const selectedCust = customers.find((c) => c.id === nextCustId);
-                    setNewProjectData((prev) => ({
-                      ...prev,
-                      customerId: nextCustId,
-                      salesRepId: selectedCust?.salesRepId || prev.salesRepId || "",
-                    }));
+                    setNewProjectData((prev) => {
+                      const defaultRep = (selectedCust?.salesRepId && selectableUsers.some((u) => u.id === selectedCust.salesRepId))
+                        ? selectedCust.salesRepId
+                        : prev.salesRepId || selectableUsers[0]?.id || "";
+                      return {
+                        ...prev,
+                        customerId: nextCustId,
+                        salesRepId: defaultRep,
+                      };
+                    });
                   }}
                   className="w-full border rounded p-1.5 mt-1"
                 >
@@ -611,7 +625,7 @@ export default function SalesWorkbenchPage() {
                   className="w-full border rounded p-1.5 mt-1 bg-white"
                 >
                   <option value="">選擇業務</option>
-                  {users.map((u) => (
+                  {selectableUsers.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
                     </option>
@@ -873,11 +887,16 @@ export default function SalesWorkbenchPage() {
                                 onChange={(e) => {
                                   const nextCustId = e.target.value;
                                   const selectedCust = customers.find((c) => c.id === nextCustId);
-                                  setNewProjectData((prev) => ({
-                                    ...prev,
-                                    customerId: nextCustId,
-                                    salesRepId: selectedCust?.salesRepId || prev.salesRepId || "",
-                                  }));
+                                  setNewProjectData((prev) => {
+                                    const defaultRep = (selectedCust?.salesRepId && selectableUsers.some((u) => u.id === selectedCust.salesRepId))
+                                      ? selectedCust.salesRepId
+                                      : prev.salesRepId || selectableUsers[0]?.id || "";
+                                    return {
+                                      ...prev,
+                                      customerId: nextCustId,
+                                      salesRepId: defaultRep,
+                                    };
+                                  });
                                 }}
                                 className="w-full border rounded p-1.5 mt-1 bg-white"
                               >
@@ -898,7 +917,7 @@ export default function SalesWorkbenchPage() {
                                 className="w-full border rounded p-1.5 mt-1 bg-white"
                               >
                                 <option value="">選擇業務</option>
-                                {users.map((u) => (
+                                {selectableUsers.map((u) => (
                                   <option key={u.id} value={u.id}>
                                     {u.name}
                                   </option>

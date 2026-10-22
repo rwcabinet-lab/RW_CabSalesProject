@@ -3,7 +3,7 @@ import { DataService } from "@/lib/data-service";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
 import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
-import { AppError } from "@/lib/errors";
+import { AppError, handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +34,28 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
     const projectId = params.id;
     const combined = await DataService.getProjectWithMilestones(projectId);
     if (!combined) {
       return NextResponse.json({ error: "查無此案場資料" }, { status: 404 });
     }
     const { project: projectRecord } = combined;
+
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    if (!isManager) {
+      const isRelated =
+        projectRecord.salesRepId === user.id ||
+        projectRecord.salesAssistantId === user.id ||
+        combined.milestones.some((m) => m.assignedToId === user.id);
+      if (!isRelated) {
+        return NextResponse.json({ error: "您無權存取此案場時程" }, { status: 403 });
+      }
+    }
     let initialMilestones = combined.milestones;
     if (projectRecord.currentStage !== "LOST") {
       const existingCodes = new Set(initialMilestones.map((m) => m.stageCode));
@@ -310,8 +326,8 @@ export async function PUT(
       }
       if (typeof updates.assignedToId === "string" && updates.assignedToId) {
         const assignee = await DataService.getUserById(updates.assignedToId);
-        if (!assignee || !["SALES_MANAGER", "SALES", "ASSISTANT"].includes(assignee.role)) {
-          return NextResponse.json({ error: "負責人必須是有效的業務主管、業務或業助帳號" }, { status: 400 });
+        if (!assignee || assignee.role === "ADMIN" || assignee.role === "LEVEL_MANAGER") {
+          return NextResponse.json({ error: "負責人員不可為管理者或理級主管" }, { status: 400 });
         }
       }
     }
@@ -411,27 +427,6 @@ export async function PUT(
       milestones: attachTrafficLights(evaluatedMilestones),
     });
   } catch (error) {
-    if (error instanceof AppError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    }
-    console.error("Failed to update milestone:", error);
-    if (error instanceof Error && (
-      error.message === "只能完成目前進行中的里程碑" ||
-      error.message === "只能完成目前進行中的收尾項目" ||
-      error.message === "案件已離開收尾階段" ||
-      error.message === "已完成的里程碑不可編輯" ||
-      error.message === "找不到此里程碑" ||
-      error.message === "此里程碑不需要審核" ||
-      error.message === "只能提交目前進行中的審核項目" ||
-      error.message === "排序清單必須包含此案件的所有里程碑且不可重複" ||
-      error.message === "找不到已完成的里程碑" ||
-      error.message === "請由最後一個已完成的里程碑開始回退"
-    )) {
-      const status = error.message === "找不到此里程碑" ? 404
-        : error.message === "排序清單必須包含此案件的所有里程碑且不可重複" ? 400
-          : 409;
-      return NextResponse.json({ error: error.message }, { status });
-    }
-    return NextResponse.json({ error: "更新里程碑失敗" }, { status: 500 });
+    return handleApiError(error, "更新里程碑失敗");
   }
 }

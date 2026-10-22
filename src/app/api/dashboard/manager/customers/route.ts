@@ -11,6 +11,9 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
+    if (!["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role)) {
+      return NextResponse.json({ error: "僅主管層級可查閱客戶營運統計" }, { status: 403 });
+    }
 
     // 利用 SQL 關聯查詢一次性取得客戶與案場摘要，並僅單獨撈取簽約里程碑 ID，徹底消除全資料表里程碑載入至記憶體的 OOM 隱患
     const [customers, signedMilestoneRows, closedMilestoneRows] = await Promise.all([

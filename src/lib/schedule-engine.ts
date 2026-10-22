@@ -4,6 +4,7 @@ import {
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
 } from "./constants";
+import { ConflictError } from "./errors";
 
 export interface TrafficLightStatus {
   color: "RED" | "YELLOW" | "GREEN" | "GRAY";
@@ -152,7 +153,7 @@ export const ScheduleEngine = {
       !["IN_PROGRESS", "OVERDUE"].includes(sorted[targetIndex].status) ||
       sorted.slice(0, targetIndex).some((milestone) => milestone.status !== "COMPLETED")
     ) {
-      throw new Error("只能完成目前進行中的里程碑");
+      throw new ConflictError("只能完成目前進行中的里程碑");
     }
 
     // 1. 標記當前進度為已完成

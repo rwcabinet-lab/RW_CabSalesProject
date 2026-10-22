@@ -17,6 +17,13 @@ export const ROLE_OPTIONS = [
   { value: "SITE_ENGINEER", label: "工務人員" },
 ] as const;
 
+/** 排除指派為案件/里程碑/任務負責人的層級（管理者與理級主管） */
+export const EXCLUDED_ASSIGNABLE_ROLES = ["ADMIN", "LEVEL_MANAGER"] as const;
+
+export function isAssignableRole(role?: string | null): boolean {
+  return Boolean(role && !EXCLUDED_ASSIGNABLE_ROLES.includes(role as any));
+}
+
 export type PageAccessKey = (typeof PAGE_ACCESS_OPTIONS)[number]["key"];
 export type AppRole = (typeof ROLE_OPTIONS)[number]["value"];
 

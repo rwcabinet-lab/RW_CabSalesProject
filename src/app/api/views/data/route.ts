@@ -1,11 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
+import { getUserFromRequest } from "@/lib/access-control";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
     const [projects, tasks, users] = await Promise.all([
       DataService.getProjects(),
       DataService.getTasks(),

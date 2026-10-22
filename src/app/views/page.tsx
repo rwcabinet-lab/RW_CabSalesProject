@@ -49,13 +49,17 @@ function checkIsClosed(p: ProjectWithMilestonesDTO): boolean {
   return Boolean(p.milestones?.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED"));
 }
 
+const EMPTY_PROJECTS: ProjectWithMilestonesDTO[] = [];
+const EMPTY_TASKS: TaskDTO[] = [];
+const EMPTY_STAFF: CalendarStaffDTO[] = [];
+
 export default function VisualViewsPage() {
   const { data: viewsData, isLoading: viewsLoading, error: viewsError, refetch } = useViewsDataQuery();
 
   const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
-  const [projects, setProjects] = useState<ProjectWithMilestonesDTO[]>([]);
-  const [tasks, setTasks] = useState<TaskDTO[]>([]);
-  const [staff, setStaff] = useState<CalendarStaffDTO[]>([]);
+  const projects = viewsData?.projects ?? EMPTY_PROJECTS;
+  const tasks = viewsData?.tasks ?? EMPTY_TASKS;
+  const staff = viewsData?.staff ?? EMPTY_STAFF;
 
   // 篩選條件狀態
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,14 +72,6 @@ export default function VisualViewsPage() {
 
   const loading = viewsLoading && !viewsData;
   const loadError = viewsError instanceof Error ? viewsError.message : "";
-
-  useEffect(() => {
-    if (viewsData) {
-      if (Array.isArray(viewsData.projects)) setProjects(viewsData.projects);
-      if (Array.isArray(viewsData.tasks)) setTasks(viewsData.tasks);
-      if (Array.isArray(viewsData.staff)) setStaff(viewsData.staff);
-    }
-  }, [viewsData]);
 
   // 動態負責業務清單
   const salesOptions = useMemo(() => {

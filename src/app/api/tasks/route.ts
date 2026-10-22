@@ -3,9 +3,19 @@ import { DataService } from "@/lib/data-service";
 import { AUDIT_STAGE_CODES } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
+import { handleApiError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      const hasCookie = Boolean(req.cookies.get("cab_sales_user_id")?.value);
+      return NextResponse.json(
+        { error: hasCookie ? "登入已失效，請重新登入" : "請先登入" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") || undefined;
     let assignedToId = searchParams.get("assignedToId") || undefined;
@@ -15,19 +25,24 @@ export async function GET(req: NextRequest) {
     if (isCompletedParam === "true") isCompleted = true;
     if (isCompletedParam === "false") isCompleted = false;
 
-    if (isCompleted) {
-      const user = await getUserFromRequest(req);
-      if (!user) {
-        const hasCookie = Boolean(req.cookies.get("cab_sales_user_id")?.value);
-        return NextResponse.json(
-          { error: hasCookie ? "登入已失效，請重新登入" : "請先登入" },
-          { status: 401 }
-        );
-      }
+    const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
 
-      const canReviewProjectTasks =
-        projectId && ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
-      assignedToId = canReviewProjectTasks ? undefined : user.id;
+    if (!isManager) {
+      if (!projectId) {
+        // 非管理員且未指定案件：嚴格限制只能存取指派給自己的任務
+        assignedToId = user.id;
+      } else {
+        // 指定案件時：確認是否為該案件相關人員
+        const targetProject = await DataService.getProjectById(projectId, { evaluateSchedule: false });
+        const isProjectStaff =
+          targetProject &&
+          (targetProject.salesRepId === user.id ||
+            targetProject.salesAssistantId === user.id ||
+            targetProject.customerSalesRepId === user.id);
+        if (!isProjectStaff) {
+          assignedToId = user.id;
+        }
+      }
     }
 
     const tasks = await DataService.getTasks({
@@ -154,15 +169,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true, task: updatedTask });
   } catch (error) {
-    console.error("Failed to update task:", error);
-    if (error instanceof Error && (
-      error.message === "只能完成目前進行中的里程碑" ||
-      error.message === "里程碑待辦請由案件細節執行回退" ||
-      error.message === "案件已進入額外階段，無法完成一般里程碑"
-    )) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
-    }
-    return NextResponse.json({ error: "更新任務狀態失敗" }, { status: 500 });
+    return handleApiError(error, "更新任務狀態失敗");
   }
 }
 

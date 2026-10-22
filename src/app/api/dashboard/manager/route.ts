@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
+    if (!MANAGER_ROLES.includes(user.role)) {
+      return NextResponse.json({ error: "僅主管層級可查閱營運總覽資料" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const monthFilter = searchParams.get("month");
@@ -288,8 +291,8 @@ export async function POST(req: NextRequest) {
     if (!assignee) {
       return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
     }
-    if (assignee.role !== "SALES_MANAGER" && assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
-      return NextResponse.json({ error: "指派對象必須是業務主管、業務或業助" }, { status: 400 });
+    if (assignee.role === "ADMIN" || assignee.role === "LEVEL_MANAGER") {
+      return NextResponse.json({ error: "指派對象不可為管理者或理級主管" }, { status: 400 });
     }
     if (priority && !["HIGH", "MEDIUM", "LOW"].includes(priority)) {
       return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
@@ -337,8 +340,8 @@ export async function PATCH(req: NextRequest) {
     if (!assignee) {
       return NextResponse.json({ error: "找不到指派對象" }, { status: 404 });
     }
-    if (assignee.role !== "SALES_MANAGER" && assignee.role !== "SALES" && assignee.role !== "ASSISTANT") {
-      return NextResponse.json({ error: "指派對象必須是業務主管、業務或業助" }, { status: 400 });
+    if (assignee.role === "ADMIN" || assignee.role === "LEVEL_MANAGER") {
+      return NextResponse.json({ error: "指派對象不可為管理者或理級主管" }, { status: 400 });
     }
 
     const task = await DataService.updateTask(taskId, {

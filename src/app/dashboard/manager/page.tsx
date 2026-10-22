@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatTenThousands } from "@/lib/currency";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
+import { isAssignableRole } from "@/lib/page-access";
 import type { ApiResponse, AssignableUserDTO, ColumnItemDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
 import {
   useManagerDashboardQuery,
@@ -18,6 +19,8 @@ import {
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+
+const EMPTY_OVERVIEW: ManagerDashboardDTO["allProjectsOverview"] = [];
 
 export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
@@ -31,7 +34,7 @@ export default function ManagerDashboardPage() {
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
 
-  // React Query 資料快取
+  // React Query 資料快取 (單一真實來源)
   const {
     data: dashboardData,
     isLoading: dashboardLoading,
@@ -41,20 +44,14 @@ export default function ManagerDashboardPage() {
   const { data: sessionUser } = useSessionQuery();
   const { data: columnsData = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
 
-  const [data, setData] = useState<ManagerDashboardDTO | null>(null);
+  const data = dashboardData ?? null;
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  const assignableUsers = users.filter((u) => ["SALES_MANAGER", "SALES", "ASSISTANT"].includes(u.role as string)) as AssignableUserDTO[];
+  const assignableUsers = users.filter((u) => isAssignableRole(u.role)) as AssignableUserDTO[];
   const columns = columnsData;
   const isAdmin = sessionUser?.role === "ADMIN";
   const loading = dashboardLoading && !data;
   const loadError = dashboardError instanceof Error ? dashboardError.message : "";
-
-  useEffect(() => {
-    if (dashboardData) {
-      setData(dashboardData);
-    }
-  }, [dashboardData]);
 
   const invalidateManager = async () => {
     await Promise.all([
@@ -83,10 +80,16 @@ export default function ManagerDashboardPage() {
         window.alert(result.error || "刪除任務失敗");
         return;
       }
-      setData((current) => current ? {
-        ...current,
-        assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
-      } : current);
+      queryClient.setQueryData<ManagerDashboardDTO>(
+        QUERY_KEYS.managerDashboard(startMonth, endMonth),
+        (current) =>
+          current
+            ? {
+                ...current,
+                assignedTasks: current.assignedTasks.filter((item) => item.id !== task.id),
+              }
+            : current
+      );
       void invalidateManager();
     } catch (err) {
       console.error("Failed to delete assigned task:", err);
@@ -105,14 +108,16 @@ export default function ManagerDashboardPage() {
       });
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) throw new Error(result.error || "刪除案件失敗");
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              allProjectsOverview: current.allProjectsOverview.filter((item) => item.id !== project.id),
-              alertList: current.alertList.filter((item) => item.id !== project.id),
-            }
-          : current
+      queryClient.setQueryData<ManagerDashboardDTO>(
+        QUERY_KEYS.managerDashboard(startMonth, endMonth),
+        (current) =>
+          current
+            ? {
+                ...current,
+                allProjectsOverview: current.allProjectsOverview.filter((item) => item.id !== project.id),
+                alertList: current.alertList.filter((item) => item.id !== project.id),
+              }
+            : current
       );
       void invalidateManager();
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
@@ -144,15 +149,17 @@ export default function ManagerDashboardPage() {
       const result = await res.json() as ApiResponse<{ task: TaskDTO }>;
       if (!res.ok) throw new Error(result.error || "指派任務失敗");
       if (result.task) {
-        setData((current) =>
-          current
-            ? {
-                ...current,
-                assignedTasks: isEditingTask
-                  ? current.assignedTasks.map((t) => (t.id === result.task.id ? result.task : t))
-                  : [result.task, ...current.assignedTasks],
-              }
-            : current
+        queryClient.setQueryData<ManagerDashboardDTO>(
+          QUERY_KEYS.managerDashboard(startMonth, endMonth),
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  assignedTasks: isEditingTask
+                    ? current.assignedTasks.map((t) => (t.id === result.task.id ? result.task : t))
+                    : [result.task, ...current.assignedTasks],
+                }
+              : current
         );
       }
       setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
@@ -165,53 +172,55 @@ export default function ManagerDashboardPage() {
     }
   };
 
-  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管看板中...</div>;
-  if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
-  if (!data) return null;
-
   // 預定完工日排序
   // 案場總覽過濾：預設排除已流標/結案
-  const filteredOverview = data.allProjectsOverview.filter(p => {
-    if (stageFilter === "ACTIVE") {
-      if (p.currentStage === "LOST" || p.isClosed) return false;
-    } else if (stageFilter === "CLOSED") {
-      if (!p.isClosed && p.currentStage !== "CLOSED") return false;
-    } else if (stageFilter && p.currentStage !== stageFilter) {
-      return false;
-    }
-    if (businessFilter && p.salesRepName !== businessFilter) return false;
-    const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
-    if (statusFilter && projectStatus !== statusFilter) return false;
-    const projectMonth = (p.expectedDate || "").slice(0, 7);
-    if (startMonth && projectMonth && projectMonth < startMonth) return false;
-    if (endMonth && projectMonth && projectMonth > endMonth) return false;
-    if ((startMonth || endMonth) && !projectMonth) return false;
-    return true;
-  });
+  const allProjectsOverview = data?.allProjectsOverview ?? EMPTY_OVERVIEW;
+
+  const filteredOverview = useMemo(() => {
+    return allProjectsOverview.filter((p) => {
+      if (stageFilter === "ACTIVE") {
+        if (p.currentStage === "LOST" || p.isClosed) return false;
+      } else if (stageFilter === "CLOSED") {
+        if (!p.isClosed && p.currentStage !== "CLOSED") return false;
+      } else if (stageFilter && p.currentStage !== stageFilter) {
+        return false;
+      }
+      if (businessFilter && p.salesRepName !== businessFilter) return false;
+      const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
+      if (statusFilter && projectStatus !== statusFilter) return false;
+      const projectMonth = (p.expectedDate || "").slice(0, 7);
+      if (startMonth && projectMonth && projectMonth < startMonth) return false;
+      if (endMonth && projectMonth && projectMonth > endMonth) return false;
+      if ((startMonth || endMonth) && !projectMonth) return false;
+      return true;
+    });
+  }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, startMonth, endMonth]);
 
   // 依完工日與狀態排序
-  const sortedOverview = [...filteredOverview].sort((a, b) => {
-    if (statusSort !== "NONE") {
-      const getStatusWeight = (item: typeof a) => {
-        if (item.currentStage === "LOST") return 5;
-        if (item.trafficLight.color === "RED") return 1;
-        if (item.trafficLight.color === "YELLOW") return 2;
-        if (item.trafficLight.color === "GREEN") return 3;
-        return 4;
-      };
-      const diff = getStatusWeight(a) - getStatusWeight(b);
-      if (diff !== 0) {
-        return statusSort === "URGENT_FIRST" ? diff : -diff;
+  const sortedOverview = useMemo(() => {
+    return [...filteredOverview].sort((a, b) => {
+      if (statusSort !== "NONE") {
+        const getStatusWeight = (item: typeof a) => {
+          if (item.currentStage === "LOST") return 5;
+          if (item.trafficLight.color === "RED") return 1;
+          if (item.trafficLight.color === "YELLOW") return 2;
+          if (item.trafficLight.color === "GREEN") return 3;
+          return 4;
+        };
+        const diff = getStatusWeight(a) - getStatusWeight(b);
+        if (diff !== 0) {
+          return statusSort === "URGENT_FIRST" ? diff : -diff;
+        }
       }
-    }
-    if (dateSort === "NONE") return 0;
-    const dateA = a.expectedDate || "";
-    const dateB = b.expectedDate || "";
-    if (!dateA && !dateB) return 0;
-    if (!dateA) return 1;
-    if (!dateB) return -1;
-    return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-  });
+      if (dateSort === "NONE") return 0;
+      const dateA = a.expectedDate || "";
+      const dateB = b.expectedDate || "";
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    });
+  }, [filteredOverview, statusSort, dateSort]);
 
   const toggleDateSort = () => {
     if (dateSort === "NONE") setDateSort("ASC");
@@ -225,13 +234,24 @@ export default function ManagerDashboardPage() {
     else setStatusSort("NONE");
   };
 
-  const totalFilteredAmount = sortedOverview.reduce(
-    (sum, p) => sum + (p.quoteAmount || p.totalAmount || 0),
-    0
-  );
+  const totalFilteredAmount = useMemo(() => {
+    return sortedOverview.reduce(
+      (sum, p) => sum + (p.quoteAmount || p.totalAmount || 0),
+      0
+    );
+  }, [sortedOverview]);
 
-  const businessOptions = Array.from(new Set(data.allProjectsOverview.map((project) => project.salesRepName))).sort();
-  const visibleColumns = [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
+  const businessOptions = useMemo(() => {
+    return Array.from(new Set(allProjectsOverview.map((project) => project.salesRepName))).sort();
+  }, [allProjectsOverview]);
+
+  const visibleColumns = useMemo(() => {
+    return [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
+  }, [columns]);
+
+  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管看板中...</div>;
+  if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
+  if (!data) return null;
 
   return (
     <div className="space-y-8 pb-16">
@@ -586,7 +606,7 @@ export default function ManagerDashboardPage() {
                   <option value="">選擇人員</option>
                   {assignableUsers.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {user.name} ({user.role === "SALES_MANAGER" ? "業務主管" : user.role === "SALES" ? "業務" : "業助"})
+                      {user.name} ({user.role === "SALES_MANAGER" ? "業務主管" : user.role === "SALES" ? "業務" : user.role === "SITE_ENGINEER" ? "工務" : "業助"})
                     </option>
                   ))}
                 </select>

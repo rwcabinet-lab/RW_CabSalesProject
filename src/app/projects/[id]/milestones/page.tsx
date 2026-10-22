@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { QUERY_KEYS } from "@/hooks/useQueries";
+import { useSessionQuery, useUsersQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -34,6 +34,7 @@ import {
   AUDIT_STAGE_CODES,
   QUOTE_STAGE_CODES,
 } from "@/lib/constants";
+import { isAssignableRole } from "@/lib/page-access";
 import type {
   ApiResponse,
   MilestoneDTO,
@@ -95,9 +96,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectDTO | null>(null);
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
-  const [assignees, setAssignees] = useState<UserDTO[]>([]);
-  const [canManageMilestones, setCanManageMilestones] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
+
+  const { data: sessionUser } = useSessionQuery();
+  const { data: users = [] } = useUsersQuery();
+
+  const currentUserId = sessionUser?.id || "";
+  const canManageMilestones = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(sessionUser?.role || "");
+  const assignees = useMemo(() => {
+    return users.filter((user: UserDTO) => isAssignableRole(user.role));
+  }, [users]);
   const [milestones, setMilestones] = useState<MilestoneWithLight[]>([]);
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [completedTasks, setCompletedTasks] = useState<TaskDTO[]>([]);
@@ -218,10 +225,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [projectId]);
-
   const applyMilestonesData = (data: { project?: ProjectDTO; milestones?: MilestoneWithLight[] }) => {
     if (data.project) {
       setProject(data.project);
@@ -259,34 +262,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setLoadError("");
 
       const milestonesPromise = fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" });
-      const usersPromise = fetch("/api/auth/users");
-      const sessionPromise = fetch("/api/auth/session", { cache: "no-store" });
       const projectsPromise = fetch("/api/projects", { cache: "no-store" });
       const tasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" });
       const completedTasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`, { cache: "no-store" });
 
-      const [milestonesRes, usersRes, sessionRes] = await Promise.all([
-        milestonesPromise,
-        usersPromise,
-        sessionPromise,
-      ]);
-
-      if (usersRes.ok) {
-        const u = await usersRes.json();
-        if (Array.isArray(u)) setAssignees(u);
-      }
-      if (sessionRes.ok) {
-        const s = await sessionRes.json();
-        setCurrentUserId(s.user?.id || "");
-        setCanManageMilestones(["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(s.user?.role));
-      }
-
+      const milestonesRes = await milestonesPromise;
       const data = await milestonesRes.json() as ApiResponse<MilestoneDetailsDTO>;
       if (!milestonesRes.ok) throw new Error(data.error || "無法載入案件里程碑");
 
@@ -318,7 +304,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoadError(err instanceof Error ? err.message : "載入失敗");
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   // 讀取特定里程碑的多次記錄
   const toggleRecords = async (milestoneId: string) => {

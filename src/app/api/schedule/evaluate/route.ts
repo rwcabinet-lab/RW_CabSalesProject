@@ -1,8 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
+import { getUserFromRequest } from "@/lib/access-control";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const summary = await DataService.evaluateAllSchedules();
     return NextResponse.json({
       success: true,
@@ -15,8 +19,11 @@ export async function POST() {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
     const summary = await DataService.evaluateAllSchedules();
     return NextResponse.json({
       success: true,
