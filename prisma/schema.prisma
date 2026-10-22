@@ -50,6 +50,8 @@ model Customer {
   projects        Project[]
 
   @@index([salesRepId])
+  @@index([taxId])
+  @@index([phone])
   @@map("customers")
 }
 
@@ -141,6 +143,7 @@ model Project {
   tasks            SalesTask[]
 
   @@index([currentStage, isDelayed])
+  @@index([expectedDate])
   @@index([customerId])
   @@index([salesRepId])
   @@index([salesAssistantId])
@@ -168,6 +171,8 @@ model ProjectMilestone {
   records        MilestoneRecord[]
 
   @@index([projectId])
+  @@index([projectId, stageOrder])
+  @@index([projectId, stageCode])
   @@index([assignedToId])
   @@index([status, plannedDueDate])
   @@map("project_milestones")
@@ -236,6 +241,7 @@ model QuoteCabinet {
   quote           Quotation        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   components      QuoteComponent[]
 
+  @@index([quoteId])
   @@map("quote_cabinets")
 }
 
@@ -255,6 +261,7 @@ model QuoteComponent {
   updatedAt     DateTime      @updatedAt @map("updated_at")
   cabinet       QuoteCabinet  @relation(fields: [cabinetItemId], references: [id], onDelete: Cascade)
 
+  @@index([cabinetItemId])
   @@map("quote_components")
 }
 
@@ -279,6 +286,8 @@ model SalesTask {
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@index([assignedToId, isCompleted])
+  @@index([assignedById])
   @@index([assignedToId])
   @@index([isCompleted, dueDatetime])
   @@map("sales_tasks")

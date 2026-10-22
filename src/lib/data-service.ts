@@ -43,9 +43,17 @@ function addDays(dateStr: string, days: number): string {
 }
 
 const projectInclude = {
-  customer: { include: { salesRep: true } },
-  salesRep: true,
-  salesAssistant: true,
+  customer: {
+    select: {
+      name: true,
+      customerType: true,
+      defaultDiscount: true,
+      salesRepId: true,
+      salesRep: { select: { name: true } },
+    },
+  },
+  salesRep: { select: { id: true, name: true } },
+  salesAssistant: { select: { id: true, name: true } },
 } as const;
 const milestoneInclude = {
   assignedTo: { select: { name: true } },
@@ -69,7 +77,7 @@ export const DataService = {
   async getCustomers(): Promise<CustomerItem[]> {
     const customers = await prisma.customer.findMany({
       relationLoadStrategy: "join",
-      include: { salesRep: true },
+      include: { salesRep: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     });
     return customers.map(c => ({
@@ -83,7 +91,7 @@ export const DataService = {
     const c = await prisma.customer.findUnique({
       where: { id },
       relationLoadStrategy: "join",
-      include: { salesRep: true },
+      include: { salesRep: { select: { id: true, name: true } } },
     });
     if (!c) return undefined;
     return {
@@ -303,70 +311,72 @@ export const DataService = {
       };
     });
 
-    const p = await prisma.project.create({
-      data: {
-        projectName: data.projectName,
-        customerId: data.customerId,
-        siteAddress: data.siteAddress,
-        siteCondition: data.siteCondition,
-        salesRepId: assignedSalesRepId,
-        currentStage: ProjectStage.DEVELOP,
-        expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
-        unitCount: data.unitCount,
-        cost: data.cost,
-        quoteAmount: data.quoteAmount,
-        estimatedBudget: data.quoteAmount || data.cost,
-        milestones: {
-          createMany: {
-            data: milestoneRows,
+    return await prisma.$transaction(async (tx) => {
+      const p = await tx.project.create({
+        data: {
+          projectName: data.projectName,
+          customerId: data.customerId,
+          siteAddress: data.siteAddress,
+          siteCondition: data.siteCondition,
+          salesRepId: assignedSalesRepId,
+          currentStage: ProjectStage.DEVELOP,
+          expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
+          unitCount: data.unitCount,
+          cost: data.cost,
+          quoteAmount: data.quoteAmount,
+          estimatedBudget: data.quoteAmount || data.cost,
+          milestones: {
+            createMany: {
+              data: milestoneRows,
+            },
           },
         },
-      },
-      relationLoadStrategy: "join",
-      include: projectInclude,
-    });
-
-    const firstMilestone = await prisma.projectMilestone.findFirst({
-      where: { projectId: p.id, stageCode: "1-1" },
-    });
-    if (firstMilestone) {
-      await prisma.salesTask.create({
-        data: {
-          projectId: p.id,
-          milestoneId: firstMilestone.id,
-          assignedToId: assignedSalesRepId,
-          taskType: TaskType.SITE_VISIT,
-          subject: MILESTONE_STAGE_LABELS["1-1"] || "客源開發",
-          dueDatetime: firstMilestone.plannedDueDate || new Date(),
-          priority: TaskPriority.MEDIUM,
-          isCompleted: false,
-        },
+        relationLoadStrategy: "join",
+        include: projectInclude,
       });
-    }
 
-    return {
-      id: p.id,
-      projectName: p.projectName,
-      customerId: p.customerId,
-      customerName: p.customer.name,
-      customerType: customerTypeFromDatabase(p.customer.customerType),
-      defaultDiscount: Number(p.customer.defaultDiscount),
-      siteAddress: p.siteAddress,
-      siteCondition: p.siteCondition || undefined,
-      salesRepId: p.salesRepId,
-      salesRepName: p.salesRep.name,
-      customerSalesRepId: p.customer.salesRepId,
-      customerSalesRepName: p.customer.salesRep.name,
-      salesAssistantId: p.salesAssistantId || undefined,
-      salesAssistantName: p.salesAssistant?.name,
-      currentStage: p.currentStage,
-      isDelayed: p.isDelayed,
-      expectedDate: dateValue(p.expectedDate),
-      estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
-      unitCount: p.unitCount ?? undefined,
-      cost: p.cost != null ? Number(p.cost) : undefined,
-      quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
-    };
+      const firstMilestone = await tx.projectMilestone.findFirst({
+        where: { projectId: p.id, stageCode: "1-1" },
+      });
+      if (firstMilestone) {
+        await tx.salesTask.create({
+          data: {
+            projectId: p.id,
+            milestoneId: firstMilestone.id,
+            assignedToId: assignedSalesRepId,
+            taskType: TaskType.SITE_VISIT,
+            subject: MILESTONE_STAGE_LABELS["1-1"] || "客源開發",
+            dueDatetime: firstMilestone.plannedDueDate || new Date(),
+            priority: TaskPriority.MEDIUM,
+            isCompleted: false,
+          },
+        });
+      }
+
+      return {
+        id: p.id,
+        projectName: p.projectName,
+        customerId: p.customerId,
+        customerName: p.customer.name,
+        customerType: customerTypeFromDatabase(p.customer.customerType),
+        defaultDiscount: Number(p.customer.defaultDiscount),
+        siteAddress: p.siteAddress,
+        siteCondition: p.siteCondition || undefined,
+        salesRepId: p.salesRepId,
+        salesRepName: p.salesRep.name,
+        customerSalesRepId: p.customer.salesRepId,
+        customerSalesRepName: p.customer.salesRep.name,
+        salesAssistantId: p.salesAssistantId || undefined,
+        salesAssistantName: p.salesAssistant?.name,
+        currentStage: p.currentStage,
+        isDelayed: p.isDelayed,
+        expectedDate: dateValue(p.expectedDate),
+        estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
+        unitCount: p.unitCount ?? undefined,
+        cost: p.cost != null ? Number(p.cost) : undefined,
+        quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+      };
+    });
   },
 
   async updateProject(id: string, data: {
@@ -391,35 +401,6 @@ export const DataService = {
         })
       : null;
 
-    if (data.salesRepId && existing && existing.salesRepId !== data.salesRepId) {
-      const oldSalesRepId = existing.salesRepId;
-      const newSalesRepId = data.salesRepId;
-
-      // 連動未進行項目（PENDING）或原主責業務尚未完成的里程碑負責人
-      await prisma.projectMilestone.updateMany({
-        where: {
-          projectId: id,
-          status: { not: MilestoneStatus.COMPLETED },
-          OR: [
-            { status: MilestoneStatus.PENDING },
-            { assignedToId: oldSalesRepId },
-            { assignedToId: null },
-          ],
-        },
-        data: { assignedToId: newSalesRepId },
-      });
-
-      // 連動未完成且原屬舊業務之待辦任務
-      await prisma.salesTask.updateMany({
-        where: {
-          projectId: id,
-          isCompleted: false,
-          assignedToId: oldSalesRepId,
-        },
-        data: { assignedToId: newSalesRepId },
-      });
-    }
-
     const updateData: Prisma.ProjectUncheckedUpdateInput = {
       ...(data.projectName !== undefined ? { projectName: data.projectName } : {}),
       ...(data.customerId !== undefined ? { customerId: data.customerId } : {}),
@@ -433,35 +414,68 @@ export const DataService = {
       ...(data.salesAssistantId !== undefined ? { salesAssistantId: data.salesAssistantId || null } : {}),
       ...(data.salesRepId ? { salesRepId: data.salesRepId } : {}),
     };
-    const p = await prisma.project.update({
-      where: { id },
-      data: updateData,
-      relationLoadStrategy: "join",
-      include: projectInclude,
+
+    return await prisma.$transaction(async (tx) => {
+      if (data.salesRepId && existing && existing.salesRepId !== data.salesRepId) {
+        const oldSalesRepId = existing.salesRepId;
+        const newSalesRepId = data.salesRepId;
+
+        // 連動未進行項目（PENDING）或原主責業務尚未完成的里程碑負責人
+        await tx.projectMilestone.updateMany({
+          where: {
+            projectId: id,
+            status: { not: MilestoneStatus.COMPLETED },
+            OR: [
+              { status: MilestoneStatus.PENDING },
+              { assignedToId: oldSalesRepId },
+              { assignedToId: null },
+            ],
+          },
+          data: { assignedToId: newSalesRepId },
+        });
+
+        // 連動未完成且原屬舊業務之待辦任務
+        await tx.salesTask.updateMany({
+          where: {
+            projectId: id,
+            isCompleted: false,
+            assignedToId: oldSalesRepId,
+          },
+          data: { assignedToId: newSalesRepId },
+        });
+      }
+
+      const p = await tx.project.update({
+        where: { id },
+        data: updateData,
+        relationLoadStrategy: "join",
+        include: projectInclude,
+      });
+
+      return {
+        id: p.id,
+        projectName: p.projectName,
+        customerId: p.customerId,
+        customerName: p.customer.name,
+        customerType: customerTypeFromDatabase(p.customer.customerType),
+        defaultDiscount: Number(p.customer.defaultDiscount),
+        siteAddress: p.siteAddress,
+        siteCondition: p.siteCondition || undefined,
+        salesRepId: p.salesRepId,
+        salesRepName: p.salesRep.name,
+        customerSalesRepId: p.customer.salesRepId,
+        customerSalesRepName: p.customer.salesRep.name,
+        salesAssistantId: p.salesAssistantId || undefined,
+        salesAssistantName: p.salesAssistant?.name,
+        currentStage: p.currentStage,
+        isDelayed: p.isDelayed,
+        expectedDate: dateValue(p.expectedDate),
+        estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
+        unitCount: p.unitCount ?? undefined,
+        cost: p.cost != null ? Number(p.cost) : undefined,
+        quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+      };
     });
-    return {
-      id: p.id,
-      projectName: p.projectName,
-      customerId: p.customerId,
-      customerName: p.customer.name,
-      customerType: customerTypeFromDatabase(p.customer.customerType),
-      defaultDiscount: Number(p.customer.defaultDiscount),
-      siteAddress: p.siteAddress,
-      siteCondition: p.siteCondition || undefined,
-      salesRepId: p.salesRepId,
-      salesRepName: p.salesRep.name,
-      customerSalesRepId: p.customer.salesRepId,
-      customerSalesRepName: p.customer.salesRep.name,
-      salesAssistantId: p.salesAssistantId || undefined,
-      salesAssistantName: p.salesAssistant?.name,
-      currentStage: p.currentStage,
-      isDelayed: p.isDelayed,
-      expectedDate: dateValue(p.expectedDate),
-      estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
-      unitCount: p.unitCount ?? undefined,
-      cost: p.cost != null ? Number(p.cost) : undefined,
-      quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
-    };
   },
 
 
@@ -693,79 +707,77 @@ export const DataService = {
       }
     }
 
-    const milestonePromise = prisma.projectMilestone.update({
-      where: { id: milestoneId, projectId },
-      data: {
-        plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
-        actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
-        status: targetStatus,
-        priority: updates.priority,
-        assignedToId: updates.assignedToId,
-        attachments: updates.attachments,
-        notes: updates.notes,
-      },
-      include: {
-        assignedTo: { select: { name: true } },
-        salesTask: { select: { id: true, subject: true, isCompleted: true } },
-      },
-    });
+    const updatedRow = await prisma.$transaction(async (tx) => {
+      const milestone = await tx.projectMilestone.update({
+        where: { id: milestoneId, projectId },
+        data: {
+          plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
+          actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
+          status: targetStatus,
+          priority: updates.priority,
+          assignedToId: updates.assignedToId,
+          attachments: updates.attachments,
+          notes: updates.notes,
+        },
+        include: {
+          assignedTo: { select: { name: true } },
+          salesTask: { select: { id: true, subject: true, isCompleted: true } },
+        },
+      });
 
-    const taskPromise = (async () => {
       if (updates.assignedToId !== undefined) {
         if (!updates.assignedToId) {
-          await prisma.salesTask.deleteMany({ where: { milestoneId } });
-          return;
+          await tx.salesTask.deleteMany({ where: { milestoneId } });
+        } else {
+          const auditSubmissionPending = Boolean(
+            existingMilestones &&
+            "auditSubmitted" in currentMilestone &&
+            currentMilestone.auditSubmitted
+          );
+          if (!auditSubmissionPending) {
+            const nextDue =
+              updates.plannedDueDate !== undefined
+                ? updates.plannedDueDate
+                  ? new Date(updates.plannedDueDate)
+                  : new Date()
+                : currentMilestone.plannedDueDate
+                  ? new Date(currentMilestone.plannedDueDate)
+                  : new Date();
+            const nextPriority = (updates.priority ?? currentMilestone.priority) as TaskPriority;
+            const assigneeChanged = currentMilestone.assignedToId !== updates.assignedToId;
+            await tx.salesTask.upsert({
+              where: { milestoneId },
+              create: {
+                projectId,
+                milestoneId,
+                assignedToId: updates.assignedToId,
+                taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
+                dueDatetime: nextDue,
+                priority: nextPriority,
+                isCompleted: false,
+                completedAt: null,
+              },
+              update: {
+                assignedToId: updates.assignedToId,
+                taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
+                dueDatetime: nextDue,
+                priority: nextPriority,
+                ...(assigneeChanged ? { isCompleted: false, completedAt: null, resultNotes: null } : {}),
+              },
+            });
+          }
         }
-        const auditSubmissionPending = Boolean(
-          existingMilestones &&
-          "auditSubmitted" in currentMilestone &&
-          currentMilestone.auditSubmitted
-        );
-        if (!auditSubmissionPending) {
-          const nextDue =
-            updates.plannedDueDate !== undefined
-              ? updates.plannedDueDate
-                ? new Date(updates.plannedDueDate)
-                : new Date()
-              : currentMilestone.plannedDueDate
-                ? new Date(currentMilestone.plannedDueDate)
-                : new Date();
-          const nextPriority = (updates.priority ?? currentMilestone.priority) as TaskPriority;
-          const assigneeChanged = currentMilestone.assignedToId !== updates.assignedToId;
-          await prisma.salesTask.upsert({
-            where: { milestoneId },
-            create: {
-              projectId,
-              milestoneId,
-              assignedToId: updates.assignedToId,
-              taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
-              subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
-              dueDatetime: nextDue,
-              priority: nextPriority,
-              isCompleted: false,
-              completedAt: null,
-            },
-            update: {
-              assignedToId: updates.assignedToId,
-              taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
-              subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
-              dueDatetime: nextDue,
-              priority: nextPriority,
-              ...(assigneeChanged ? { isCompleted: false, completedAt: null, resultNotes: null } : {}),
-            },
-          });
-          return;
-        }
-      }
-      if (updates.priority !== undefined) {
-        await prisma.salesTask.updateMany({
+      } else if (updates.priority !== undefined) {
+        await tx.salesTask.updateMany({
           where: { milestoneId },
           data: { priority: updates.priority as TaskPriority },
         });
       }
-    })();
 
-    const [updatedRow] = await Promise.all([milestonePromise, taskPromise]);
+      return milestone;
+    });
 
     const currentList = existingMilestones
       ? existingMilestones.map((m) =>
@@ -1169,7 +1181,7 @@ export const DataService = {
             },
           });
 
-      const ops: Promise<unknown>[] = [
+      const ops: Prisma.PrismaPromise<unknown>[] = [
         milestoneOp,
         prisma.project.update({
           where: { id: projectId },
@@ -1184,7 +1196,7 @@ export const DataService = {
           })
         );
       }
-      const [savedMs] = await Promise.all(ops) as [{ id: string }, ...unknown[]];
+      const [savedMs] = (await prisma.$transaction(ops)) as [{ id: string }, ...unknown[]];
 
       const updatedItem: ProjectMilestoneItem = existingMilestone
         ? {
@@ -1404,7 +1416,7 @@ export const DataService = {
       );
       const evaluated = ScheduleEngine.evaluateMilestones(updatedList);
 
-      await Promise.all([
+      await prisma.$transaction([
         prisma.projectMilestone.update({
           where: { id: milestone.id },
           data: {
@@ -1855,13 +1867,13 @@ export const DataService = {
     notes?: string;
     assignedToId?: string;
   }) {
-    const maxOrder = (await prisma.milestoneRecord.aggregate({
-      where: { milestoneId },
-      _max: { recordOrder: true },
-    }))._max.recordOrder || 0;
+    return prisma.$transaction(async (tx) => {
+      const maxOrder = (await tx.milestoneRecord.aggregate({
+        where: { milestoneId },
+        _max: { recordOrder: true },
+      }))._max.recordOrder || 0;
 
-    const [record] = await Promise.all([
-      prisma.milestoneRecord.create({
+      const record = await tx.milestoneRecord.create({
         data: {
           milestoneId,
           recordOrder: maxOrder + 1,
@@ -1873,18 +1885,17 @@ export const DataService = {
         },
         relationLoadStrategy: "join",
         include: { assignedTo: { select: { id: true, name: true } } },
-      }),
-      ...(data.actualDueDate
-        ? [
-            prisma.projectMilestone.update({
-              where: { id: milestoneId },
-              data: { actualDueDate: new Date(data.actualDueDate) },
-            }),
-          ]
-        : []),
-    ]);
+      });
 
-    return record;
+      if (data.actualDueDate) {
+        await tx.projectMilestone.update({
+          where: { id: milestoneId },
+          data: { actualDueDate: new Date(data.actualDueDate) },
+        });
+      }
+
+      return record;
+    });
   },
 
   async deleteMilestoneRecord(recordId: string) {

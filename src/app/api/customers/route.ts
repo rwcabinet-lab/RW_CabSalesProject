@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     if (trimmedTaxId) {
       const existingByTaxId = await prisma.customer.findFirst({
         where: { taxId: trimmedTaxId },
+        select: { id: true, name: true },
       });
       if (existingByTaxId) {
         return NextResponse.json(
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     if (trimmedPhone) {
       const existingByPhone = await prisma.customer.findFirst({
         where: { phone: trimmedPhone },
+        select: { id: true, name: true },
       });
       if (existingByPhone) {
         return NextResponse.json(
@@ -122,6 +124,7 @@ export async function PATCH(req: NextRequest) {
     if (trimmedTaxId) {
       const existingByTaxId = await prisma.customer.findFirst({
         where: { taxId: trimmedTaxId, id: { not: id } },
+        select: { id: true, name: true },
       });
       if (existingByTaxId) {
         return NextResponse.json(
@@ -135,6 +138,7 @@ export async function PATCH(req: NextRequest) {
     if (trimmedPhone) {
       const existingByPhone = await prisma.customer.findFirst({
         where: { phone: trimmedPhone, id: { not: id } },
+        select: { id: true, name: true },
       });
       if (existingByPhone) {
         return NextResponse.json(
