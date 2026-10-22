@@ -18,6 +18,12 @@ import {
 const prisma = new PrismaClient();
 
 async function seed() {
+  const existingUserCount = await prisma.user.count();
+  if (existingUserCount > 0) {
+    console.log("Database already initialized with data, skipping seed to prevent data pollution.");
+    return;
+  }
+
   await prisma.user.createMany({
     data: [
       { id: "u1", name: "張志豪", email: "admin@cabsales.tw", role: Role.ADMIN },
