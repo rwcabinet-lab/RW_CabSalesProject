@@ -265,12 +265,15 @@ export const DataService = {
   async addProject(data: {
     projectName: string; customerId: string; siteAddress: string; siteCondition?: string;
     expectedDate?: string; unitCount?: number; cost?: number; quoteAmount?: number;
+    salesRepId?: string;
   }): Promise<ProjectDetail | undefined> {
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
       select: { id: true, salesRepId: true },
     });
     if (!customer) return undefined;
+
+    const assignedSalesRepId = data.salesRepId || customer.salesRepId;
 
     const defaultDays = await this.getMilestoneDefaultDays();
     const allCodes = STANDARD_MILESTONE_STAGE_CODES;
@@ -286,7 +289,7 @@ export const DataService = {
         stageOrder: index + 1,
         plannedDueDate: planned,
         status: index === 0 ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING,
-        assignedToId: customer.salesRepId,
+        assignedToId: assignedSalesRepId,
       };
     });
 
@@ -296,7 +299,7 @@ export const DataService = {
         customerId: data.customerId,
         siteAddress: data.siteAddress,
         siteCondition: data.siteCondition,
-        salesRepId: customer.salesRepId,
+        salesRepId: assignedSalesRepId,
         currentStage: ProjectStage.DEVELOP,
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
         unitCount: data.unitCount,
@@ -321,7 +324,7 @@ export const DataService = {
         data: {
           projectId: p.id,
           milestoneId: firstMilestone.id,
-          assignedToId: customer.salesRepId,
+          assignedToId: assignedSalesRepId,
           taskType: TaskType.SITE_VISIT,
           subject: MILESTONE_STAGE_LABELS["1-1"] || "客源開發",
           dueDatetime: firstMilestone.plannedDueDate || new Date(),
@@ -361,6 +364,42 @@ export const DataService = {
     expectedDate?: string; unitCount?: number | null; cost?: number | null; quoteAmount?: number | null;
     salesAssistantId?: string | null; salesRepId?: string; estimatedBudget?: number | null;
   }): Promise<ProjectDetail | undefined> {
+    const existing = data.salesRepId
+      ? await prisma.project.findUnique({
+          where: { id },
+          select: { salesRepId: true },
+        })
+      : null;
+
+    if (data.salesRepId && existing && existing.salesRepId !== data.salesRepId) {
+      const oldSalesRepId = existing.salesRepId;
+      const newSalesRepId = data.salesRepId;
+
+      // 連動未進行項目（PENDING）或原主責業務尚未完成的里程碑負責人
+      await prisma.projectMilestone.updateMany({
+        where: {
+          projectId: id,
+          status: { not: MilestoneStatus.COMPLETED },
+          OR: [
+            { status: MilestoneStatus.PENDING },
+            { assignedToId: oldSalesRepId },
+            { assignedToId: null },
+          ],
+        },
+        data: { assignedToId: newSalesRepId },
+      });
+
+      // 連動未完成且原屬舊業務之待辦任務
+      await prisma.salesTask.updateMany({
+        where: {
+          projectId: id,
+          isCompleted: false,
+          assignedToId: oldSalesRepId,
+        },
+        data: { assignedToId: newSalesRepId },
+      });
+    }
+
     const updateData: Prisma.ProjectUncheckedUpdateInput = {
       ...(data.projectName !== undefined ? { projectName: data.projectName } : {}),
       ...(data.customerId !== undefined ? { customerId: data.customerId } : {}),

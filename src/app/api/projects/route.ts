@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();
-    const { projectName, customerId, siteAddress, siteCondition, expectedDate, unitCount, cost, quoteAmount } = body;
+    const { projectName, customerId, siteAddress, siteCondition, expectedDate, unitCount, cost, quoteAmount, salesRepId } = body;
 
     if (!projectName || !customerId || !siteAddress) {
       return NextResponse.json({ error: "案場名稱、關聯客戶、施工地址為必填欄位" }, { status: 400 });
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       unitCount: unitCount ? Number(unitCount) : undefined,
       cost: cost ? Number(cost) : undefined,
       quoteAmount: quoteAmount ? Number(quoteAmount) : undefined,
+      salesRepId: salesRepId || undefined,
     });
 
     return NextResponse.json({ project }, { status: 201 });

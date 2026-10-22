@@ -159,7 +159,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [projectEditError, setProjectEditError] = useState("");
   const [projectEditForm, setProjectEditForm] = useState({
     projectName: "", siteAddress: "", siteCondition: "", expectedDate: "",
-    unitCount: "", cost: "", quoteAmount: "",
+    unitCount: "", cost: "", quoteAmount: "", salesRepId: "",
   });
 
   const openEditProjectInfo = () => {
@@ -172,6 +172,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       unitCount: project.unitCount != null ? String(project.unitCount) : "",
       cost: project.cost != null ? String(toTenThousands(project.cost)) : "",
       quoteAmount: project.quoteAmount != null ? String(toTenThousands(project.quoteAmount)) : "",
+      salesRepId: project.salesRepId || "",
     });
     setProjectEditError("");
     setProjectEditOpen(true);
@@ -192,6 +193,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         unitCount: projectEditForm.unitCount ? Number(projectEditForm.unitCount) : undefined,
         cost: projectEditForm.cost ? fromTenThousands(Number(projectEditForm.cost)) : undefined,
         quoteAmount: projectEditForm.quoteAmount ? fromTenThousands(Number(projectEditForm.quoteAmount)) : undefined,
+        salesRepId: projectEditForm.salesRepId || undefined,
       };
       const res = await fetch("/api/projects", {
         method: "PATCH",
@@ -204,9 +206,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (data.project) {
         setProject(data.project);
         setProjects((prev) => prev.map((item) => (item.id === data.project.id ? data.project : item)));
-      } else {
-        await refreshMilestonesOnly();
       }
+      await refreshMilestonesOnly();
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
@@ -1560,7 +1561,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             </div>
             <form onSubmit={handleSaveProjectInfo} className="space-y-3 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">案場名稱 *</label>
                   <input
                     required
@@ -1569,6 +1570,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, projectName: e.target.value })}
                     className="w-full border rounded p-2 text-xs"
                   />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">主責業務 *</label>
+                  <select
+                    required
+                    value={projectEditForm.salesRepId}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, salesRepId: e.target.value })}
+                    className="w-full border rounded p-2 text-xs bg-white"
+                  >
+                    <option value="">選擇業務</option>
+                    {assignees.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block font-semibold text-slate-700 mb-1">施工地址 *</label>
@@ -1640,8 +1657,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={projectEditSaving}
-                  className="px-4 py-1.5 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors"
+                  disabled={projectEditSaving || !projectEditForm.projectName || !projectEditForm.siteAddress || !projectEditForm.salesRepId}
+                  className="px-4 py-1.5 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   {projectEditSaving ? "儲存中..." : "確認儲存"}
                 </button>

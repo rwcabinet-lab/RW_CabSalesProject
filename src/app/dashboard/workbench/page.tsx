@@ -20,7 +20,7 @@ import type {
   WorkbenchDashboardDTO,
   WorkbenchProjectDTO,
 } from "@/types/dto";
-import { useWorkbenchQuery, useCustomersQuery, useColumnConfigQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useWorkbenchQuery, useCustomersQuery, useUsersQuery, useColumnConfigQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 
 const EMPTY_PROJECTS: WorkbenchProjectDTO[] = [];
@@ -31,6 +31,7 @@ export default function SalesWorkbenchPage() {
   const queryClient = useQueryClient();
   const { data: workbenchData, isLoading: workbenchLoading } = useWorkbenchQuery();
   const { data: customers = [] } = useCustomersQuery();
+  const { data: users = [] } = useUsersQuery();
   const { data: columnConfig = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
 
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制)
@@ -181,6 +182,7 @@ export default function SalesWorkbenchPage() {
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
         cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
         quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
+        salesRepId: newProjectData.salesRepId || undefined,
       };
       const res = await fetch("/api/projects", {
         method: editingProjectId ? "PATCH" : "POST",
@@ -206,6 +208,8 @@ export default function SalesWorkbenchPage() {
                       defaultDiscount: savedProject.defaultDiscount ?? p.defaultDiscount,
                       siteAddress: savedProject.siteAddress ?? p.siteAddress,
                       siteCondition: savedProject.siteCondition ?? p.siteCondition,
+                      salesRepId: savedProject.salesRepId ?? p.salesRepId,
+                      salesRepName: savedProject.salesRepName ?? p.salesRepName,
                       expectedDate: savedProject.expectedDate ?? p.expectedDate,
                       unitCount: savedProject.unitCount ?? p.unitCount,
                       cost: savedProject.cost ?? p.cost,
@@ -470,7 +474,10 @@ export default function SalesWorkbenchPage() {
           </h2>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => openAddProject(customers[0]?.id || "")}
+              onClick={() => {
+                const firstCust = customers[0];
+                openAddProject(firstCust?.id || "", firstCust?.salesRepId || "");
+              }}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"
             >
               <Plus className="w-4 h-4" /> 新增案場
@@ -561,7 +568,7 @@ export default function SalesWorkbenchPage() {
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <label>
                 案場名稱 *
                 <input
@@ -576,13 +583,37 @@ export default function SalesWorkbenchPage() {
                 <select
                   required
                   value={newProjectData.customerId}
-                  onChange={(e) => setNewProjectData({ customerId: e.target.value })}
+                  onChange={(e) => {
+                    const nextCustId = e.target.value;
+                    const selectedCust = customers.find((c) => c.id === nextCustId);
+                    setNewProjectData((prev) => ({
+                      ...prev,
+                      customerId: nextCustId,
+                      salesRepId: selectedCust?.salesRepId || prev.salesRepId || "",
+                    }));
+                  }}
                   className="w-full border rounded p-1.5 mt-1"
                 >
                   <option value="">選擇客戶</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                主責業務 *
+                <select
+                  required
+                  value={newProjectData.salesRepId || ""}
+                  onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
+                  className="w-full border rounded p-1.5 mt-1 bg-white"
+                >
+                  <option value="">選擇業務</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
                     </option>
                   ))}
                 </select>
@@ -634,10 +665,17 @@ export default function SalesWorkbenchPage() {
                   className="w-full border rounded p-1.5 mt-1"
                 />
               </label>
-              <div className="flex items-end">
+              <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
                 <button
-                  disabled={savingProject || !newProjectData.projectName}
-                  className="w-full bg-emerald-600 text-white rounded p-1.5 font-bold disabled:opacity-50"
+                  type="button"
+                  onClick={() => setProjectPanelOpen(false)}
+                  className="px-4 py-1.5 border rounded font-semibold text-slate-600 bg-white hover:bg-slate-100"
+                >
+                  取消
+                </button>
+                <button
+                  disabled={savingProject || !newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress || !newProjectData.salesRepId}
+                  className="px-6 py-1.5 bg-emerald-600 text-white rounded font-bold disabled:opacity-50 hover:bg-emerald-700 transition-colors"
                 >
                   {savingProject ? "儲存中..." : "儲存案場"}
                 </button>
@@ -832,13 +870,37 @@ export default function SalesWorkbenchPage() {
                               <select
                                 required
                                 value={newProjectData.customerId}
-                                onChange={(e) => setNewProjectData({ customerId: e.target.value })}
+                                onChange={(e) => {
+                                  const nextCustId = e.target.value;
+                                  const selectedCust = customers.find((c) => c.id === nextCustId);
+                                  setNewProjectData((prev) => ({
+                                    ...prev,
+                                    customerId: nextCustId,
+                                    salesRepId: selectedCust?.salesRepId || prev.salesRepId || "",
+                                  }));
+                                }}
                                 className="w-full border rounded p-1.5 mt-1 bg-white"
                               >
                                 <option value="">選擇客戶</option>
                                 {customers.map((c) => (
                                   <option key={c.id} value={c.id}>
                                     {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="font-semibold text-slate-700">
+                              主責業務 *
+                              <select
+                                required
+                                value={newProjectData.salesRepId || ""}
+                                onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
+                                className="w-full border rounded p-1.5 mt-1 bg-white"
+                              >
+                                <option value="">選擇業務</option>
+                                {users.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.name}
                                   </option>
                                 ))}
                               </select>
@@ -890,20 +952,20 @@ export default function SalesWorkbenchPage() {
                                 className="w-full border rounded p-1.5 mt-1 bg-white"
                               />
                             </label>
-                            <div className="flex items-end gap-2">
-                              <button
-                                type="submit"
-                                disabled={savingProject || !newProjectData.projectName}
-                                className="flex-1 bg-emerald-600 text-white rounded p-1.5 font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                              >
-                                {savingProject ? "儲存中..." : "確認儲存"}
-                              </button>
+                            <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
                               <button
                                 type="button"
                                 onClick={closeEditProject}
                                 className="px-3 py-1.5 border rounded font-semibold text-slate-600 bg-white hover:bg-slate-100"
                               >
                                 取消
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={savingProject || !newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress || !newProjectData.salesRepId}
+                                className="px-5 py-1.5 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                              >
+                                {savingProject ? "儲存中..." : "確認儲存"}
                               </button>
                             </div>
                           </div>

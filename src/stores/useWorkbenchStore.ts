@@ -11,6 +11,7 @@ export interface ProjectFormData {
   unitCount: string;
   cost: string;
   quoteAmount: string;
+  salesRepId: string;
 }
 
 export interface TaskFormData {
@@ -56,7 +57,7 @@ interface WorkbenchState {
   setProjectPanelOpen: (open: boolean) => void;
   setEditingProjectId: (id: string | null) => void;
   setNewProjectData: (data: Partial<ProjectFormData> | ((prev: ProjectFormData) => ProjectFormData)) => void;
-  openAddProject: (defaultCustomerId?: string) => void;
+  openAddProject: (defaultCustomerId?: string, defaultSalesRepId?: string) => void;
   openEditProject: (project: WorkbenchProjectDTO) => void;
   closeEditProject: () => void;
 
@@ -83,6 +84,7 @@ const initialProjectForm: ProjectFormData = {
   unitCount: "",
   cost: "",
   quoteAmount: "",
+  salesRepId: "",
 };
 
 const initialTaskForm: TaskFormData = {
@@ -146,10 +148,10 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
     set((state) => ({
       newProjectData: typeof data === "function" ? data(state.newProjectData) : { ...state.newProjectData, ...data },
     })),
-  openAddProject: (defaultCustomerId = "") =>
+  openAddProject: (defaultCustomerId = "", defaultSalesRepId = "") =>
     set({
       editingProjectId: null,
-      newProjectData: { ...initialProjectForm, customerId: defaultCustomerId },
+      newProjectData: { ...initialProjectForm, customerId: defaultCustomerId, salesRepId: defaultSalesRepId },
       isProjectPanelOpen: true,
     }),
   openEditProject: (p) =>
@@ -168,6 +170,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
           unitCount: p.unitCount?.toString() || "",
           cost: p.cost != null ? toTenThousands(p.cost).toFixed(1) : "",
           quoteAmount: p.quoteAmount != null ? toTenThousands(p.quoteAmount).toFixed(1) : "",
+          salesRepId: p.salesRepId || "",
         },
       };
     }),
