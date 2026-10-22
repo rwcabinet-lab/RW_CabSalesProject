@@ -52,6 +52,7 @@ model Customer {
   @@index([salesRepId])
   @@index([taxId])
   @@index([phone])
+  @@index([createdAt(sort: Desc)])
   @@map("customers")
 }
 
@@ -107,6 +108,9 @@ model Project {
   @@index([customerId])
   @@index([salesRepId])
   @@index([salesAssistantId])
+  @@index([createdAt(sort: Desc)])
+  @@index([salesRepId, createdAt(sort: Desc)])
+  @@index([salesAssistantId, createdAt(sort: Desc)])
   @@map("projects")
 }
 
@@ -134,7 +138,9 @@ model ProjectMilestone {
   @@index([projectId, stageOrder])
   @@index([projectId, stageCode])
   @@index([assignedToId])
+  @@index([assignedToId, projectId])
   @@index([status, plannedDueDate])
+  @@index([plannedDueDate, status])
   @@map("project_milestones")
 }
 
@@ -191,6 +197,7 @@ model SalesTask {
   @@index([assignedToId, isCompleted])
   @@index([assignedById])
   @@index([assignedToId])
+  @@index([assignedToId, projectId])
   @@index([isCompleted, dueDatetime])
   @@map("sales_tasks")
 }

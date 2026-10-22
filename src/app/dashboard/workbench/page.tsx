@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
-import { formatTenThousands, fromTenThousands } from "@/lib/currency";
+import { formatTenThousands } from "@/lib/currency";
 import type {
   ApiResponse,
   TaskDTO,
@@ -25,6 +25,7 @@ import { useWorkbenchQuery, useCustomersQuery, useUsersQuery, useColumnConfigQue
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
 import { WorkbenchCreateTaskModal, WorkbenchCompleteTaskModal } from "@/components/workbench/WorkbenchModals";
+import { WorkbenchAddProjectPanel, WorkbenchEditProjectRow } from "@/components/workbench/WorkbenchProjectForms";
 import { toast } from "@/stores/useToastStore";
 
 const EMPTY_PROJECTS: WorkbenchProjectDTO[] = [];
@@ -66,8 +67,6 @@ export default function SalesWorkbenchPage() {
     }))
   );
 
-  const newProjectData = useWorkbenchStore((s) => s.newProjectData);
-  const setNewProjectData = useWorkbenchStore((s) => s.setNewProjectData);
   const setStartMonth = useWorkbenchStore((s) => s.setStartMonth);
   const setEndMonth = useWorkbenchStore((s) => s.setEndMonth);
   const setStatusFilter = useWorkbenchStore((s) => s.setStatusFilter);
@@ -88,71 +87,11 @@ export default function SalesWorkbenchPage() {
   const loading = workbenchLoading && !workbenchData;
   const columns = columnConfig;
 
-  // 操作載入狀態
-  const [savingProject, setSavingProject] = useState(false);
-
   const invalidateWorkbench = async (options?: { includeViews?: boolean }) => {
     await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
     if (options?.includeViews) {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
-    }
-  };
-
-  const handleSaveProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress) return;
-    setSavingProject(true);
-    try {
-      const payload = {
-        ...newProjectData,
-        unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
-        cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
-        quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
-        salesRepId: newProjectData.salesRepId || undefined,
-      };
-      const res = await fetch("/api/projects", {
-        method: editingProjectId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingProjectId ? { id: editingProjectId, ...payload } : payload),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const savedProject = result?.project;
-        if (savedProject && editingProjectId) {
-          queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              myProjects: old.myProjects.map((p) =>
-                p.id === editingProjectId
-                  ? {
-                      ...p,
-                      projectName: savedProject.projectName ?? p.projectName,
-                      customerId: savedProject.customerId ?? p.customerId,
-                      customerName: savedProject.customerName ?? p.customerName,
-                      customerType: savedProject.customerType ?? p.customerType,
-                      defaultDiscount: savedProject.defaultDiscount ?? p.defaultDiscount,
-                      siteAddress: savedProject.siteAddress ?? p.siteAddress,
-                      siteCondition: savedProject.siteCondition ?? p.siteCondition,
-                      salesRepId: savedProject.salesRepId ?? p.salesRepId,
-                      salesRepName: savedProject.salesRepName ?? p.salesRepName,
-                      expectedDate: savedProject.expectedDate ?? p.expectedDate,
-                      unitCount: savedProject.unitCount ?? p.unitCount,
-                      cost: savedProject.cost ?? p.cost,
-                      quoteAmount: savedProject.quoteAmount ?? p.quoteAmount,
-                    }
-                  : p
-              ),
-            };
-          });
-        }
-      }
-      setProjectPanelOpen(false);
-      closeEditProject();
-      void invalidateWorkbench({ includeViews: true });
-    } finally {
-      setSavingProject(false);
     }
   };
 
@@ -492,132 +431,11 @@ export default function SalesWorkbenchPage() {
         </div>
 
         {isProjectPanelOpen && !editingProjectId && (
-          <form onSubmit={handleSaveProject} className="p-4 bg-emerald-50 border-b border-emerald-100">
-            <div className="flex justify-between font-bold mb-3">
-              新增案場{" "}
-              <button type="button" onClick={() => setProjectPanelOpen(false)}>
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <label>
-                案場名稱 *
-                <input
-                  required
-                  value={newProjectData.projectName}
-                  onChange={(e) => setNewProjectData({ projectName: e.target.value })}
-                  className="w-full border rounded p-1.5 mt-1"
-                />
-              </label>
-              <label>
-                客戶 *
-                <select
-                  required
-                  value={newProjectData.customerId}
-                  onChange={(e) => {
-                    const nextCustId = e.target.value;
-                    const selectedCust = customers.find((c) => c.id === nextCustId);
-                    setNewProjectData((prev) => {
-                      const defaultRep = (selectedCust?.salesRepId && selectableUsers.some((u) => u.id === selectedCust.salesRepId))
-                        ? selectedCust.salesRepId
-                        : prev.salesRepId || selectableUsers[0]?.id || "";
-                      return {
-                        ...prev,
-                        customerId: nextCustId,
-                        salesRepId: defaultRep,
-                      };
-                    });
-                  }}
-                  className="w-full border rounded p-1.5 mt-1"
-                >
-                  <option value="">選擇客戶</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                主責業務 *
-                <select
-                  required
-                  value={newProjectData.salesRepId || ""}
-                  onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
-                  className="w-full border rounded p-1.5 mt-1 bg-white"
-                >
-                  <option value="">選擇業務</option>
-                  {selectableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                施工地址 *
-                <input
-                  required
-                  value={newProjectData.siteAddress}
-                  onChange={(e) => setNewProjectData({ siteAddress: e.target.value })}
-                  className="w-full border rounded p-1.5 mt-1"
-                />
-              </label>
-              <label>
-                戶數
-                <input
-                  type="number"
-                  value={newProjectData.unitCount}
-                  onChange={(e) => setNewProjectData({ unitCount: e.target.value })}
-                  className="w-full border rounded p-1.5 mt-1"
-                />
-              </label>
-              <label>
-                成本金額（萬）
-                <input
-                  type="number"
-                  step="0.1"
-                  value={newProjectData.cost}
-                  onChange={(e) => setNewProjectData({ cost: e.target.value })}
-                  className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
-                />
-              </label>
-              <label>
-                報價（萬）
-                <input
-                  type="number"
-                  step="0.1"
-                  value={newProjectData.quoteAmount}
-                  onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
-                  className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
-                />
-              </label>
-              <label>
-                預計完工日
-                <input
-                  type="date"
-                  value={newProjectData.expectedDate}
-                  onChange={(e) => setNewProjectData({ expectedDate: e.target.value })}
-                  className="w-full border rounded p-1.5 mt-1"
-                />
-              </label>
-              <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
-                <button
-                  type="button"
-                  onClick={() => setProjectPanelOpen(false)}
-                  className="px-4 py-1.5 border rounded font-semibold text-slate-600 bg-white hover:bg-slate-100"
-                >
-                  取消
-                </button>
-                <button
-                  disabled={savingProject || !newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress || !newProjectData.salesRepId}
-                  className="px-6 py-1.5 bg-emerald-600 text-white rounded font-bold disabled:opacity-50 hover:bg-emerald-700 transition-colors"
-                >
-                  {savingProject ? "儲存中..." : "儲存案場"}
-                </button>
-              </div>
-            </div>
-          </form>
+          <WorkbenchAddProjectPanel
+            customers={customers}
+            selectableUsers={selectableUsers}
+            onInvalidate={invalidateWorkbench}
+          />
         )}
 
         <div className="overflow-x-auto">
@@ -776,143 +594,14 @@ export default function SalesWorkbenchPage() {
                     })}
                   </tr>
                   {editingProjectId === p.id && (
-                    <tr className="bg-emerald-50/90 border-b-2 border-emerald-500">
-                      <td colSpan={visibleColumns.length} className="p-4 shadow-inner">
-                        <form onSubmit={handleSaveProject} className="space-y-3">
-                          <div className="flex justify-between items-center font-bold text-slate-800">
-                            <span className="flex items-center gap-1.5 text-emerald-800 text-sm">
-                              <Edit3 className="w-4 h-4" /> 編輯案場：{p.projectName}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={closeEditProject}
-                              className="text-slate-500 hover:text-slate-700 p-1"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                            <label className="font-semibold text-slate-700">
-                              案場名稱 *
-                              <input
-                                required
-                                value={newProjectData.projectName}
-                                onChange={(e) => setNewProjectData({ projectName: e.target.value })}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              />
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              客戶 *
-                              <select
-                                required
-                                value={newProjectData.customerId}
-                                onChange={(e) => {
-                                  const nextCustId = e.target.value;
-                                  const selectedCust = customers.find((c) => c.id === nextCustId);
-                                  setNewProjectData((prev) => {
-                                    const defaultRep = (selectedCust?.salesRepId && selectableUsers.some((u) => u.id === selectedCust.salesRepId))
-                                      ? selectedCust.salesRepId
-                                      : prev.salesRepId || selectableUsers[0]?.id || "";
-                                    return {
-                                      ...prev,
-                                      customerId: nextCustId,
-                                      salesRepId: defaultRep,
-                                    };
-                                  });
-                                }}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              >
-                                <option value="">選擇客戶</option>
-                                {customers.map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              主責業務 *
-                              <select
-                                required
-                                value={newProjectData.salesRepId || ""}
-                                onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              >
-                                <option value="">選擇業務</option>
-                                {selectableUsers.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              施工地址 *
-                              <input
-                                required
-                                value={newProjectData.siteAddress}
-                                onChange={(e) => setNewProjectData({ siteAddress: e.target.value })}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              />
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              戶數
-                              <input
-                                type="number"
-                                value={newProjectData.unitCount}
-                                onChange={(e) => setNewProjectData({ unitCount: e.target.value })}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              />
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              成本金額（萬）
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={newProjectData.cost}
-                                onChange={(e) => setNewProjectData({ cost: e.target.value })}
-                                className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
-                              />
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              報價（萬）
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={newProjectData.quoteAmount}
-                                onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
-                                className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
-                              />
-                            </label>
-                            <label className="font-semibold text-slate-700">
-                              預計完工日
-                              <input
-                                type="date"
-                                value={newProjectData.expectedDate}
-                                onChange={(e) => setNewProjectData({ expectedDate: e.target.value })}
-                                className="w-full border rounded p-1.5 mt-1 bg-white"
-                              />
-                            </label>
-                            <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
-                              <button
-                                type="button"
-                                onClick={closeEditProject}
-                                className="px-3 py-1.5 border rounded font-semibold text-slate-600 bg-white hover:bg-slate-100"
-                              >
-                                取消
-                              </button>
-                              <button
-                                type="submit"
-                                disabled={savingProject || !newProjectData.projectName || !newProjectData.customerId || !newProjectData.siteAddress || !newProjectData.salesRepId}
-                                className="px-5 py-1.5 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                              >
-                                {savingProject ? "儲存中..." : "確認儲存"}
-                              </button>
-                            </div>
-                          </div>
-                        </form>
-                      </td>
-                    </tr>
+                    <WorkbenchEditProjectRow
+                      projectId={p.id}
+                      projectName={p.projectName}
+                      colSpan={visibleColumns.length}
+                      customers={customers}
+                      selectableUsers={selectableUsers}
+                      onInvalidate={invalidateWorkbench}
+                    />
                   )}
                 </Fragment>
               ))}

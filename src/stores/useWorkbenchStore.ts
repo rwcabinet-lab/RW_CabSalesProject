@@ -168,8 +168,8 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
           siteCondition: p.siteCondition,
           expectedDate: p.expectedDate ? p.expectedDate.slice(0, 10) : "",
           unitCount: p.unitCount?.toString() || "",
-          cost: p.cost != null ? toTenThousands(p.cost).toFixed(1) : "",
-          quoteAmount: p.quoteAmount != null ? toTenThousands(p.quoteAmount).toFixed(1) : "",
+          cost: p.cost != null ? String(toTenThousands(p.cost)) : "",
+          quoteAmount: p.quoteAmount != null ? String(toTenThousands(p.quoteAmount)) : "",
           salesRepId: p.salesRepId || "",
         },
       };

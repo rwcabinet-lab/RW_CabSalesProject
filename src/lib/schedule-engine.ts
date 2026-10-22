@@ -93,7 +93,7 @@ export const ScheduleEngine = {
     project: { currentStage: string },
     milestones: ProjectMilestoneItem[] = [],
   ): boolean {
-    if (project.currentStage === "CLOSED") return true;
+    if (project.currentStage === "CLOSED" || project.currentStage === "DONE") return true;
     return milestones.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED");
   },
 

@@ -17,6 +17,7 @@ import {
   useColumnConfigQuery,
   QUERY_KEYS,
 } from "@/hooks/useQueries";
+import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTaskModal";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -82,7 +83,6 @@ export default function ManagerDashboardPage() {
   const [assignModal, setAssignModal] = useState<{ open: boolean; projectId: string; projectName: string; taskId: string; userId: string; subject: string; priority: "HIGH" | "MEDIUM" | "LOW"; dueDate: string }>({
     open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate()
   });
-  const [assigning, setAssigning] = useState(false);
 
   const handleDeleteAssignedTask = async (task: TaskDTO) => {
     if (!window.confirm(`確定刪除已指派任務「${task.subject}」？`)) return;
@@ -149,46 +149,21 @@ export default function ManagerDashboardPage() {
     }
   };
 
-  const handleAssignTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAssigning(true);
-    try {
-      const isEditingTask = Boolean(assignModal.taskId);
-      const res = await fetch("/api/dashboard/manager", {
-        method: isEditingTask ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(isEditingTask ? { taskId: assignModal.taskId } : { projectId: assignModal.projectId }),
-          assignedToId: assignModal.userId,
-          subject: assignModal.subject,
-          priority: assignModal.priority,
-          dueDatetime: `${assignModal.dueDate}T00:00:00.000Z`,
-        }),
-      });
-      const result = await res.json() as ApiResponse<{ task: TaskDTO }>;
-      if (!res.ok) throw new Error(result.error || "指派任務失敗");
-      if (result.task) {
-        queryClient.setQueryData<ManagerDashboardDTO>(
-          QUERY_KEYS.managerDashboard(startMonth, endMonth),
-          (current) =>
-            current
-              ? {
-                  ...current,
-                  assignedTasks: isEditingTask
-                    ? current.assignedTasks.map((t) => (t.id === result.task.id ? result.task : t))
-                    : [result.task, ...current.assignedTasks],
-                }
-              : current
-        );
-      }
-      setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
-      void invalidateManager();
-      toast.success(isEditingTask ? "任務已成功更新！" : "任務已成功指派！");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "指派任務失敗");
-    } finally {
-      setAssigning(false);
-    }
+  const handleTaskAssignedSuccess = (task: TaskDTO, isEditingTask: boolean) => {
+    queryClient.setQueryData<ManagerDashboardDTO>(
+      QUERY_KEYS.managerDashboard(startMonth, endMonth),
+      (current) =>
+        current
+          ? {
+              ...current,
+              assignedTasks: isEditingTask
+                ? current.assignedTasks.map((t) => (t.id === task.id ? task : t))
+                : [task, ...current.assignedTasks],
+            }
+          : current
+    );
+    setAssignModal({ open: false, projectId: "", projectName: "", taskId: "", userId: "", subject: "", priority: "MEDIUM", dueDate: todayDate() });
+    void invalidateManager();
   };
 
   // 預定完工日排序
@@ -594,39 +569,14 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* 指派任務 Modal */}
+      {/* 指派任務 Modal (獨立封裝元件) */}
       {assignModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
-            <h3 className="font-bold mb-4 flex items-center gap-2"><Sparkles className="text-blue-600 w-5 h-5"/> {assignModal.taskId ? "變更指派任務" : "指派任務"} - {assignModal.projectName}</h3>
-            <form onSubmit={handleAssignTask} className="space-y-3 text-sm">
-              <label className="block font-semibold">指派對象
-                <select required value={assignModal.userId} onChange={e=>setAssignModal({...assignModal, userId: e.target.value})} className="w-full border p-2 mt-1 rounded">
-                  <option value="">選擇人員</option>
-                  {assignableUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.role === "SALES_MANAGER" ? "業務主管" : user.role === "SALES" ? "業務" : user.role === "SITE_ENGINEER" ? "工務" : "業助"})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block font-semibold">任務要求/主題
-                <textarea required rows={3} value={assignModal.subject} onChange={e=>setAssignModal({...assignModal, subject: e.target.value})} className="w-full border p-2 mt-1 rounded" placeholder="例如：請盡速確認客戶廚具圖面"/>
-              </label>
-              <label className="block font-semibold">預定完成日
-                <input required type="date" value={assignModal.dueDate} onChange={e=>setAssignModal({...assignModal, dueDate: e.target.value})} className="w-full border p-2 mt-1 rounded"/>
-              </label>
-              <label className="block font-semibold">優先度
-                <select required value={assignModal.priority} onChange={e=>setAssignModal({...assignModal, priority: e.target.value as "HIGH" | "MEDIUM" | "LOW"})} className="w-full border p-2 mt-1 rounded">
-                  <option value="HIGH">高</option>
-                  <option value="MEDIUM">中</option>
-                  <option value="LOW">低</option>
-                </select>
-              </label>
-              <div className="flex justify-end gap-2 mt-4"><button type="button" onClick={()=>setAssignModal({...assignModal,open:false})} className="px-4 py-2 bg-slate-200 rounded font-bold">取消</button><button disabled={assigning} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">{assigning ? "儲存中..." : assignModal.taskId ? "儲存變更" : "確認指派"}</button></div>
-            </form>
-          </div>
-        </div>
+        <ManagerAssignTaskModal
+          modalData={assignModal}
+          assignableUsers={assignableUsers}
+          onClose={() => setAssignModal((prev) => ({ ...prev, open: false }))}
+          onSuccess={handleTaskAssignedSuccess}
+        />
       )}
     </div>
   );

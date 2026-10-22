@@ -347,6 +347,7 @@ export type CustomerItem = CustomerDTO;
 export type ProjectDetail = ProjectDTO;
 export type ProjectMilestoneItem = MilestoneDTO;
 export type MilestonePhase = MilestonePhaseDTO;
+export type SalesTaskItem = TaskDTO;
 
 export interface ManagedUserDTO {
   id: string;

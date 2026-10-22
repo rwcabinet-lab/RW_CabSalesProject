@@ -39,6 +39,14 @@ export async function GET(req: NextRequest) {
     ]);
 
     const projectIds = myProjects.map((p) => p.id);
+    if (projectIds.length === 0) {
+      return NextResponse.json({
+        currentUser,
+        myProjects: [],
+        tasks,
+      });
+    }
+
     const milestonesByProject = await DataService.getMilestonesByProjectIds(projectIds);
 
     // 月份過濾邏輯 (依預定完成日過濾當前進行中里程碑)
@@ -68,7 +76,7 @@ export async function GET(req: NextRequest) {
           : { color: "GREEN" as const, label: "正常", daysDiff: 0 };
 
         const isClosed = ScheduleEngine.isProjectClosed(p, milestones);
-        const isDelayed = ScheduleEngine.isProjectDelayed(p, milestones);
+        const isDelayed = isClosed || p.currentStage === "LOST" ? false : ScheduleEngine.isProjectDelayed(p, milestones);
 
         return {
           id: p.id,
