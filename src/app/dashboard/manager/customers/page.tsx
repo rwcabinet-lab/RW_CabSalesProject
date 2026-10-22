@@ -2,8 +2,16 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2 } from "lucide-react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
+
+const CustomerTypeDistributionChart = dynamic(
+  () => import("@/components/dashboard/ManagerCharts").then((mod) => mod.CustomerTypeDistributionChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-64 bg-slate-50 animate-pulse rounded-xl" />,
+  }
+);
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
@@ -178,31 +186,7 @@ export default function CustomerStatsPage() {
           客戶類型與案場金額分佈
         </h3>
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data.customerTypeDistribution.map((item) => ({
-                ...item,
-                label: CUSTOMER_TYPE_LABELS[item.type] || item.label,
-              }))}
-              margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-            >
-              <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip
-                cursor={{ fill: "#f1f5f9" }}
-                formatter={(value: any, name: any) => {
-                  if (name === "客戶數量") return [`${value} 家`, name];
-                  return [formatTenThousands(Number(value)), name];
-                }}
-                contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-              />
-              <Bar dataKey="count" name="客戶數量" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                {data.customerTypeDistribution.map((entry, idx) => (
-                  <Cell key={`bar-${idx}`} fill={idx % 2 === 0 ? "#3b82f6" : "#6366f1"} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <CustomerTypeDistributionChart data={data.customerTypeDistribution} />
         </div>
       </div>
 

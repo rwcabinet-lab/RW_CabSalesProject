@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSessionQuery, useUsersQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useSessionQuery, useUsersQuery, useProjectsQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -95,7 +95,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectDTO | null>(null);
-  const [projects, setProjects] = useState<ProjectDTO[]>([]);
+  const { data: projects = [] } = useProjectsQuery();
 
   const { data: sessionUser } = useSessionQuery();
   const { data: users = [] } = useUsersQuery();
@@ -212,7 +212,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setProjectEditOpen(false);
       if (data.project) {
         setProject(data.project);
-        setProjects((prev) => prev.map((item) => (item.id === data.project.id ? data.project : item)));
+        queryClient.setQueryData<ProjectDTO[]>(QUERY_KEYS.projects, (prev) =>
+          prev ? prev.map((item) => (item.id === data.project.id ? data.project : item)) : prev
+        );
       }
       await refreshMilestonesOnly();
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
@@ -268,7 +270,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       setLoadError("");
 
       const milestonesPromise = fetch(`/api/projects/${projectId}/milestones`, { cache: "no-store" });
-      const projectsPromise = fetch("/api/projects", { cache: "no-store" });
       const tasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" });
       const completedTasksPromise = fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=true`, { cache: "no-store" });
 
@@ -279,12 +280,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       applyMilestonesData(data);
       setLoading(false);
 
-      void Promise.all([projectsPromise, tasksPromise, completedTasksPromise])
-        .then(async ([projectsRes, tasksRes, completedTasksRes]) => {
-          if (projectsRes.ok) {
-            const p = await projectsRes.json();
-            if (Array.isArray(p)) setProjects(p);
-          }
+      void Promise.all([tasksPromise, completedTasksPromise])
+        .then(async ([tasksRes, completedTasksRes]) => {
           if (tasksRes.ok) {
             const tasksData = await tasksRes.json() as ApiResponse<TaskDTO[]>;
             if (Array.isArray(tasksData)) setTasks(tasksData);

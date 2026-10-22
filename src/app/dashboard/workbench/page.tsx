@@ -23,6 +23,8 @@ import type {
 } from "@/types/dto";
 import { useWorkbenchQuery, useCustomersQuery, useUsersQuery, useColumnConfigQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
+import { useShallow } from "zustand/react/shallow";
+import { WorkbenchCreateTaskModal, WorkbenchCompleteTaskModal } from "@/components/workbench/WorkbenchModals";
 
 const EMPTY_PROJECTS: WorkbenchProjectDTO[] = [];
 const EMPTY_TASKS: TaskDTO[] = [];
@@ -40,7 +42,7 @@ export default function SalesWorkbenchPage() {
     [users]
   );
 
-  // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制)
+  // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制 - 使用細粒度 Selector 避免多餘 Re-render)
   const {
     startMonth,
     endMonth,
@@ -48,34 +50,35 @@ export default function SalesWorkbenchPage() {
     stageFilter,
     dateSort,
     statusSort,
-    setStartMonth,
-    setEndMonth,
-    setStatusFilter,
-    setStageFilter,
-    toggleDateSort,
-    toggleStatusSort,
-
     isProjectPanelOpen,
     editingProjectId,
-    newProjectData,
-    setProjectPanelOpen,
-    setNewProjectData,
-    openAddProject,
-    openEditProject,
-    closeEditProject,
+  } = useWorkbenchStore(
+    useShallow((s) => ({
+      startMonth: s.startMonth,
+      endMonth: s.endMonth,
+      statusFilter: s.statusFilter,
+      stageFilter: s.stageFilter,
+      dateSort: s.dateSort,
+      statusSort: s.statusSort,
+      isProjectPanelOpen: s.isProjectPanelOpen,
+      editingProjectId: s.editingProjectId,
+    }))
+  );
 
-    showTaskModal,
-    newTaskData,
-    taskToComplete,
-    completionNotes,
-    completionDate,
-    setShowTaskModal,
-    setNewTaskData,
-    setTaskToComplete,
-    setCompletionNotes,
-    setCompletionDate,
-    resetTaskModal,
-  } = useWorkbenchStore();
+  const newProjectData = useWorkbenchStore((s) => s.newProjectData);
+  const setNewProjectData = useWorkbenchStore((s) => s.setNewProjectData);
+  const setStartMonth = useWorkbenchStore((s) => s.setStartMonth);
+  const setEndMonth = useWorkbenchStore((s) => s.setEndMonth);
+  const setStatusFilter = useWorkbenchStore((s) => s.setStatusFilter);
+  const setStageFilter = useWorkbenchStore((s) => s.setStageFilter);
+  const toggleDateSort = useWorkbenchStore((s) => s.toggleDateSort);
+  const toggleStatusSort = useWorkbenchStore((s) => s.toggleStatusSort);
+  const setProjectPanelOpen = useWorkbenchStore((s) => s.setProjectPanelOpen);
+  const openAddProject = useWorkbenchStore((s) => s.openAddProject);
+  const openEditProject = useWorkbenchStore((s) => s.openEditProject);
+  const closeEditProject = useWorkbenchStore((s) => s.closeEditProject);
+  const setShowTaskModal = useWorkbenchStore((s) => s.setShowTaskModal);
+  const setTaskToComplete = useWorkbenchStore((s) => s.setTaskToComplete);
 
   // 伺服端狀態單一真實來源 (Single Source of Truth from TanStack Query)
   const projects = workbenchData?.myProjects ?? EMPTY_PROJECTS;
@@ -84,97 +87,14 @@ export default function SalesWorkbenchPage() {
   const loading = workbenchLoading && !workbenchData;
   const columns = columnConfig;
 
-  // 操作載入與錯誤狀態
+  // 操作載入狀態
   const [savingProject, setSavingProject] = useState(false);
-  const [creatingTask, setCreatingTask] = useState(false);
-  const [completingTask, setCompletingTask] = useState(false);
-  const [completionError, setCompletionError] = useState("");
 
   const invalidateWorkbench = async (options?: { includeViews?: boolean }) => {
     await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench });
     if (options?.includeViews) {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
-    }
-  };
-
-  const handleCompleteTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskToComplete) return;
-
-    const completedAt =
-      completionDate ||
-      new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-    setCompletingTask(true);
-    setCompletionError("");
-
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId: taskToComplete.id,
-          isCompleted: true,
-          resultNotes: completionNotes.trim(),
-          completedAt,
-        }),
-      });
-      const result = (await res.json()) as ApiResponse<{ success: boolean; task: TaskDTO }>;
-      if (!res.ok) {
-        setCompletionError(result.error || "完成待辦失敗，請稍後再試");
-        return;
-      }
-      queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks.map((task) =>
-            task.id === taskToComplete.id
-              ? { ...task, isCompleted: true, resultNotes: completionNotes.trim(), completedAt }
-              : task
-          ),
-        };
-      });
-      setTaskToComplete(null);
-      void invalidateWorkbench({ includeViews: true });
-    } catch (err) {
-      console.error("Failed to complete task:", err);
-      setCompletionError("完成待辦時發生錯誤，請稍後再試");
-    } finally {
-      setCompletingTask(false);
-    }
-  };
-
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskData.subject || !newTaskData.projectId) return;
-    setCreatingTask(true);
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newTaskData,
-          dueDatetime: new Date(newTaskData.dueDatetime).toISOString(),
-          assignedToId: currentUser.id,
-        }),
-      });
-      if (res.ok) {
-        const createdTask = (await res.json()) as TaskDTO;
-        if (createdTask && createdTask.id) {
-          queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              tasks: [createdTask, ...old.tasks],
-            };
-          });
-        }
-        resetTaskModal();
-        void invalidateWorkbench({ includeViews: true });
-      }
-    } finally {
-      setCreatingTask(false);
     }
   };
 
@@ -443,7 +363,6 @@ export default function SalesWorkbenchPage() {
                             type="button"
                             onClick={() => {
                               setTaskToComplete(task);
-                              setCompletionError("");
                             }}
                             className="mx-auto flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
                           >
@@ -999,134 +918,13 @@ export default function SalesWorkbenchPage() {
         </div>
       </div>
 
-      {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white p-6 rounded-xl w-96 shadow-2xl">
-            <h3 className="font-bold mb-4">新增待辦</h3>
-            <form onSubmit={handleCreateTask} className="space-y-3 text-sm">
-              <label className="block font-semibold">
-                關聯案場
-                <select
-                  required
-                  value={newTaskData.projectId}
-                  onChange={(e) => setNewTaskData({ projectId: e.target.value })}
-                  className="w-full border p-1.5 mt-1 rounded"
-                >
-                  <option value="">選擇</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.projectName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block font-semibold">
-                主題
-                <input
-                  required
-                  value={newTaskData.subject}
-                  onChange={(e) => setNewTaskData({ subject: e.target.value })}
-                  className="w-full border p-1.5 mt-1 rounded"
-                />
-              </label>
-              <label className="block font-semibold">
-                預計完成時間
-                <input
-                  required
-                  type="datetime-local"
-                  value={newTaskData.dueDatetime}
-                  onChange={(e) => setNewTaskData({ dueDatetime: e.target.value })}
-                  className="w-full border p-1.5 mt-1 rounded"
-                />
-              </label>
-              <label className="block font-semibold">
-                優先度
-                <select
-                  value={newTaskData.priority}
-                  onChange={(e) => setNewTaskData({ priority: e.target.value })}
-                  className="w-full border p-1.5 mt-1 rounded"
-                >
-                  <option value="HIGH">高</option>
-                  <option value="MEDIUM">中</option>
-                  <option value="LOW">低</option>
-                </select>
-              </label>
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={resetTaskModal}
-                  className="px-3 py-1 bg-slate-200 rounded font-bold"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingTask}
-                  className="px-3 py-1 bg-blue-600 text-white rounded font-bold disabled:opacity-50"
-                >
-                  {creatingTask ? "建立中..." : "建立"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <WorkbenchCreateTaskModal
+        currentUserId={currentUser.id}
+        projects={projects}
+        onInvalidate={invalidateWorkbench}
+      />
 
-      {taskToComplete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={handleCompleteTask} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-lg font-bold">完成待辦</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              [{taskToComplete.projectName}] {taskToComplete.subject}
-            </p>
-            <label className="mb-4 block text-sm font-semibold">
-              實際完成日
-              <input
-                type="date"
-                required
-                value={completionDate}
-                onChange={(e) => setCompletionDate(e.target.value)}
-                className="mt-2 w-full rounded border p-2 font-normal"
-              />
-            </label>
-            <label className="block text-sm font-semibold">
-              完成備註
-              <textarea
-                value={completionNotes}
-                onChange={(e) => setCompletionNotes(e.target.value)}
-                rows={5}
-                placeholder="請填寫完成結果或處理備註"
-                className="mt-2 w-full rounded border p-2 font-normal"
-              />
-            </label>
-            {completionError && (
-              <p role="alert" className="mt-3 text-sm text-red-600">
-                {completionError}
-              </p>
-            )}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setTaskToComplete(null);
-                  setCompletionError("");
-                }}
-                disabled={completingTask}
-                className="rounded bg-slate-200 px-4 py-2 text-sm font-semibold"
-              >
-                取消
-              </button>
-              <button
-                type="submit"
-                disabled={completingTask}
-                className="rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {completingTask ? "完成中..." : "確認完成"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <WorkbenchCompleteTaskModal onInvalidate={invalidateWorkbench} />
     </div>
   );
 }

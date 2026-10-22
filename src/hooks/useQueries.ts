@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { PageAccessKey } from "@/lib/page-access";
 import type {
   ApiResponse,
@@ -8,6 +8,9 @@ import type {
   CustomerDTO,
   CustomerStatsDashboardDTO,
   ManagerDashboardDTO,
+  MilestoneDetailsDTO,
+  ProjectDTO,
+  TaskDTO,
   UserDTO,
   ViewsDataDTO,
   WorkbenchDashboardDTO,
@@ -24,6 +27,10 @@ export const QUERY_KEYS = {
   session: ["session"] as const,
   users: ["users"] as const,
   customers: ["customers"] as const,
+  projects: ["projects", "list"] as const,
+  projectMilestones: (projectId: string) => ["projects", projectId, "milestones"] as const,
+  projectTasks: (projectId: string, isCompleted: boolean) =>
+    ["projects", projectId, "tasks", isCompleted ? "completed" : "active"] as const,
   columnConfig: ["projects", "columns-config"] as const,
   workbench: ["dashboard", "workbench"] as const,
   managerDashboard: (startMonth?: string, endMonth?: string) =>
@@ -172,6 +179,62 @@ export function useViewsDataQuery() {
       }
       return json;
     },
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * 取得所有專案清單（快取 1 分鐘，供里程碑切換下拉選單與選取器使用）
+ */
+export function useProjectsQuery() {
+  return useQuery({
+    queryKey: QUERY_KEYS.projects,
+    queryFn: async (): Promise<ProjectDTO[]> => {
+      const res = await fetch("/api/projects");
+      const data = (await res.json()) as ApiResponse<ProjectDTO[]>;
+      if (!res.ok || !Array.isArray(data)) {
+        throw new Error(data.error || "無法取得專案列表");
+      }
+      return data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * 取得指定案場之里程碑明細（快取 30 秒）
+ */
+export function useProjectMilestonesQuery(projectId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.projectMilestones(projectId),
+    queryFn: async (): Promise<MilestoneDetailsDTO> => {
+      const res = await fetch(`/api/projects/${projectId}/milestones`);
+      const data = (await res.json()) as ApiResponse<MilestoneDetailsDTO>;
+      if (!res.ok || !data.project) {
+        throw new Error(data.error || "無法取得案件里程碑資料");
+      }
+      return data;
+    },
+    enabled: Boolean(projectId),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * 取得指定案場之待辦任務（快取 30 秒）
+ */
+export function useProjectTasksQuery(projectId: string, isCompleted: boolean) {
+  return useQuery({
+    queryKey: QUERY_KEYS.projectTasks(projectId, isCompleted),
+    queryFn: async (): Promise<TaskDTO[]> => {
+      const res = await fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=${isCompleted}`);
+      const data = (await res.json()) as ApiResponse<TaskDTO[]>;
+      if (!res.ok || !Array.isArray(data)) {
+        throw new Error(data.error || "無法取得待辦任務");
+      }
+      return data;
+    },
+    enabled: Boolean(projectId),
     staleTime: 30 * 1000,
   });
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatTenThousands } from "@/lib/currency";
@@ -21,6 +21,22 @@ const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 const EMPTY_OVERVIEW: ManagerDashboardDTO["allProjectsOverview"] = [];
+
+const SalesWorkloadChart = dynamic(
+  () => import("@/components/dashboard/ManagerCharts").then((mod) => mod.SalesWorkloadChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-64 bg-slate-50 animate-pulse rounded-xl" />,
+  }
+);
+
+const StageBottlenecksChart = dynamic(
+  () => import("@/components/dashboard/ManagerCharts").then((mod) => mod.StageBottlenecksChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-64 bg-slate-50 animate-pulse rounded-xl" />,
+  }
+);
 
 export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
@@ -337,16 +353,7 @@ export default function ManagerDashboardPage() {
             </div>
           </div>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.salesWorkload} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis xAxisId="total" dataKey="salesRepName" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <XAxis xAxisId="delayed" dataKey="salesRepName" hide />
-                <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                <Bar xAxisId="total" dataKey="totalProjects" name="總案場數" fill="#60a5fa" radius={[4, 4, 0, 0]} barSize={32} />
-                <Bar xAxisId="delayed" dataKey="delayedProjects" name="延誤案場數" fill="#ef4444" radius={[3, 3, 0, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+            <SalesWorkloadChart data={data.salesWorkload} />
           </div>
         </div>
 
@@ -356,18 +363,7 @@ export default function ManagerDashboardPage() {
             案件階段分佈與卡關瓶頸
           </h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.stageBottlenecks} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                <XAxis type="number" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="stageLabel" tick={{ fontSize: 12, fill: "#64748b", fontWeight: "bold" }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                <Bar dataKey="projectCount" name="停留案場數" fill="#cbd5e1" radius={[0, 4, 4, 0]}>
-                  {data.stageBottlenecks.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.delayedCount > 2 ? "#f87171" : entry.delayedCount > 0 ? "#fbbf24" : "#cbd5e1"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <StageBottlenecksChart data={data.stageBottlenecks} />
           </div>
         </div>
       </div>

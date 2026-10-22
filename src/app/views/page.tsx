@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import {
   Kanban,
   BarChart3,
@@ -15,8 +16,30 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { KanbanBoard } from "@/components/views/KanbanBoard";
-import { GanttChart } from "@/components/views/GanttChart";
-import { CalendarView } from "@/components/views/CalendarView";
+
+const GanttChart = dynamic(
+  () => import("@/components/views/GanttChart").then((mod) => mod.GanttChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-96 bg-white border border-slate-200 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 text-sm font-medium">
+        載入甘特圖中...
+      </div>
+    ),
+  }
+);
+
+const CalendarView = dynamic(
+  () => import("@/components/views/CalendarView").then((mod) => mod.CalendarView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-96 bg-white border border-slate-200 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 text-sm font-medium">
+        載入行事曆中...
+      </div>
+    ),
+  }
+);
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { useViewsDataQuery } from "@/hooks/useQueries";
 import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
