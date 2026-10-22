@@ -43,21 +43,14 @@ export async function GET(req: NextRequest) {
 
     // Helper to evaluate if project is closed (依據 [結案] 里程碑是否完成)
     const isProjectClosed = (p: (typeof projects)[0]) => {
-      if (p.currentStage === "CLOSED") return true;
       const ms = milestonesByProject[p.id] || [];
-      return ms.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED");
+      return ScheduleEngine.isProjectClosed(p, ms);
     };
 
     // Helper to evaluate project delayed state
     const isProjectDelayed = (p: (typeof projects)[0]) => {
-      if (p.currentStage === "LOST" || isProjectClosed(p)) return false;
       const ms = milestonesByProject[p.id] || [];
-      const activeM = ms.find((m) => m.status === "OVERDUE" || m.status === "IN_PROGRESS");
-      if (activeM) {
-        const tl = ScheduleEngine.getTrafficLight(activeM);
-        return tl.color === "RED" || activeM.status === "OVERDUE";
-      }
-      return p.isDelayed;
+      return ScheduleEngine.isProjectDelayed(p, ms);
     };
 
     // Helper to check if project has contract signed [送約/簽約] completed

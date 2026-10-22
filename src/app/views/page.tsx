@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import {
-  Kanban,
   BarChart3,
   Calendar,
   Search,
@@ -15,7 +14,6 @@ import {
   CalendarDays,
   ShieldAlert,
 } from "lucide-react";
-import { KanbanBoard } from "@/components/views/KanbanBoard";
 
 const GanttChart = dynamic(
   () => import("@/components/views/GanttChart").then((mod) => mod.GanttChart),
@@ -79,7 +77,7 @@ const EMPTY_STAFF: CalendarStaffDTO[] = [];
 export default function VisualViewsPage() {
   const { data: viewsData, isLoading: viewsLoading, error: viewsError, refetch } = useViewsDataQuery();
 
-  const [activeTab, setActiveTab] = useState<"kanban" | "gantt" | "calendar">("kanban");
+  const [activeTab, setActiveTab] = useState<"gantt" | "calendar">("gantt");
   const projects = viewsData?.projects ?? EMPTY_PROJECTS;
   const tasks = viewsData?.tasks ?? EMPTY_TASKS;
   const staff = viewsData?.staff ?? EMPTY_STAFF;
@@ -240,7 +238,7 @@ export default function VisualViewsPage() {
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
               模組 D：多元可視化視圖
             </span>
-            <span className="text-xs text-slate-500 font-medium">階段看板、甘特圖時程軸、行事曆排程</span>
+            <span className="text-xs text-slate-500 font-medium">甘特圖時程軸、行事曆排程</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
             全廠專案時程多維可視化檢視
@@ -249,18 +247,6 @@ export default function VisualViewsPage() {
 
         {/* Tab 標籤切換組件 */}
         <div className="flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-          <button
-            onClick={() => setActiveTab("kanban")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === "kanban"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Kanban className="w-3.5 h-3.5" />
-            <span>階段看板 (Kanban)</span>
-          </button>
-
           <button
             onClick={() => setActiveTab("gantt")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
@@ -453,7 +439,6 @@ export default function VisualViewsPage() {
           </div>
 
           <div className="text-[11px] text-slate-500">
-            {activeTab === "kanban" && "💡 看板各欄位卡片依篩選結果即時連動分佈"}
             {activeTab === "gantt" && "💡 甘特圖僅顯示符合條件之案場時程軸"}
             {activeTab === "calendar" && "💡 行事曆僅呈現符合條件之案場待辦與里程碑"}
           </div>
@@ -461,8 +446,6 @@ export default function VisualViewsPage() {
       </div>
 
       {/* 視圖內容 */}
-      {activeTab === "kanban" && <KanbanBoard projects={filteredProjects} />}
-
       {activeTab === "gantt" && <GanttChart projects={filteredProjects} tasks={filteredTasks} />}
 
       {activeTab === "calendar" && (

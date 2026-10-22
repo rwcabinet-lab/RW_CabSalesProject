@@ -1672,8 +1672,39 @@ export const DataService = {
   },
 
 
-  async evaluateAllSchedules() {
-    return { alerts: [] }; // Mock for now
+  async evaluateAllSchedules(currentDate: Date = new Date()) {
+    const [projects, milestonesByProject] = await Promise.all([
+      this.getProjects(),
+      this.getMilestonesByProjectIds(),
+    ]);
+
+    const updates: Prisma.PrismaPromise<unknown>[] = [];
+    let delayedCount = 0;
+
+    for (const p of projects) {
+      const ms = milestonesByProject[p.id] || [];
+      const evaluatedDelayed = ScheduleEngine.isProjectDelayed(p, ms, currentDate);
+      if (evaluatedDelayed) delayedCount++;
+
+      if (p.isDelayed !== evaluatedDelayed) {
+        updates.push(
+          prisma.project.update({
+            where: { id: p.id },
+            data: { isDelayed: evaluatedDelayed },
+          })
+        );
+      }
+    }
+
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
+    }
+
+    return {
+      totalProjects: projects.length,
+      delayedCount,
+      updatedCount: updates.length,
+    };
   },
 
   async toggleTaskComplete(

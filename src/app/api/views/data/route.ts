@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
         trafficLight: ScheduleEngine.getTrafficLight(m),
       }));
 
+      const isDelayed = ScheduleEngine.isProjectDelayed(p, milestones);
+
       return {
         ...p,
+        isDelayed,
         milestones: milestonesWithLights,
       };
     });

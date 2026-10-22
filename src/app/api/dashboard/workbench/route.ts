@@ -67,7 +67,8 @@ export async function GET(req: NextRequest) {
           ? ScheduleEngine.getTrafficLight(activeMilestone)
           : { color: "GREEN" as const, label: "正常", daysDiff: 0 };
 
-        const isClosed = p.currentStage === "CLOSED" || milestones.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED");
+        const isClosed = ScheduleEngine.isProjectClosed(p, milestones);
+        const isDelayed = ScheduleEngine.isProjectDelayed(p, milestones);
 
         return {
           id: p.id,
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
           expectedDate: p.expectedDate || "",
           currentStage: p.currentStage,
           siteAddress: p.siteAddress,
-          isDelayed: p.currentStage === "LOST" ? false : p.isDelayed,
+          isDelayed,
           isClosed,
           salesRepId: p.salesRepId,
           salesRepName: p.salesRepName,
