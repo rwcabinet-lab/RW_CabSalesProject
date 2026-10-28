@@ -167,15 +167,15 @@ export default function ManagerDashboardPage() {
   };
 
   // 預定完工日排序
-  // 案場總覽過濾：預設排除已流標/結案
+  // 案場總覽過濾：預設排除已流標/請款
   const allProjectsOverview = data?.allProjectsOverview ?? EMPTY_OVERVIEW;
 
   const filteredOverview = useMemo(() => {
     return allProjectsOverview.filter((p) => {
       if (stageFilter === "ACTIVE") {
-        if (p.currentStage === "LOST" || p.isClosed) return false;
-      } else if (stageFilter === "CLOSED") {
-        if (!p.isClosed && p.currentStage !== "CLOSED") return false;
+        if (p.currentStage === "LOST" || p.isClosed || p.currentStage === "BILLED" || p.currentStage === "CLOSED") return false;
+      } else if (stageFilter === "BILLED" || stageFilter === "CLOSED") {
+        if (!p.isClosed && p.currentStage !== "BILLED" && p.currentStage !== "CLOSED") return false;
       } else if (stageFilter && p.currentStage !== stageFilter) {
         return false;
       }
@@ -381,7 +381,7 @@ export default function ManagerDashboardPage() {
             <label className="flex items-center gap-2">
               階段：
               <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="ACTIVE">進行中案件 (預設，排除已流標/結案)</option>
+                <option value="ACTIVE">進行中案件 (預設，排除已流標/請款)</option>
                 <option value="">全部階段</option>
                 <option value="DEVELOP">第一階段：案件開發</option>
                 <option value="REQUIREMENT">第二階段：現況及需求確認</option>
@@ -389,10 +389,10 @@ export default function ManagerDashboardPage() {
                 <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
                 <option value="PROD_SHIP">第五階段：生產及派送</option>
                 <option value="INSTALL">第六階段：安裝及驗收</option>
-                <option value="CLOSURE">第七階段：結案/售後</option>
+                <option value="CLOSURE">第七階段：請款/售後</option>
                 <option value="WRAP_UP">收尾中</option>
                 <option value="LOST">已流標</option>
-                <option value="CLOSED">結案</option>
+                <option value="BILLED">請款</option>
               </select>
             </label>
           </div>
@@ -487,7 +487,7 @@ export default function ManagerDashboardPage() {
                       case "stageProgress":
                         return (
                           <td key={col.key} className="p-3 font-bold text-slate-700">
-                            {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
+                            {p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}
                             <div className="mt-1 text-[10px] font-normal text-slate-500">
                               {p.currentStage === "LOST" ? p.currentStageLabel : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
                             </div>

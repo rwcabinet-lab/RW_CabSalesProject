@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.projectMilestone.findMany({
         where: {
-          stageCode: "7-3",
+          stageCode: { in: ["7-2", "7-3"] },
           status: "COMPLETED",
         },
         select: { projectId: true },
@@ -56,13 +56,13 @@ export async function GET(req: NextRequest) {
 
     // Helper to check if project has contract signed / won
     const isProjectContractSigned = (p: { id: string; currentStage: string }) => {
-      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED"].includes(p.currentStage);
+      const isPastContractStage = ["PRE_PROD", "PROD_SHIP", "INSTALL", "CLOSURE", "CLOSED", "BILLED"].includes(p.currentStage);
       return signedProjectIds.has(p.id) || isPastContractStage;
     };
 
-    // Helper to check if project is closed (依據 [結案] 里程碑是否完成)
+    // Helper to check if project is closed (依據 [請款] 里程碑是否完成)
     const isProjectClosed = (p: { id: string; currentStage: string }) => {
-      return closedProjectIds.has(p.id) || p.currentStage === "CLOSED";
+      return closedProjectIds.has(p.id) || p.currentStage === "CLOSED" || p.currentStage === "BILLED";
     };
 
     const customerTypeLabels: Record<string, string> = {

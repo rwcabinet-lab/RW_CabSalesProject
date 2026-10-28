@@ -96,14 +96,14 @@ export default function SalesWorkbenchPage() {
   };
 
   // 預定完工日與狀態排序
-  // 過濾邏輯：預設排除已流標/結案 (stageFilter === "ACTIVE")
+  // 過濾邏輯：預設排除已流標/請款 (stageFilter === "ACTIVE")
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       let match = true;
       if (stageFilter === "ACTIVE") {
-        if (p.currentStage === "LOST" || p.isClosed) match = false;
-      } else if (stageFilter === "CLOSED") {
-        if (!p.isClosed && p.currentStage !== "CLOSED") match = false;
+        if (p.currentStage === "LOST" || p.isClosed || p.currentStage === "BILLED" || p.currentStage === "CLOSED") match = false;
+      } else if (stageFilter === "BILLED" || stageFilter === "CLOSED") {
+        if (!p.isClosed && p.currentStage !== "BILLED" && p.currentStage !== "CLOSED") match = false;
       } else if (stageFilter) {
         if (p.currentStage !== stageFilter) match = false;
       }
@@ -406,7 +406,7 @@ export default function SalesWorkbenchPage() {
               onChange={(e) => setStageFilter(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             >
-              <option value="ACTIVE">進行中案件 (預設，排除已流標/結案)</option>
+              <option value="ACTIVE">進行中案件 (預設，排除已流標/請款)</option>
               <option value="">全部案件</option>
               <option value="DEVELOP">第一階段：案件開發</option>
               <option value="REQUIREMENT">第二階段：現況及需求確認</option>
@@ -414,10 +414,10 @@ export default function SalesWorkbenchPage() {
               <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
               <option value="PROD_SHIP">第五階段：生產及派送</option>
               <option value="INSTALL">第六階段：安裝及驗收</option>
-              <option value="CLOSURE">第七階段：結案/售後</option>
+              <option value="CLOSURE">第七階段：請款/售後</option>
               <option value="WRAP_UP">收尾中</option>
               <option value="LOST">已流標</option>
-              <option value="CLOSED">結案</option>
+              <option value="BILLED">請款</option>
             </select>
           </label>
         </div>
@@ -536,9 +536,9 @@ export default function SalesWorkbenchPage() {
                         case "stageProgress":
                           return (
                             <td key={col.key} className="p-3 font-bold text-slate-700">
-                              {PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage}
+                              {p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}
                               <div className="mt-1 text-[10px] font-normal text-slate-500">
-                                {p.currentStage === "LOST" ? "—" : p.activeMilestone?.stageName || "完結"}
+                                {p.currentStage === "LOST" ? "—" : p.isClosed ? "已請款" : p.activeMilestone?.stageName || "完結"}
                               </div>
                             </td>
                           );

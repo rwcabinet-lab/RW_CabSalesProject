@@ -90,19 +90,19 @@ export const ScheduleEngine = {
   },
 
   /**
-   * 判定專案是否已結案 (CLOSED 階段或 7-3 結案里程碑已完成)
+   * 判定專案是否已請款完成 (BILLED / CLOSED 階段，或 7-2 / 7-3 里程碑已完成)
    */
   isProjectClosed(
     project: { currentStage: string },
     milestones: ProjectMilestoneItem[] = [],
   ): boolean {
-    if (project.currentStage === "CLOSED" || project.currentStage === "DONE") return true;
-    return milestones.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED");
+    if (project.currentStage === "BILLED" || project.currentStage === "CLOSED" || project.currentStage === "DONE") return true;
+    return milestones.some((m) => (m.stageCode === "7-2" || m.stageCode === "7-3") && m.status === "COMPLETED");
   },
 
   /**
    * 評估專案是否逾期卡關：
-   * 1. 已流標 (LOST) 或已結案 (CLOSED / 7-3 COMPLETED) 視為非逾期 (false)
+   * 1. 已流標 (LOST) 或已請款完成 (BILLED / CLOSED / 7-2 COMPLETED) 視為非逾期 (false)
    * 2. 活躍里程碑 (OVERDUE 或 IN_PROGRESS) 之時程燈號若為 RED 或狀態為 OVERDUE 則判定為逾期 (true)
    * 3. 否則若活躍里程碑存在且未逾期則為 false；無活躍里程碑時回退專案既有 isDelayed
    */

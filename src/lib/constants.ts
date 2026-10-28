@@ -39,7 +39,7 @@ export function matchesStage(projectStage: string, columnId: string): boolean {
   if (columnId === "DEVELOP" && ["CONTACT", "INQUIRY", "MEASUREMENT", "QUOTE", "CONTRACT"].includes(projectStage)) return true;
   if (columnId === "PROPOSAL" && projectStage === "DESIGN") return true;
   if (columnId === "PROD_SHIP" && (projectStage === "PRODUCTION" || projectStage === "HANDOFF")) return true;
-  if (columnId === "CLOSED" && projectStage === "DONE") return true;
+  if ((columnId === "BILLED" || columnId === "CLOSED") && (projectStage === "BILLED" || projectStage === "CLOSED" || projectStage === "DONE")) return true;
   return false;
 }
 
@@ -120,7 +120,7 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
   PRE_PROD:    "第四階段：生產前確認/拆單",
   PROD_SHIP:   "第五階段：生產及派送",
   INSTALL:     "第六階段：安裝及驗收",
-  CLOSURE:     "第七階段：結案/售後",
+  CLOSURE:     "第七階段：請款/售後",
   EXTRA:       "額外階段：收尾/已流標",
   // 向下相容
   CONTACT:     "接洽期",
@@ -135,9 +135,9 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   PRE_PROD: "生產前確認/拆單",
   PROD_SHIP: "生產及派送",
   INSTALL: "安裝及驗收",
-  CLOSURE: "結案/售後",
-  CLOSED: "已結案",
-  BILLED: "已立帳",
+  CLOSURE: "請款/售後",
+  CLOSED: "請款",
+  BILLED: "請款",
   WRAP_UP: "收尾",
   LOST: "已流標",
   INQUIRY: "接洽期",

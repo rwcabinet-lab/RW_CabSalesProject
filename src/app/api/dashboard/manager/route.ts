@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     // 正規項目完成推進產生的里程碑待辦（含 milestoneId）不列入主管「已指派任務」列表
     const assignedTasks = allAssignedTasks.filter((task) => !task.milestoneId);
 
-    // Helper to evaluate if project is closed (依據 [結案] 里程碑是否完成)
+    // Helper to evaluate if project is closed (依據 [請款] 里程碑是否完成)
     const isProjectClosed = (p: (typeof projects)[0]) => {
       const ms = milestonesByProject[p.id] || [];
       return ScheduleEngine.isProjectClosed(p, ms);
@@ -131,9 +131,9 @@ export async function GET(req: NextRequest) {
       PRE_PROD:    "生產前確認/拆單",
       PROD_SHIP:   "生產及派送",
       INSTALL:     "安裝及驗收",
-      CLOSURE:     "結案/售後",
-      CLOSED:      "已結案",
-      BILLED:      "已立帳",
+      CLOSURE:     "請款/售後",
+      CLOSED:      "請款",
+      BILLED:      "請款",
       WRAP_UP:     "收尾",
       LOST:        "已流標",
       DONE:        "完成",
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
         customerType: p.customerType,
         defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
-        currentStageLabel: p.currentStage === "LOST" ? "已流標" : isClosed ? "已結案" : stageLabels[p.currentStage] || p.currentStage,
+        currentStageLabel: p.currentStage === "LOST" ? "已流標" : isClosed ? "請款" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.salesRepName || p.customerSalesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
       { stage: "PRE_PROD", label: "四、生產前確認/拆單", aliases: ["PRE_PROD"] },
       { stage: "PROD_SHIP", label: "五、生產及派送", aliases: ["PROD_SHIP", "PRODUCTION"] },
       { stage: "INSTALL", label: "六、安裝及驗收", aliases: ["INSTALL"] },
-      { stage: "CLOSURE", label: "七、結案/售後", aliases: ["CLOSURE", "CLOSED", "WRAP_UP"] },
+      { stage: "CLOSURE", label: "七、請款/售後", aliases: ["CLOSURE", "CLOSED", "BILLED", "WRAP_UP"] },
     ];
 
     const stageBottlenecks = sevenStages.map(({ stage, label, aliases }) => {

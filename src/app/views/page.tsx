@@ -44,15 +44,15 @@ import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
 
 const STAGE_FILTER_OPTIONS = [
   { value: "", label: "全部階段" },
-  { value: "ACTIVE", label: "進行中案件 (排除結案/流標)" },
+  { value: "ACTIVE", label: "進行中案件 (排除請款/流標)" },
   { value: "DEVELOP", label: "第一階段：案件開發" },
   { value: "REQUIREMENT", label: "第二階段：現況及需求確認" },
   { value: "PROPOSAL", label: "第三階段：設計提案/報價/簽約" },
   { value: "PRE_PROD", label: "第四階段：生產前確認/拆單" },
   { value: "PROD_SHIP", label: "第五階段：生產及派送" },
   { value: "INSTALL", label: "第六階段：安裝及驗收" },
-  { value: "CLOSURE", label: "第七階段：結案/售後" },
-  { value: "CLOSED", label: "已結案" },
+  { value: "CLOSURE", label: "第七階段：請款/售後" },
+  { value: "BILLED", label: "請款" },
   { value: "WRAP_UP", label: "收尾中" },
   { value: "LOST", label: "已流標" },
 ];
@@ -61,13 +61,13 @@ const STATUS_FILTER_OPTIONS = [
   { value: "", label: "全部狀態" },
   { value: "RED", label: "🔴 逾期卡關" },
   { value: "GREEN", label: "🟢 進度正常" },
-  { value: "CLOSED", label: "🏁 已結案" },
+  { value: "BILLED", label: "🏁 已請款" },
   { value: "LOST", label: "⚪ 已流標" },
 ];
 
 function checkIsClosed(p: ProjectWithMilestonesDTO): boolean {
-  if (p.currentStage === "CLOSED" || p.currentStage === "DONE") return true;
-  return Boolean(p.milestones?.some((m) => m.stageCode === "7-3" && m.status === "COMPLETED"));
+  if (p.currentStage === "BILLED" || p.currentStage === "CLOSED" || p.currentStage === "DONE") return true;
+  return Boolean(p.milestones?.some((m) => (m.stageCode === "7-2" || m.stageCode === "7-3") && m.status === "COMPLETED"));
 }
 
 const EMPTY_PROJECTS: ProjectWithMilestonesDTO[] = [];
@@ -119,9 +119,9 @@ export default function VisualViewsPage() {
 
       // 1. 階段篩選
       if (stageFilter === "ACTIVE") {
-        if (p.currentStage === "LOST" || isClosed) return false;
-      } else if (stageFilter === "CLOSED") {
-        if (!isClosed && p.currentStage !== "CLOSED") return false;
+        if (p.currentStage === "LOST" || isClosed || p.currentStage === "BILLED" || p.currentStage === "CLOSED") return false;
+      } else if (stageFilter === "BILLED" || stageFilter === "CLOSED") {
+        if (!isClosed && p.currentStage !== "BILLED" && p.currentStage !== "CLOSED") return false;
       } else if (stageFilter === "LOST") {
         if (p.currentStage !== "LOST") return false;
       } else if (stageFilter) {
@@ -133,7 +133,7 @@ export default function VisualViewsPage() {
         if (!p.isDelayed || p.currentStage === "LOST" || isClosed) return false;
       } else if (statusFilter === "GREEN") {
         if (p.isDelayed || p.currentStage === "LOST" || isClosed) return false;
-      } else if (statusFilter === "CLOSED") {
+      } else if (statusFilter === "BILLED" || statusFilter === "CLOSED") {
         if (!isClosed) return false;
       } else if (statusFilter === "LOST") {
         if (p.currentStage !== "LOST") return false;
@@ -428,7 +428,7 @@ export default function VisualViewsPage() {
             {delayedCount > 0 && (
               <span className="text-red-700 font-bold">🔴 逾期卡關 {delayedCount} 案</span>
             )}
-            <span className="text-teal-700">🏁 已結案 {closedCount} 案</span>
+            <span className="text-teal-700">🏁 已請款 {closedCount} 案</span>
             {lostCount > 0 && (
               <span className="text-slate-500">⚪ 已流標 {lostCount} 案</span>
             )}

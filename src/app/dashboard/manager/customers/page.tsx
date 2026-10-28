@@ -286,7 +286,7 @@ export default function CustomerStatsPage() {
                       案場統計
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
-                    <span className="text-[11px] font-normal text-slate-400">總數(進度/結案/流標)</span>
+                    <span className="text-[11px] font-normal text-slate-400">總數(進行/請款/流標)</span>
                   </div>
                 </th>
                 <th
