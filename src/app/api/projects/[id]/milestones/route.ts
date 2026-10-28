@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "@/lib/schedule-engine";
-import { getUserFromRequest } from "@/lib/access-control";
+import { getUserFromRequest, getRolePages } from "@/lib/access-control";
 import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
 import { AppError, handleApiError } from "@/lib/errors";
 
@@ -92,7 +92,7 @@ export async function PUT(
   try {
     const projectId = params.id;
     const body = await req.json();
-    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted } = body;
+    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted, orderedMilestoneIds } = body;
 
     const [user, combined] = await Promise.all([
       getUserFromRequest(req),
@@ -129,6 +129,30 @@ export async function PUT(
     if (project.currentStage === "LOST") {
       return NextResponse.json({ error: "此案件已流標，階段項目不可編輯或推進" }, { status: 409 });
     }
+
+    if (action === "reorder") {
+      const userPages = await getRolePages(user.role);
+      const canReorder = user.role === "ADMIN" || userPages.includes("milestone_reorder");
+      if (!canReorder) {
+        return NextResponse.json({ error: "您無權變更里程碑進度順序" }, { status: 403 });
+      }
+
+      if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.length === 0) {
+        return NextResponse.json({ error: "缺少 orderedMilestoneIds 排序資料" }, { status: 400 });
+      }
+
+      const updatedMilestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
+      const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
+      const updatedProject = { ...project, isDelayed };
+
+      return NextResponse.json({
+        success: true,
+        project: updatedProject,
+        milestones: attachTrafficLights(evaluatedMilestones),
+        message: "里程碑進度順序已更新",
+      });
+    }
+
     const canReviewAudit = isManager || user.id === project.salesRepId;
 
     if (action === "submitAudit") {

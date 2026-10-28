@@ -103,6 +103,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const currentUserId = sessionUser?.id || "";
   const canManageMilestones = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(sessionUser?.role || "");
+  const canReorderMilestones =
+    sessionUser?.role === "ADMIN" ||
+    Boolean(sessionUser?.accessiblePages?.includes("milestone_reorder"));
   const assignees = useMemo(() => {
     return users.filter((user: UserDTO) => isAssignableRole(user.role));
   }, [users]);
@@ -390,6 +393,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     sourceId: string,
     targetId: string,
   ) => {
+    if (!canReorderMilestones) {
+      toast.warning("您沒有拖曳變更進度順序的權限");
+      return;
+    }
     if (sourceId === targetId || isProjectLost) return;
     const reorderedPhase = [...phaseGroups[phase]];
     const sourceIndex = reorderedPhase.findIndex(({ id }) => id === sourceId);
@@ -469,6 +476,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   };
 
   const handleDragStartItem = (e: React.DragEvent, id: string) => {
+    if (!canReorderMilestones) return;
     dragStartOrderRef.current = [...milestones];
     setDraggedMilestoneId(id);
     e.dataTransfer.effectAllowed = "move";
@@ -988,7 +996,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
-              const canDrag = canManageMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
+              const canDrag = canReorderMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
               const isBeingDragged = draggedMilestoneId === m.id;
 
               return (
@@ -1099,7 +1107,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                 />
                               </span>
                             ) : (
-                              <span title={m.status === "COMPLETED" ? "已完成進度已鎖定工序" : "進行中進度不可調整順序"}>
+                              <span title={!canReorderMilestones ? "您沒有拖曳變更進度順序的權限" : m.status === "COMPLETED" ? "已完成進度已鎖定工序" : "進行中進度不可調整順序"}>
                                 <Lock
                                   className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300"
                                   aria-label="工序已鎖定"

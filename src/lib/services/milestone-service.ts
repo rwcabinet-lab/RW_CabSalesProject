@@ -1150,4 +1150,59 @@ export const MilestoneService = {
   async deleteMilestoneRecord(recordId: string) {
     return prisma.milestoneRecord.delete({ where: { id: recordId } });
   },
+
+  async reorderMilestones(projectId: string, orderedMilestoneIds: string[]): Promise<ProjectMilestoneItem[]> {
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.projectMilestone.findMany({
+        where: { projectId },
+        select: { id: true, status: true },
+      });
+      const existingIdSet = new Set(existing.map((m) => m.id));
+
+      for (const id of orderedMilestoneIds) {
+        if (!existingIdSet.has(id)) {
+          throw new BadRequestError(`里程碑項目不存在或不屬於此案件: ${id}`);
+        }
+      }
+
+      await Promise.all(
+        orderedMilestoneIds.map((id, index) =>
+          tx.projectMilestone.update({
+            where: { id },
+            data: { stageOrder: index + 1 },
+          })
+        )
+      );
+
+      const updated = await tx.projectMilestone.findMany({
+        where: { projectId },
+        include: milestoneInclude,
+        orderBy: { stageOrder: "asc" },
+      });
+
+      return updated.map((m) => {
+        const isAuditSubmitted = Boolean(
+          m.salesTask?.subject.startsWith("【需審核】") &&
+          !m.salesTask?.isCompleted &&
+          m.status !== "COMPLETED"
+        );
+        return {
+          id: m.id,
+          projectId: m.projectId,
+          stageCode: m.stageCode as MilestoneStageCode,
+          phase: m.phase as MilestonePhaseDTO,
+          stageOrder: m.stageOrder,
+          plannedDueDate: dateOnlyValue(m.plannedDueDate),
+          actualDueDate: dateOnlyValue(m.actualDueDate),
+          status: m.status,
+          priority: m.priority,
+          assignedToId: m.assignedToId || null,
+          assignedToName: m.assignedTo?.name || null,
+          attachments: m.attachments,
+          notes: m.notes,
+          auditSubmitted: isAuditSubmitted,
+        };
+      });
+    });
+  },
 };

@@ -71,7 +71,13 @@ export async function loadUserAccessProfile(userId: string): Promise<UserAccessP
     return null;
   }
 
-  const pages = (user.pages as PageAccessKey[] | null) || DEFAULT_ROLE_PAGES[user.role as AppRole];
+  let pages = (user.pages as PageAccessKey[] | null) || DEFAULT_ROLE_PAGES[user.role as AppRole];
+  if (user.role === "ADMIN") {
+    const adminSet = new Set<PageAccessKey>(pages);
+    adminSet.add("admin");
+    adminSet.add("milestone_reorder");
+    pages = Array.from(adminSet);
+  }
   const profile: UserAccessProfile = {
     id: user.id,
     name: user.name,
@@ -111,9 +117,16 @@ export async function getRolePages(role: Role | AppRole): Promise<PageAccessKey[
     return cached.pages;
   }
   const savedAccess = await prisma.rolePageAccess.findUnique({ where: { role } });
-  const pages = savedAccess
+  let pages = savedAccess
     ? savedAccess.pages as PageAccessKey[]
     : DEFAULT_ROLE_PAGES[role as AppRole];
+
+  if (role === "ADMIN") {
+    const adminSet = new Set<PageAccessKey>(pages);
+    adminSet.add("admin");
+    adminSet.add("milestone_reorder");
+    pages = Array.from(adminSet);
+  }
   rolePagesCache.set(role, { pages, expiresAt: Date.now() + ACCESS_PROFILE_TTL_MS });
   return pages;
 }

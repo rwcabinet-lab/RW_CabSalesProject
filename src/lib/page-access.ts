@@ -6,6 +6,7 @@ export const PAGE_ACCESS_OPTIONS = [
   { key: "customers", label: "客戶主檔", href: "/customers" },
   { key: "projects", label: "案場、里程碑與報價", href: "/projects" },
   { key: "admin", label: "管理者設定", href: "/admin" },
+  { key: "milestone_reorder", label: "里程碑各進度項目拖曳變更順序", href: "" },
 ] as const;
 
 export const ROLE_OPTIONS = [
@@ -28,9 +29,9 @@ export type PageAccessKey = (typeof PAGE_ACCESS_OPTIONS)[number]["key"];
 export type AppRole = (typeof ROLE_OPTIONS)[number]["value"];
 
 export const DEFAULT_ROLE_PAGES: Record<AppRole, PageAccessKey[]> = {
-  ADMIN: ["home", "workbench", "manager", "views", "customers", "projects", "admin"],
-  LEVEL_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects"],
-  SALES_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects"],
+  ADMIN: ["home", "workbench", "manager", "views", "customers", "projects", "admin", "milestone_reorder"],
+  LEVEL_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
+  SALES_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
   SALES: ["home", "workbench", "views", "customers", "projects"],
   ASSISTANT: ["home", "workbench", "views", "projects"],
   SITE_ENGINEER: ["home", "workbench", "views", "projects"],
