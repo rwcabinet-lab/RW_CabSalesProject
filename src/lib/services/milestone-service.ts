@@ -653,59 +653,68 @@ export const MilestoneService = {
     const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedList);
     const evaluatedTarget = evaluatedMilestones[targetIndex];
 
-    const operations: Prisma.PrismaPromise<unknown>[] = [
-      prisma.projectMilestone.update({
-        where: { id: target.id },
-        data: { status: evaluatedTarget.status, actualDueDate: null },
-      }),
-      prisma.salesTask.updateMany({
-        where: { milestoneId: target.id },
-        data: { isCompleted: false, completedAt: null },
-      }),
-      prisma.project.update({
-        where: { id: projectId },
-        data: { currentStage: stage, isDelayed },
-      }),
-    ];
+    const resetPendingMilestoneIds: string[] = [];
+    const shiftMilestoneIds: string[] = [];
 
     for (let i = targetIndex + 1; i < updatedList.length; i++) {
       const m = updatedList[i];
       const orig = milestones[i];
-      const statusChanged = m.status !== orig.status;
-      const dateChanged = m.plannedDueDate !== orig.plannedDueDate && Boolean(m.plannedDueDate);
-
-      if (statusChanged || dateChanged) {
-        operations.push(
-          prisma.projectMilestone.update({
-            where: { id: m.id },
-            data: {
-              ...(statusChanged ? { status: m.status } : {}),
-              ...(dateChanged ? { plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`) } : {}),
-            },
-          })
-        );
+      if (m.status !== orig.status && m.status === MilestoneStatus.PENDING) {
+        resetPendingMilestoneIds.push(m.id);
       }
-      if (statusChanged && m.status === MilestoneStatus.PENDING) {
-        // 里程碑回退至待開始狀態時，清理先前推進自動產生之未完成任務，防止幽靈待辦殘留
-        operations.push(
-          prisma.salesTask.deleteMany({
-            where: { milestoneId: m.id, isCompleted: false },
-          })
-        );
-      }
-      if (dateChanged) {
-        operations.push(
-          prisma.salesTask.updateMany({
-            where: { milestoneId: m.id, isCompleted: false },
-            data: {
-              dueDatetime: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
-            },
-          })
-        );
+      if (
+        daysToRestore > 0 &&
+        m.status !== MilestoneStatus.COMPLETED &&
+        !["X-1", "X-2"].includes(m.stageCode) &&
+        m.plannedDueDate
+      ) {
+        shiftMilestoneIds.push(m.id);
       }
     }
 
-    await prisma.$transaction(operations);
+    await prisma.$transaction(async (tx) => {
+      // 1. 回退目標里程碑狀態並清空實際完成日
+      await tx.projectMilestone.update({
+        where: { id: target.id },
+        data: { status: evaluatedTarget.status, actualDueDate: null },
+      });
+      // 2. 重置關聯任務為未完成
+      await tx.salesTask.updateMany({
+        where: { milestoneId: target.id },
+        data: { isCompleted: false, completedAt: null },
+      });
+      // 3. 更新案場階段與逾期評估
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentStage: stage, isDelayed },
+      });
+
+      // 4. 批次將受影響的後續里程碑重置為 PENDING，並批次清理幽靈待辦任務
+      if (resetPendingMilestoneIds.length > 0) {
+        await tx.projectMilestone.updateMany({
+          where: { id: { in: resetPendingMilestoneIds } },
+          data: { status: MilestoneStatus.PENDING },
+        });
+        await tx.salesTask.deleteMany({
+          where: { milestoneId: { in: resetPendingMilestoneIds }, isCompleted: false },
+        });
+      }
+
+      // 5. 若有提前天數需還原，使用單一高效 SQL 批次平移所有後續里程碑與任務日期，避免數十次循序網路往返延遲
+      if (daysToRestore > 0 && shiftMilestoneIds.length > 0) {
+        await tx.$executeRaw`
+          UPDATE project_milestones
+          SET planned_due_date = planned_due_date + (${daysToRestore} * INTERVAL '1 day')
+          WHERE id = ANY(${shiftMilestoneIds}::text[])
+        `;
+        await tx.$executeRaw`
+          UPDATE sales_tasks
+          SET due_datetime = due_datetime + (${daysToRestore} * INTERVAL '1 day')
+          WHERE milestone_id = ANY(${shiftMilestoneIds}::text[]) AND is_completed = false
+        `;
+      }
+    });
+
     return evaluatedMilestones;
   },
 
@@ -728,6 +737,8 @@ export const MilestoneService = {
       const existingMilestone = existingMilestones.find((m) => m.stageCode === stageCode);
       const maxOrder = existingMilestones.reduce((max, m) => Math.max(max, m.stageOrder), 0);
       const stageOrder = existingMilestone ? existingMilestone.stageOrder : maxOrder + 1;
+      const projectSalesId = existingProject.salesRepId || existingProject.customerSalesRepId;
+      const projectSalesName = existingProject.salesRepName || existingProject.customerSalesRepName;
 
       const milestoneOp = existingMilestone
         ? prisma.projectMilestone.update({
@@ -737,7 +748,7 @@ export const MilestoneService = {
               plannedDueDate: isWrapUp ? plannedDueDate : undefined,
               actualDueDate: isWrapUp ? null : actualDueDate,
               notes: reason,
-              assignedToId: existingMilestone.assignedToId || existingProject.customerSalesRepId,
+              assignedToId: existingMilestone.assignedToId || projectSalesId,
             },
           })
         : prisma.projectMilestone.create({
@@ -750,7 +761,7 @@ export const MilestoneService = {
               plannedDueDate: isWrapUp ? plannedDueDate : null,
               actualDueDate: isWrapUp ? null : actualDueDate,
               notes: reason,
-              assignedToId: existingProject.customerSalesRepId,
+              assignedToId: projectSalesId,
             },
           });
 
@@ -778,8 +789,8 @@ export const MilestoneService = {
             plannedDueDate: isWrapUp ? dateOnlyValue(plannedDueDate) : existingMilestone.plannedDueDate,
             actualDueDate: isWrapUp ? null : dateOnlyValue(actualDueDate),
             notes: reason,
-            assignedToId: existingMilestone.assignedToId || existingProject.customerSalesRepId || null,
-            assignedToName: existingMilestone.assignedToName || existingProject.customerSalesRepName,
+            assignedToId: existingMilestone.assignedToId || projectSalesId || null,
+            assignedToName: existingMilestone.assignedToName || projectSalesName,
           }
         : {
             id: savedMs.id,
@@ -793,8 +804,8 @@ export const MilestoneService = {
             actualDueDate: isWrapUp ? null : dateOnlyValue(actualDueDate),
             notes: reason,
             attachments: null,
-            assignedToId: existingProject.customerSalesRepId || null,
-            assignedToName: existingProject.customerSalesRepName,
+            assignedToId: projectSalesId || null,
+            assignedToName: projectSalesName,
           };
 
       const nextList = existingMilestone

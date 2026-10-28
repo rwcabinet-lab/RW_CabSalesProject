@@ -62,6 +62,9 @@ export const ScheduleEngine = {
     }
 
     if (!milestone.plannedDueDate) {
+      if (milestone.status === "IN_PROGRESS") {
+        return { color: "GRAY", label: "暫緩", daysDiff: 999 };
+      }
       return { color: "GRAY", label: "未排定時程", daysDiff: 999 };
     }
 
@@ -158,6 +161,8 @@ export const ScheduleEngine = {
         } else if (m.status === "OVERDUE") {
           return { ...m, status: "IN_PROGRESS" as const };
         }
+      } else if (!m.plannedDueDate && m.status === "OVERDUE") {
+        return { ...m, status: "IN_PROGRESS" as const };
       }
 
       return m;

@@ -111,8 +111,8 @@ export async function GET(req: NextRequest) {
       if (isDelayed) workloadMap[key].delayed++;
     };
     for (const p of projects) {
-      const salesRepName = p.customerSalesRepName || p.salesRepName || "其他業務";
-      addWorkload(`sales:${p.customerSalesRepId || p.salesRepId}`, `${salesRepName}（業務）`, isProjectDelayed(p));
+      const salesRepName = p.salesRepName || p.customerSalesRepName || "其他業務";
+      addWorkload(`sales:${p.salesRepId || p.customerSalesRepId}`, `${salesRepName}（業務）`, isProjectDelayed(p));
       if (p.salesAssistantId && p.salesAssistantName) {
         addWorkload(`assistant:${p.salesAssistantId}`, `${p.salesAssistantName}（業助）`, isProjectDelayed(p));
       }
@@ -185,7 +185,7 @@ export async function GET(req: NextRequest) {
         defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
         currentStageLabel: p.currentStage === "LOST" ? "已流標" : isClosed ? "已結案" : stageLabels[p.currentStage] || p.currentStage,
-        salesRepName: p.customerSalesRepName || p.salesRepName,
+        salesRepName: p.salesRepName || p.customerSalesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
         isClosed,

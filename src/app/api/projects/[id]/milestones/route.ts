@@ -417,8 +417,8 @@ export async function PUT(
       updates || {},
       initialMilestones,
       {
-        id: project.customerSalesRepId || project.salesRepId,
-        name: project.customerSalesRepName || project.salesRepName,
+        id: project.salesRepId || project.customerSalesRepId || "",
+        name: project.salesRepName || project.customerSalesRepName || "",
       },
     );
     const updatedMilestones = initialMilestones.map((m) => (m.id === milestoneId && updated ? updated : m));

@@ -1143,6 +1143,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               {!isProjectLost && m.trafficLight?.color === "YELLOW" && (
                                 <span className="text-[10px] text-amber-600 font-bold">● {m.trafficLight.label}</span>
                               )}
+                              {!isProjectLost && m.trafficLight?.label === "暫緩" && (
+                                <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full font-bold">● 暫緩</span>
+                              )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">

@@ -395,7 +395,7 @@ export default function SalesWorkbenchPage() {
               <option value="RED">逾期</option>
               <option value="YELLOW">即將到期</option>
               <option value="GREEN">正常</option>
-              <option value="GRAY">未排定/已完成</option>
+              <option value="GRAY">暫緩/未排定/已完成</option>
               <option value="LOST">已流標</option>
             </select>
           </label>
