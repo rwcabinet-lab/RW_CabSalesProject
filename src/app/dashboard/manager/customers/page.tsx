@@ -129,6 +129,12 @@ export default function CustomerStatsPage() {
           >
             營運總覽分析
           </Link>
+          <Link
+            href="/dashboard/manager?tab=status"
+            className="px-4 py-2 text-sm font-bold rounded-lg text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            案件現況統計
+          </Link>
           <div className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-blue-600 shadow-sm">
             客戶資料統計
           </div>

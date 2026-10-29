@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import {
   QUERY_KEYS,
 } from "@/hooks/useQueries";
 import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTaskModal";
+import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjectStatusReport";
 
 const todayDate = () =>
   new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -54,6 +55,31 @@ export default function ManagerDashboardPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
+
+  // 分頁切換：營運總覽分析 vs 案件現況統計
+  const [activeTab, setActiveTab] = useState<"overview" | "status">("overview");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "status") {
+        setActiveTab("status");
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tab: "overview" | "status") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "status") {
+        url.searchParams.set("tab", "status");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   // React Query 資料快取 (單一真實來源)
   const {
@@ -288,13 +314,34 @@ export default function ManagerDashboardPage() {
       <div className="flex flex-wrap justify-between items-center border-b pb-4 gap-4">
         <div>
           <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控室</span>
-          <h1 className="text-2xl font-black mt-1">營運總覽分析</h1>
+          <h1 className="text-2xl font-black mt-1">
+            {activeTab === "overview" ? "營運總覽分析" : "案件現況統計"}
+          </h1>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <div className="px-4 py-2 text-sm font-bold rounded-lg bg-white text-blue-600 shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleTabChange("overview")}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${
+              activeTab === "overview"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
             營運總覽分析
-          </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("status")}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${
+              activeTab === "status"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            案件現況統計
+          </button>
           <Link
             href="/dashboard/manager/customers"
             className="px-4 py-2 text-sm font-bold rounded-lg text-slate-600 hover:text-slate-900 transition-colors"
@@ -304,6 +351,10 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
+      {activeTab === "status" ? (
+        <ManagerProjectStatusReport />
+      ) : (
+        <>
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">進行中總案場數</div>
@@ -668,6 +719,8 @@ export default function ManagerDashboardPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* 指派任務 Modal (獨立封裝元件) */}
       {assignModal.open && (

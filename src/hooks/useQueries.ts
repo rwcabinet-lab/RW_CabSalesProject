@@ -8,6 +8,7 @@ import type {
   CustomerDTO,
   CustomerStatsDashboardDTO,
   ManagerDashboardDTO,
+  ManagerProjectStatusReportDTO,
   MilestoneDetailsDTO,
   ProjectDTO,
   TaskDTO,
@@ -36,6 +37,8 @@ export const QUERY_KEYS = {
   managerDashboard: (startMonth?: string, endMonth?: string, startDate?: string, endDate?: string) =>
     ["dashboard", "manager", startMonth || "all", endMonth || "all", startDate || "all", endDate || "all"] as const,
   managerCustomerStats: ["dashboard", "manager", "customers"] as const,
+  managerProjectStatus: (year?: string | number, month?: string | number) =>
+    ["dashboard", "manager", "status-report", String(year || "2026"), String(month || "10")] as const,
   viewsData: ["views", "data"] as const,
 };
 
@@ -165,6 +168,27 @@ export function useManagerCustomerStatsQuery() {
       const json = (await res.json()) as CustomerStatsDashboardDTO & { error?: string };
       if (!res.ok || json.error) {
         throw new Error(json.error || "獲取客戶統計失敗");
+      }
+      return json;
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * 主管監控室案件現況統計（經營會議報告：已簽約/已報價/估價中）
+ */
+export function useManagerProjectStatusQuery(year?: string | number, month?: string | number) {
+  return useQuery({
+    queryKey: QUERY_KEYS.managerProjectStatus(year, month),
+    queryFn: async (): Promise<ManagerProjectStatusReportDTO> => {
+      const params = new URLSearchParams();
+      if (year) params.set("year", String(year));
+      if (month) params.set("month", String(month));
+      const res = await fetch(`/api/dashboard/manager/status-report?${params.toString()}`);
+      const json = (await res.json()) as ManagerProjectStatusReportDTO & { error?: string };
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "獲取案件現況統計報告失敗");
       }
       return json;
     },

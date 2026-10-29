@@ -362,3 +362,67 @@ export interface RolePermissionDTO {
   pages: any[];
 }
 export type MilestoneStageCode = MilestoneStageCodeDTO;
+
+// ----------------------------------------------------------------
+// 案件現況統計 (經營會議報告) 專用 DTO
+// ----------------------------------------------------------------
+export interface ProjectStatusItemDTO {
+  id: string;
+  customerName: string;
+  projectName: string;
+  region: string;
+  unitCount: number;
+  amount: number | null;
+  progressNotes?: string;
+  expectedDate?: string | null;
+  year: string;
+  currentStage?: string;
+  overrideSection?: "SIGNED" | "ESTIMATING" | "QUOTED" | null;
+}
+
+export interface ProjectStatusYearGroupDTO {
+  year: string;
+  subtotalAmount: number;
+  subtotalLabel: string;
+  totalUnits: number;
+  projects: ProjectStatusItemDTO[];
+}
+
+export interface ProjectStatusSectionDTO {
+  title: string;
+  key: "SIGNED" | "ESTIMATING" | "QUOTED";
+  totalAmount: number;
+  totalAmountLabel: string;
+  totalProjects: number;
+  totalUnits: number;
+  yearlyGroups: ProjectStatusYearGroupDTO[];
+}
+
+export interface TargetPeriodSummaryDTO {
+  periodKey: string; // e.g. "2026/Q1", "2026/10月"
+  periodLabel: string;
+  targetAmount: number;
+  actualAmount: number;
+  achievementRate: number;
+  cumulativeActual: number;
+  isCurrent?: boolean;
+}
+
+export interface ExecutiveReportTargetSummaryDTO {
+  annualYear: number;
+  annualTarget: number;
+  cumulativeActual: number;
+  achievementRate: number;
+  periods: TargetPeriodSummaryDTO[];
+}
+
+export interface ManagerProjectStatusReportDTO {
+  reportTitle: string;
+  year: number;
+  month: number;
+  targetSummary: ExecutiveReportTargetSummaryDTO;
+  signedSection: ProjectStatusSectionDTO;
+  estimatingSection: ProjectStatusSectionDTO;
+  quotedSection: ProjectStatusSectionDTO;
+}
+

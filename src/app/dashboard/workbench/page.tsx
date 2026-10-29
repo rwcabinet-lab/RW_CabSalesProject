@@ -9,7 +9,6 @@ import {
   Edit3,
   CheckCircle2,
   X,
-  Trash2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -158,36 +157,6 @@ export default function SalesWorkbenchPage() {
 
   const isAdmin = currentUser.role === "ADMIN";
   const visibleTasks = isAdmin ? tasks : pendingTasks;
-  const canDeleteTask = (task: TaskDTO) =>
-    isAdmin || task.assignedById === currentUser.id || task.assignedToId === currentUser.id;
-
-  const handleDeleteTask = async (task: TaskDTO) => {
-    if (!window.confirm(`確定刪除待辦「${task.subject}」？`)) return;
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: task.id }),
-      });
-      const result = (await res.json()) as ApiResponse<{ success: boolean }>;
-      if (!res.ok) {
-        toast.error(result.error || "刪除待辦失敗");
-        return;
-      }
-      queryClient.setQueryData<WorkbenchDashboardDTO>(QUERY_KEYS.workbench, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks.filter((item) => item.id !== task.id),
-        };
-      });
-      toast.success("已成功刪除該待辦事項");
-      void invalidateWorkbench({ includeViews: true });
-    } catch (err) {
-      console.error("Failed to delete task:", err);
-      toast.error("刪除待辦時發生錯誤，請稍後重試");
-    }
-  };
 
   const handleDeleteProject = async (project: WorkbenchProjectDTO) => {
     if (
@@ -300,26 +269,28 @@ export default function SalesWorkbenchPage() {
                       </td>
                       <td className="p-3">{task.priority}</td>
                       <td className="p-3 text-center">
-                        {!task.isCompleted && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTaskToComplete(task);
-                            }}
-                            className="mx-auto flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
-                          >
-                            <CheckCircle2 className="h-4 w-4" /> 完成
-                          </button>
-                        )}
-                        {canDeleteTask(task) && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTask(task)}
-                            className="mx-auto mt-1 flex items-center gap-1 rounded bg-red-100 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-200"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" /> 刪除
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center gap-2">
+                          {!task.isCompleted && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTaskToComplete(task);
+                              }}
+                              className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition-colors"
+                            >
+                              <CheckCircle2 className="h-4 w-4" /> 完成
+                            </button>
+                          )}
+                          {task.projectId && (
+                            <Link
+                              href={`/projects/${task.projectId}/milestones`}
+                              prefetch={true}
+                              className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-xs font-semibold hover:bg-blue-100 hover:text-blue-700 shadow-sm transition-colors"
+                            >
+                              案件細節
+                            </Link>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
