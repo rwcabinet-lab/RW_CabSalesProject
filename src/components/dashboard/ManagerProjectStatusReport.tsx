@@ -7,17 +7,13 @@ import {
   Download,
   Settings,
   RefreshCw,
-  ExternalLink,
-  Filter,
   Search,
   CheckCircle2,
-  Clock,
-  FileSpreadsheet,
   X,
   MoreVertical,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useManagerProjectStatusQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useManagerProjectStatusQuery } from "@/hooks/useQueries";
 import { toast } from "@/stores/useToastStore";
 import type {
   ManagerProjectStatusReportDTO,
@@ -39,13 +35,12 @@ interface TargetEditForm {
 
 export function ManagerProjectStatusReport() {
   const queryClient = useQueryClient();
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
 
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(10);
   const [regionFilter, setRegionFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [stageView, setStageView] = useState<"ALL" | "SIGNED" | "ESTIMATING" | "QUOTED">("ALL");
 
   // 目標設定彈窗
   const [targetModalOpen, setTargetModalOpen] = useState(false);
@@ -134,6 +129,19 @@ export function ManagerProjectStatusReport() {
   const filteredQuotedGroups = useMemo(
     () => (report ? filterSection(report.quotedSection) : []),
     [report, filterSection]
+  );
+
+  const signedCount = useMemo(
+    () => filteredSignedGroups.reduce((s, g) => s + g.projects.length, 0),
+    [filteredSignedGroups]
+  );
+  const estimatingCount = useMemo(
+    () => filteredEstimatingGroups.reduce((s, g) => s + g.projects.length, 0),
+    [filteredEstimatingGroups]
+  );
+  const quotedCount = useMemo(
+    () => filteredQuotedGroups.reduce((s, g) => s + g.projects.length, 0),
+    [filteredQuotedGroups]
   );
 
   // 開啟目標編輯視窗並載入現有數據
@@ -306,7 +314,7 @@ export function ManagerProjectStatusReport() {
   if (!report) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* 頂部操作工具列 */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-3">
@@ -423,380 +431,452 @@ export function ManagerProjectStatusReport() {
         </div>
       </div>
 
-      {/* 報表主視覺主體 (與附圖完全一致之四宮格版面) */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm print:p-0 print:border-none print:shadow-none space-y-6">
+      {/* 階段切換按鈕 (單頁全寬視圖 / 快捷過濾) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => setStageView("ALL")}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
+            stageView === "ALL"
+              ? "bg-slate-900 text-white"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          全部顯示 (單頁完整展開)
+        </button>
+        <button
+          type="button"
+          onClick={() => setStageView("SIGNED")}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
+            stageView === "SIGNED"
+              ? "bg-[#8da35e] text-white"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          已簽約 ({signedCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStageView("ESTIMATING")}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
+            stageView === "ESTIMATING"
+              ? "bg-[#9ebb64] text-white"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          估價中 ({estimatingCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStageView("QUOTED")}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
+            stageView === "QUOTED"
+              ? "bg-[#7b9150] text-white"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          已報價 ({quotedCount})
+        </button>
+      </div>
+
+      {/* 報表單頁主體 (全寬拉大展開版面) */}
+      <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm print:p-0 print:border-none print:shadow-none space-y-8 w-full">
         {/* 頂部標題 */}
-        <div className="text-center py-2">
+        <div className="text-center py-2 border-b pb-4">
           <h1 className="text-2xl sm:text-3xl font-black text-rose-600 tracking-wider inline-block">
             {selectedMonth} 月份系統櫃部經營會議報告
           </h1>
         </div>
 
-        {/* 左右對稱排版：左欄 (目標達成率 + 已簽約) / 右欄 (估價中 + 已報價) */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-          {/* ===================== 左側欄位 ===================== */}
-          <div className="space-y-6">
-            {/* 1. 頂部左側：目標與業績達成率卡片 */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm">
-              {/* 綠色大橫幅 */}
-              <div className="bg-[#8da35e] text-white px-4 py-2.5 font-bold flex flex-wrap items-center justify-between text-sm sm:text-base tracking-wide border-b border-[#7b9150]">
-                <div>{selectedYear} 年目標 NT ${(report.targetSummary.annualTarget / 1_000_000).toFixed(0)}M</div>
-                <div className="flex items-center gap-4">
-                  <span>達成率：{report.targetSummary.achievementRate}%</span>
-                  <span>累積業績：$ {(report.targetSummary.cumulativeActual / 1_000_000).toFixed(1)}M</span>
-                </div>
-              </div>
+        {/* 1. 頂部：目標與業績達成率卡片 (全寬大氣呈現) */}
+        <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm w-full">
+          {/* 綠色大橫幅 */}
+          <div className="bg-[#8da35e] text-white px-6 py-3 font-bold flex flex-wrap items-center justify-between text-base tracking-wide border-b border-[#7b9150]">
+            <div className="text-lg">
+              {selectedYear} 年目標 NT ${(report.targetSummary.annualTarget / 1_000_000).toFixed(0)}M
+            </div>
+            <div className="flex items-center gap-6 text-sm sm:text-base">
+              <span>達成率：<span className="font-black text-amber-200 text-lg">{report.targetSummary.achievementRate}%</span></span>
+              <span>累積業績：<span className="font-black text-white text-lg">$ {(report.targetSummary.cumulativeActual / 1_000_000).toFixed(1)}M</span></span>
+            </div>
+          </div>
 
-              {/* 目標明細表 */}
-              <table className="w-full text-xs sm:text-sm text-center border-collapse">
+          {/* 目標明細表 (全寬展開) */}
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-sm text-center border-collapse">
+              <thead>
+                <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300">
+                  <th className="py-2.5 px-4 border-r border-slate-300 w-1/5">月份</th>
+                  <th className="py-2.5 px-4 border-r border-slate-300 w-1/5">目標</th>
+                  <th className="py-2.5 px-4 border-r border-slate-300 w-1/5">業績/月</th>
+                  <th className="py-2.5 px-4 border-r border-slate-300 w-1/5">達成率</th>
+                  <th className="py-2.5 px-4 w-1/5">累積業績</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {report.targetSummary.periods.map((p) => {
+                  const isCurr = p.isCurrent;
+                  return (
+                    <tr
+                      key={p.periodKey}
+                      className={`hover:bg-slate-50 transition-colors ${
+                        isCurr ? "text-rose-600 font-bold bg-rose-50/50" : "text-slate-800"
+                      }`}
+                    >
+                      <td className="py-2.5 px-4 border-r border-slate-200 font-semibold">{p.periodLabel}</td>
+                      <td className="py-2.5 px-4 border-r border-slate-200 tabular-nums">
+                        目標 ${(p.targetAmount / 1_000_000).toFixed(1)}M
+                      </td>
+                      <td className="py-2.5 px-4 border-r border-slate-200 tabular-nums font-semibold">
+                        業績 ${(p.actualAmount / 1_000_000).toFixed(1)}M
+                      </td>
+                      <td className="py-2.5 px-4 border-r border-slate-200 font-bold tabular-nums">
+                        {p.achievementRate}%
+                      </td>
+                      <td className="py-2.5 px-4 font-bold tabular-nums">
+                        $ {(p.cumulativeActual / 1_000_000).toFixed(1)}M
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 2. 【已簽約】全寬展開表格 */}
+        {(stageView === "ALL" || stageView === "SIGNED") && (
+          <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm w-full">
+            <div className="bg-[#8da35e] text-white py-3 px-6 font-bold text-base flex flex-wrap items-center justify-between tracking-wide border-b border-[#7b9150]">
+              <span className="flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-white" />
+                已簽約
+              </span>
+              <span className="text-sm font-normal text-emerald-50">
+                共 {report.signedSection.totalProjects} 個案場 ｜ 總金額 {report.signedSection.totalAmountLabel} ｜ 總戶數 {report.signedSection.totalUnits} 戶
+              </span>
+            </div>
+
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300">
-                    <th className="py-2 px-3 border-r border-slate-300 w-1/5">月份</th>
-                    <th className="py-2 px-3 border-r border-slate-300 w-1/5">目標</th>
-                    <th className="py-2 px-3 border-r border-slate-300 w-1/5">業績/月</th>
-                    <th className="py-2 px-3 border-r border-slate-300 w-1/5">達成率</th>
-                    <th className="py-2 px-3 w-1/5">累積業績</th>
+                  <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">竣工日期</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-56 text-left pl-6">客戶名稱</th>
+                    <th className="py-3 px-6 border-r border-slate-300 text-left">案場名稱</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">工程地區</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-24">戶數</th>
+                    <th className="py-3 px-6 border-r border-slate-300 w-44 text-right pr-6">金額</th>
+                    <th className="py-3 px-4 w-36 text-center font-black">合計</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {report.targetSummary.periods.map((p) => {
-                    const isCurr = p.isCurrent;
-                    return (
-                      <tr
-                        key={p.periodKey}
-                        className={`hover:bg-slate-50 transition-colors ${
-                          isCurr ? "text-rose-600 font-bold bg-rose-50/40" : "text-slate-800"
-                        }`}
-                      >
-                        <td className="py-2 px-3 border-r border-slate-200">{p.periodLabel}</td>
-                        <td className="py-2 px-3 border-r border-slate-200">
-                          目標 ${(p.targetAmount / 1_000_000).toFixed(1)}M
-                        </td>
-                        <td className="py-2 px-3 border-r border-slate-200">
-                          業績 ${(p.actualAmount / 1_000_000).toFixed(1)}M
-                        </td>
-                        <td className="py-2 px-3 border-r border-slate-200">{p.achievementRate}%</td>
-                        <td className="py-2 px-3 font-semibold">
-                          $ {(p.cumulativeActual / 1_000_000).toFixed(1)}M
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredSignedGroups.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        尚無符合條件之已簽約案場
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSignedGroups.map((group) => {
+                      return group.projects.map((proj, pIdx) => (
+                        <tr
+                          key={proj.id}
+                          className="hover:bg-amber-50/40 transition-colors group text-slate-800"
+                        >
+                          {/* 合併儲存格：竣工年度 */}
+                          {pIdx === 0 && (
+                            <td
+                              rowSpan={group.projects.length}
+                              className="py-3 px-4 border-r border-slate-300 font-black text-center bg-slate-50/70 align-middle text-slate-700 text-base tabular-nums"
+                            >
+                              {group.year}
+                            </td>
+                          )}
+
+                          {/* 客戶名稱 */}
+                          <td className="py-3 px-4 border-r border-slate-200 font-semibold pl-6">
+                            {proj.customerName}
+                          </td>
+
+                          {/* 案場名稱 (點擊直達進度) */}
+                          <td className="py-3 px-6 border-r border-slate-200 font-bold text-slate-900">
+                            <div className="flex items-center justify-between gap-2">
+                              <Link
+                                href={`/projects/${proj.id}/milestones`}
+                                className="hover:text-blue-600 hover:underline transition-colors"
+                              >
+                                {proj.projectName}
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => setActionMenuProject(proj)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
+                                title="調整階段"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 工程地區 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center font-medium text-slate-600">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+                              {proj.region}
+                            </span>
+                          </td>
+
+                          {/* 戶數 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center tabular-nums font-semibold">
+                            {proj.unitCount}
+                          </td>
+
+                          {/* 金額 */}
+                          <td className="py-3 px-6 border-r border-slate-200 text-right font-bold tabular-nums font-mono pr-6">
+                            ${proj.amount ? proj.amount.toLocaleString("en-US") : "0"}
+                          </td>
+
+                          {/* 合計 (合併顯示各年度百萬小計) */}
+                          {pIdx === 0 && (
+                            <td
+                              rowSpan={group.projects.length}
+                              className="py-3 px-4 text-center font-black text-slate-900 bg-emerald-50/40 align-middle tabular-nums text-base"
+                            >
+                              {group.subtotalLabel}
+                            </td>
+                          )}
+                        </tr>
+                      ));
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-
-            {/* 2. 左下方：已簽約 表格 */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm">
-              <div className="bg-[#8da35e] text-white py-2 px-4 text-center font-bold text-base tracking-wider border-b border-[#7b9150]">
-                已簽約
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">竣工日期</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-24">客戶名稱</th>
-                      <th className="py-2 px-3 border-r border-slate-300 text-left">案場名稱</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">工程地區</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-12">戶數</th>
-                      <th className="py-2 px-3 border-r border-slate-300 w-28 text-right">金額</th>
-                      <th className="py-2 px-3 w-20 text-center font-black">合計</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {filteredSignedGroups.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-slate-400">
-                          尚無符合條件之已簽約案場
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredSignedGroups.map((group) => {
-                        return group.projects.map((proj, pIdx) => (
-                          <tr
-                            key={proj.id}
-                            className="hover:bg-amber-50/30 transition-colors group text-slate-800"
-                          >
-                            {/* 合併儲存格：竣工年度 */}
-                            {pIdx === 0 && (
-                              <td
-                                rowSpan={group.projects.length}
-                                className="py-2 px-2 border-r border-slate-300 font-bold text-center bg-slate-50/60 align-middle text-slate-700"
-                              >
-                                {group.year}
-                              </td>
-                            )}
-
-                            {/* 客戶名稱 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center truncate max-w-[100px]" title={proj.customerName}>
-                              {proj.customerName}
-                            </td>
-
-                            {/* 案場名稱 (點擊直達進度) */}
-                            <td className="py-2 px-3 border-r border-slate-200 font-medium">
-                              <div className="flex items-center justify-between gap-1">
-                                <Link
-                                  href={`/projects/${proj.id}/milestones`}
-                                  className="hover:text-blue-600 hover:underline transition-colors truncate"
-                                  title={proj.projectName}
-                                >
-                                  {proj.projectName}
-                                </Link>
-                                <button
-                                  type="button"
-                                  onClick={() => setActionMenuProject(proj)}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
-                                  title="調整階段"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* 工程地區 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center text-slate-600">
-                              {proj.region}
-                            </td>
-
-                            {/* 戶數 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center tabular-nums">
-                              {proj.unitCount}
-                            </td>
-
-                            {/* 金額 */}
-                            <td className="py-2 px-3 border-r border-slate-200 text-right font-medium tabular-nums">
-                              ${proj.amount ? proj.amount.toLocaleString("en-US") : "0"}
-                            </td>
-
-                            {/* 合計 (合併顯示各年度百萬小計) */}
-                            {pIdx === 0 && (
-                              <td
-                                rowSpan={group.projects.length}
-                                className="py-2 px-2 text-center font-black text-slate-900 bg-emerald-50/30 align-middle tabular-nums text-sm"
-                              >
-                                {group.subtotalLabel}
-                              </td>
-                            )}
-                          </tr>
-                        ));
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
+        )}
 
-          {/* ===================== 右側欄位 ===================== */}
-          <div className="space-y-6">
-            {/* 3. 右上方：估價中 表格 */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm">
-              <div className="bg-[#a8bf7b] text-slate-900 py-2 px-4 text-center font-bold text-base tracking-wider border-b border-[#92a867]">
+        {/* 3. 【估價中】全寬展開表格 */}
+        {(stageView === "ALL" || stageView === "ESTIMATING") && (
+          <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm w-full">
+            <div className="bg-[#a8bf7b] text-slate-900 py-3 px-6 font-bold text-base flex flex-wrap items-center justify-between tracking-wide border-b border-[#92a867]">
+              <span className="flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-800" />
                 估價中
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">竣工日期</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-24">客戶名稱</th>
-                      <th className="py-2 px-3 border-r border-slate-300 text-left">案場名稱</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">工程地區</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-12">戶數</th>
-                      <th className="py-2 px-3 text-center w-36">進度</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {filteredEstimatingGroups.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-6 text-center text-slate-400">
-                          尚無符合條件之估價中案場
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredEstimatingGroups.map((group) => {
-                        return group.projects.map((proj, pIdx) => (
-                          <tr
-                            key={proj.id}
-                            className="hover:bg-amber-50/30 transition-colors group text-slate-800"
-                          >
-                            {/* 合併儲存格：竣工年度 */}
-                            {pIdx === 0 && (
-                              <td
-                                rowSpan={group.projects.length}
-                                className="py-2 px-2 border-r border-slate-300 font-bold text-center bg-slate-50/60 align-middle text-slate-700"
-                              >
-                                {group.year}
-                              </td>
-                            )}
-
-                            {/* 客戶名稱 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center truncate max-w-[100px]" title={proj.customerName}>
-                              {proj.customerName}
-                            </td>
-
-                            {/* 案場名稱 */}
-                            <td className="py-2 px-3 border-r border-slate-200 font-medium">
-                              <div className="flex items-center justify-between gap-1">
-                                <Link
-                                  href={`/projects/${proj.id}/milestones`}
-                                  className="hover:text-blue-600 hover:underline transition-colors truncate"
-                                  title={proj.projectName}
-                                >
-                                  {proj.projectName}
-                                </Link>
-                                <button
-                                  type="button"
-                                  onClick={() => setActionMenuProject(proj)}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
-                                  title="調整階段"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* 工程地區 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center text-slate-600">
-                              {proj.region}
-                            </td>
-
-                            {/* 戶數 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center tabular-nums">
-                              {proj.unitCount}
-                            </td>
-
-                            {/* 進度狀態 */}
-                            <td className="py-2 px-3 text-center">
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                                  proj.progressNotes?.includes("核對中")
-                                    ? "bg-amber-100 text-amber-800"
-                                    : proj.progressNotes?.includes("已丈量")
-                                    ? "bg-blue-100 text-blue-800"
-                                    : proj.progressNotes?.includes("尚未提供")
-                                    ? "bg-rose-100 text-rose-800"
-                                    : "bg-slate-100 text-slate-700"
-                                }`}
-                              >
-                                {proj.progressNotes || "估價中"}
-                              </span>
-                            </td>
-                          </tr>
-                        ));
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              </span>
+              <span className="text-sm font-normal text-slate-800">
+                共 {report.estimatingSection.totalProjects} 個案場 ｜ 總戶數 {report.estimatingSection.totalUnits} 戶
+              </span>
             </div>
 
-            {/* 4. 右下方：已報價 表格 */}
-            <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm">
-              <div className="bg-[#8da35e] text-white py-2 px-4 text-center font-bold text-base tracking-wider border-b border-[#7b9150]">
-                已報價
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">竣工日期</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-24">客戶名稱</th>
-                      <th className="py-2 px-3 border-r border-slate-300 text-left">案場名稱</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-16">工程地區</th>
-                      <th className="py-2 px-2 border-r border-slate-300 w-12">戶數</th>
-                      <th className="py-2 px-3 border-r border-slate-300 w-28 text-right">金額</th>
-                      <th className="py-2 px-3 w-20 text-center font-black">合計</th>
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">竣工日期</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-56 text-left pl-6">客戶名稱</th>
+                    <th className="py-3 px-6 border-r border-slate-300 text-left">案場名稱</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">工程地區</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-24">戶數</th>
+                    <th className="py-3 px-6 text-center w-64">進度</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredEstimatingGroups.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                        尚無符合條件之估價中案場
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {filteredQuotedGroups.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-slate-400">
-                          尚無符合條件之已報價案場
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredQuotedGroups.map((group) => {
-                        return group.projects.map((proj, pIdx) => (
-                          <tr
-                            key={proj.id}
-                            className="hover:bg-amber-50/30 transition-colors group text-slate-800"
-                          >
-                            {/* 合併儲存格：竣工年度 */}
-                            {pIdx === 0 && (
-                              <td
-                                rowSpan={group.projects.length}
-                                className="py-2 px-2 border-r border-slate-300 font-bold text-center bg-slate-50/60 align-middle text-slate-700"
+                  ) : (
+                    filteredEstimatingGroups.map((group) => {
+                      return group.projects.map((proj, pIdx) => (
+                        <tr
+                          key={proj.id}
+                          className="hover:bg-amber-50/40 transition-colors group text-slate-800"
+                        >
+                          {/* 合併儲存格：竣工年度 */}
+                          {pIdx === 0 && (
+                            <td
+                              rowSpan={group.projects.length}
+                              className="py-3 px-4 border-r border-slate-300 font-black text-center bg-slate-50/70 align-middle text-slate-700 text-base tabular-nums"
+                            >
+                              {group.year}
+                            </td>
+                          )}
+
+                          {/* 客戶名稱 */}
+                          <td className="py-3 px-4 border-r border-slate-200 font-semibold pl-6">
+                            {proj.customerName}
+                          </td>
+
+                          {/* 案場名稱 */}
+                          <td className="py-3 px-6 border-r border-slate-200 font-bold text-slate-900">
+                            <div className="flex items-center justify-between gap-2">
+                              <Link
+                                href={`/projects/${proj.id}/milestones`}
+                                className="hover:text-blue-600 hover:underline transition-colors"
                               >
-                                {group.year}
-                              </td>
-                            )}
+                                {proj.projectName}
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => setActionMenuProject(proj)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
+                                title="調整階段"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
 
-                            {/* 客戶名稱 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center truncate max-w-[100px]" title={proj.customerName}>
-                              {proj.customerName}
-                            </td>
-
-                            {/* 案場名稱 */}
-                            <td className="py-2 px-3 border-r border-slate-200 font-medium">
-                              <div className="flex items-center justify-between gap-1">
-                                <Link
-                                  href={`/projects/${proj.id}/milestones`}
-                                  className="hover:text-blue-600 hover:underline transition-colors truncate"
-                                  title={proj.projectName}
-                                >
-                                  {proj.projectName}
-                                </Link>
-                                <button
-                                  type="button"
-                                  onClick={() => setActionMenuProject(proj)}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
-                                  title="調整階段"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* 工程地區 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center text-slate-600">
+                          {/* 工程地區 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center font-medium text-slate-600">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
                               {proj.region}
-                            </td>
+                            </span>
+                          </td>
 
-                            {/* 戶數 */}
-                            <td className="py-2 px-2 border-r border-slate-200 text-center tabular-nums">
-                              {proj.unitCount}
-                            </td>
+                          {/* 戶數 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center tabular-nums font-semibold">
+                            {proj.unitCount}
+                          </td>
 
-                            {/* 金額 */}
-                            <td className="py-2 px-3 border-r border-slate-200 text-right font-medium tabular-nums">
-                              ${proj.amount ? proj.amount.toLocaleString("en-US") : "0"}
-                            </td>
-
-                            {/* 合計 (合併顯示各年度百萬小計) */}
-                            {pIdx === 0 && (
-                              <td
-                                rowSpan={group.projects.length}
-                                className="py-2 px-2 text-center font-black text-slate-900 bg-emerald-50/30 align-middle tabular-nums text-sm"
-                              >
-                                {group.subtotalLabel}
-                              </td>
-                            )}
-                          </tr>
-                        ));
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                          {/* 進度狀態標籤 */}
+                          <td className="py-3 px-6 text-center">
+                            <span
+                              className={`inline-block px-3 py-1 rounded-md text-xs font-bold ${
+                                proj.progressNotes?.includes("核對中")
+                                  ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                  : proj.progressNotes?.includes("已丈量")
+                                  ? "bg-blue-100 text-blue-800 border border-blue-300"
+                                  : proj.progressNotes?.includes("尚未提供")
+                                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                  : "bg-slate-100 text-slate-700 border border-slate-300"
+                              }`}
+                            >
+                              {proj.progressNotes || "估價中"}
+                            </span>
+                          </td>
+                        </tr>
+                      ));
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* 4. 【已報價】全寬展開表格 */}
+        {(stageView === "ALL" || stageView === "QUOTED") && (
+          <div className="border border-slate-300 rounded-xl overflow-hidden shadow-sm w-full">
+            <div className="bg-[#8da35e] text-white py-3 px-6 font-bold text-base flex flex-wrap items-center justify-between tracking-wide border-b border-[#7b9150]">
+              <span className="flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-white" />
+                已報價
+              </span>
+              <span className="text-sm font-normal text-emerald-50">
+                共 {report.quotedSection.totalProjects} 個案場 ｜ 總金額 {report.quotedSection.totalAmountLabel} ｜ 總戶數 {report.quotedSection.totalUnits} 戶
+              </span>
+            </div>
+
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-[#eaf0dc] text-slate-800 font-bold border-b border-slate-300 text-center">
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">竣工日期</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-56 text-left pl-6">客戶名稱</th>
+                    <th className="py-3 px-6 border-r border-slate-300 text-left">案場名稱</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-32">工程地區</th>
+                    <th className="py-3 px-4 border-r border-slate-300 w-24">戶數</th>
+                    <th className="py-3 px-6 border-r border-slate-300 w-44 text-right pr-6">金額</th>
+                    <th className="py-3 px-4 w-36 text-center font-black">合計</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredQuotedGroups.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
+                        尚無符合條件之已報價案場
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredQuotedGroups.map((group) => {
+                      return group.projects.map((proj, pIdx) => (
+                        <tr
+                          key={proj.id}
+                          className="hover:bg-amber-50/40 transition-colors group text-slate-800"
+                        >
+                          {/* 合併儲存格：竣工年度 */}
+                          {pIdx === 0 && (
+                            <td
+                              rowSpan={group.projects.length}
+                              className="py-3 px-4 border-r border-slate-300 font-black text-center bg-slate-50/70 align-middle text-slate-700 text-base tabular-nums"
+                            >
+                              {group.year}
+                            </td>
+                          )}
+
+                          {/* 客戶名稱 */}
+                          <td className="py-3 px-4 border-r border-slate-200 font-semibold pl-6">
+                            {proj.customerName}
+                          </td>
+
+                          {/* 案場名稱 */}
+                          <td className="py-3 px-6 border-r border-slate-200 font-bold text-slate-900">
+                            <div className="flex items-center justify-between gap-2">
+                              <Link
+                                href={`/projects/${proj.id}/milestones`}
+                                className="hover:text-blue-600 hover:underline transition-colors"
+                              >
+                                {proj.projectName}
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => setActionMenuProject(proj)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-opacity print:hidden"
+                                title="調整階段"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 工程地區 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center font-medium text-slate-600">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+                              {proj.region}
+                            </span>
+                          </td>
+
+                          {/* 戶數 */}
+                          <td className="py-3 px-4 border-r border-slate-200 text-center tabular-nums font-semibold">
+                            {proj.unitCount}
+                          </td>
+
+                          {/* 金額 */}
+                          <td className="py-3 px-6 border-r border-slate-200 text-right font-bold tabular-nums font-mono pr-6">
+                            ${proj.amount ? proj.amount.toLocaleString("en-US") : "0"}
+                          </td>
+
+                          {/* 合計 (合併顯示各年度百萬小計) */}
+                          {pIdx === 0 && (
+                            <td
+                              rowSpan={group.projects.length}
+                              className="py-3 px-4 text-center font-black text-slate-900 bg-emerald-50/40 align-middle tabular-nums text-base"
+                            >
+                              {group.subtotalLabel}
+                            </td>
+                          )}
+                        </tr>
+                      ));
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 彈窗：目標設定 */}
