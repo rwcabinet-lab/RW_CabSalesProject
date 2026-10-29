@@ -44,7 +44,7 @@ import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
 
 const STAGE_FILTER_OPTIONS = [
   { value: "", label: "全部階段" },
-  { value: "ACTIVE", label: "進行中案件 (排除請款/流標)" },
+  { value: "ACTIVE", label: "進行中案件" },
   { value: "DEVELOP", label: "第一階段：案件開發" },
   { value: "REQUIREMENT", label: "第二階段：現況及需求確認" },
   { value: "PROPOSAL", label: "第三階段：設計提案/報價/簽約" },
@@ -53,8 +53,8 @@ const STAGE_FILTER_OPTIONS = [
   { value: "INSTALL", label: "第六階段：安裝及驗收" },
   { value: "CLOSURE", label: "第七階段：請款/售後" },
   { value: "BILLED", label: "請款" },
-  { value: "WRAP_UP", label: "收尾中" },
-  { value: "LOST", label: "已流標" },
+  { value: "WRAP_UP", label: "收尾" },
+  { value: "LOST", label: "流標" },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -62,7 +62,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "RED", label: "🔴 逾期卡關" },
   { value: "GREEN", label: "🟢 進度正常" },
   { value: "BILLED", label: "🏁 已請款" },
-  { value: "LOST", label: "⚪ 已流標" },
+  { value: "LOST", label: "⚪ 流標" },
 ];
 
 function checkIsClosed(p: ProjectWithMilestonesDTO): boolean {
@@ -496,7 +496,7 @@ export default function VisualViewsPage() {
             )}
             <span className="text-teal-700">🏁 已請款 {closedCount} 案</span>
             {lostCount > 0 && (
-              <span className="text-slate-500">⚪ 已流標 {lostCount} 案</span>
+              <span className="text-slate-500">⚪ 流標 {lostCount} 案</span>
             )}
             <span className="text-slate-300">|</span>
             <span>

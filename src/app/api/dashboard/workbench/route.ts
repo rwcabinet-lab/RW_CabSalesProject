@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
         if (monthFilter && dueMonth !== monthFilter) return null;
 
         const trafficLight = p.currentStage === "LOST"
-          ? { color: "GRAY" as const, label: "已流標", daysDiff: 0 }
+          ? { color: "GRAY" as const, label: "流標", daysDiff: 0 }
           : activeMilestone
           ? ScheduleEngine.getTrafficLight(activeMilestone)
           : { color: "GREEN" as const, label: "正常", daysDiff: 0 };

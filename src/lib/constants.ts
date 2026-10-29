@@ -82,7 +82,7 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "7-4": "追蹤二次回購",
   // 額外階段
   "X-1": "收尾",
-  "X-2": "已流標",
+  "X-2": "流標",
 };
 
 /** 需要審核的子進度清單 (繪圖/報價/提案/合約/施工圖) */
@@ -121,7 +121,7 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
   PROD_SHIP:   "第五階段：生產及派送",
   INSTALL:     "第六階段：安裝及驗收",
   CLOSURE:     "第七階段：請款/售後",
-  EXTRA:       "額外階段：收尾/已流標",
+  EXTRA:       "額外階段：收尾/流標",
   // 向下相容
   CONTACT:     "接洽期",
   DESIGN:      "設計確認期",
@@ -139,7 +139,7 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   CLOSED: "請款",
   BILLED: "請款",
   WRAP_UP: "收尾",
-  LOST: "已流標",
+  LOST: "流標",
   INQUIRY: "接洽期",
   MEASUREMENT: "接洽期",
   QUOTE: "接洽期",

@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
       CLOSED:      "請款",
       BILLED:      "請款",
       WRAP_UP:     "收尾",
-      LOST:        "已流標",
+      LOST:        "流標",
       DONE:        "完成",
       CONTACT:     "接洽期",
       DESIGN:      "設計確認期",
@@ -192,13 +192,13 @@ export async function GET(req: NextRequest) {
         customerType: p.customerType,
         defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
-        currentStageLabel: p.currentStage === "LOST" ? "已流標" : isClosed ? "請款" : stageLabels[p.currentStage] || p.currentStage,
+        currentStageLabel: p.currentStage === "LOST" ? "流標" : isClosed ? "請款" : stageLabels[p.currentStage] || p.currentStage,
         salesRepName: p.salesRepName || p.customerSalesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
         isClosed,
         trafficLight: p.currentStage === "LOST"
-          ? { color: "GRAY" as const, label: "已流標", daysDiff: 0 }
+          ? { color: "GRAY" as const, label: "流標", daysDiff: 0 }
           : trafficLight,
         expectedDate: p.expectedDate || "",
         unitCount: p.unitCount,

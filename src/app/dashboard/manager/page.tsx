@@ -385,7 +385,7 @@ export default function ManagerDashboardPage() {
       {/* 統一案件清單 (套用全域欄位設定) */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 所有案件狀態總覽</h2>
+          <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 篩選條件</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
             <div className="flex items-center gap-1.5">
               <span>時間區間：</span>
@@ -467,7 +467,7 @@ export default function ManagerDashboardPage() {
                 <option value="YELLOW">即將到期</option>
                 <option value="GREEN">正常</option>
                 <option value="GRAY">暫緩/未排定/已完成</option>
-                <option value="LOST">已流標</option>
+                <option value="LOST">流標</option>
               </select>
             </label>
             <label className="flex items-center gap-2">
@@ -481,7 +481,7 @@ export default function ManagerDashboardPage() {
             <label className="flex items-center gap-2">
               階段：
               <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="ACTIVE">進行中案件 (預設，排除已流標/請款)</option>
+                <option value="ACTIVE">進行中案件</option>
                 <option value="">全部階段</option>
                 <option value="DEVELOP">第一階段：案件開發</option>
                 <option value="REQUIREMENT">第二階段：現況及需求確認</option>
@@ -490,8 +490,8 @@ export default function ManagerDashboardPage() {
                 <option value="PROD_SHIP">第五階段：生產及派送</option>
                 <option value="INSTALL">第六階段：安裝及驗收</option>
                 <option value="CLOSURE">第七階段：請款/售後</option>
-                <option value="WRAP_UP">收尾中</option>
-                <option value="LOST">已流標</option>
+                <option value="WRAP_UP">收尾</option>
+                <option value="LOST">流標</option>
                 <option value="BILLED">請款</option>
               </select>
             </label>

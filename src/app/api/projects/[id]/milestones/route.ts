@@ -23,7 +23,7 @@ function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTraff
       ...m,
       status,
       trafficLight: isProjectLost
-        ? { color: "GRAY" as const, label: m.status === "COMPLETED" ? "已完成" : "已流標", daysDiff: 0 }
+        ? { color: "GRAY" as const, label: m.status === "COMPLETED" ? "已完成" : "流標", daysDiff: 0 }
         : ScheduleEngine.getTrafficLight(m),
     };
   });

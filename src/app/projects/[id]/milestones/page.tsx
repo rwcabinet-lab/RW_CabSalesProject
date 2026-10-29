@@ -809,12 +809,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 <h1 className="text-2xl font-black text-slate-900">{project.projectName}</h1>
                 {isProjectLost && (
                   <span className="flex items-center gap-1 bg-red-600 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm">
-                    <Lock className="w-3 h-3" /> 已流標（不可編輯）
+                    <Lock className="w-3 h-3" /> 流標（不可編輯）
                   </span>
                 )}
                 {project.currentStage === "WRAP_UP" && (
                   <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                    收尾中
+                    收尾
                   </span>
                 )}
               </div>
@@ -919,9 +919,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <h3 className="text-sm font-bold text-slate-800">收尾與流標階段操作</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {isProjectLost
-                      ? "此案件目前處於已流標狀態，所有里程碑進度與時程已停止計算。"
+                      ? "此案件目前處於流標狀態，所有里程碑進度與時程已停止計算。"
                       : project?.currentStage === "WRAP_UP"
-                      ? "此案件目前處於收尾中，可記錄後續收尾項目或轉為流標。"
+                      ? "此案件目前處於收尾，可記錄後續收尾項目或流標。"
                       : "案場若進入尾聲需要收尾追蹤，或未能成案需終止，可在此切換階段。"}
                   </p>
                 </div>
@@ -949,7 +949,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           className="rounded-lg border border-amber-300 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
                         >
                           <Archive className="w-3.5 h-3.5" />
-                          進入收尾階段
+                          收尾
                         </button>
                       )}
                       <button
@@ -961,7 +961,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         className="rounded-lg border border-red-300 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
                       >
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        轉為流標
+                        流標
                       </button>
                     </>
                   )}
@@ -1514,7 +1514,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <p className="text-red-700 bg-red-50 p-2.5 rounded-lg border border-red-200">
                 {specialAdvanceModal.stageCode === "X-2"
                   ? "轉為流標後，該案件的所有里程碑將進入唯讀鎖定狀態，不可再編輯或推進。"
-                  : "進入收尾階段後，案場狀態將標記為收尾中。"}
+                  : "進入收尾階段後，案場狀態將標記為收尾。"}
               </p>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">原因說明 *</label>

@@ -54,7 +54,7 @@ export const ScheduleEngine = {
     isProjectLost: boolean = false,
   ): TrafficLightStatus {
     if (isProjectLost || milestone.stageCode === "X-2") {
-      return { color: "GRAY", label: milestone.status === "COMPLETED" ? "已完成" : "已流標", daysDiff: 0 };
+      return { color: "GRAY", label: milestone.status === "COMPLETED" ? "已完成" : "流標", daysDiff: 0 };
     }
 
     if (milestone.status === "COMPLETED") {
