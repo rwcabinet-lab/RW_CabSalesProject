@@ -67,7 +67,7 @@ const STATUS_FILTER_OPTIONS = [
 
 function checkIsClosed(p: ProjectWithMilestonesDTO): boolean {
   if (p.currentStage === "BILLED" || p.currentStage === "CLOSED" || p.currentStage === "DONE") return true;
-  return Boolean(p.milestones?.some((m) => (m.stageCode === "7-2" || m.stageCode === "7-3") && m.status === "COMPLETED"));
+  return Boolean(p.milestones?.some((m) => m.stageCode === "7-2" && m.status === "COMPLETED"));
 }
 
 const EMPTY_PROJECTS: ProjectWithMilestonesDTO[] = [];

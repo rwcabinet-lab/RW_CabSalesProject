@@ -1166,7 +1166,8 @@ export const MilestoneService = {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.projectMilestone.findMany({
         where: { projectId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, stageOrder: true },
+        orderBy: { stageOrder: "asc" },
       });
       const existingIdSet = new Set(existing.map((m) => m.id));
 
@@ -1176,8 +1177,17 @@ export const MilestoneService = {
         }
       }
 
+      // 補足可能未在傳入清單中的其他項目（確保全量排序不遺漏）
+      const orderedSet = new Set(orderedMilestoneIds);
+      const fullOrderedIds = [...orderedMilestoneIds];
+      for (const m of existing) {
+        if (!orderedSet.has(m.id)) {
+          fullOrderedIds.push(m.id);
+        }
+      }
+
       await Promise.all(
-        orderedMilestoneIds.map((id, index) =>
+        fullOrderedIds.map((id, index) =>
           tx.projectMilestone.update({
             where: { id },
             data: { stageOrder: index + 1 },

@@ -103,9 +103,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const currentUserId = sessionUser?.id || "";
   const canManageMilestones = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(sessionUser?.role || "");
-  const canReorderMilestones =
-    sessionUser?.role === "ADMIN" ||
-    Boolean(sessionUser?.accessiblePages?.includes("milestone_reorder"));
+  const canReorderMilestones = canManageMilestones;
   const assignees = useMemo(() => {
     return users.filter((user: UserDTO) => isAssignableRole(user.role));
   }, [users]);
@@ -116,7 +114,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [loadError, setLoadError] = useState("");
   const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("DEVELOP");
   const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null);
-  const dragStartOrderRef = useRef<MilestoneWithLight[] | null>(null);
+  const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null);
   const [cancellingLost, setCancellingLost] = useState(false);
 
   // 行內編輯
@@ -394,35 +392,41 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     targetId: string,
   ) => {
     if (!canReorderMilestones) {
-      toast.warning("您沒有拖曳變更進度順序的權限");
+      toast.warning("您沒有變更進度順序的權限");
       return;
     }
     if (sourceId === targetId || isProjectLost) return;
-    const reorderedPhase = [...phaseGroups[phase]];
-    const sourceIndex = reorderedPhase.findIndex(({ id }) => id === sourceId);
-    const targetIndex = reorderedPhase.findIndex(({ id }) => id === targetId);
+    const currentPhaseList = phaseGroups[phase];
+    const sourceIndex = currentPhaseList.findIndex(({ id }) => id === sourceId);
+    const targetIndex = currentPhaseList.findIndex(({ id }) => id === targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
 
     // 方案 A 檢查：僅允許未開始 (PENDING) 項目相互調整順序
-    const sourceMilestone = reorderedPhase[sourceIndex];
-    const targetMilestone = reorderedPhase[targetIndex];
+    const sourceMilestone = currentPhaseList[sourceIndex];
+    const targetMilestone = currentPhaseList[targetIndex];
     if (sourceMilestone.status !== "PENDING" || targetMilestone.status !== "PENDING") {
       toast.warning("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
       return;
     }
 
+    const reorderedPhase = [...currentPhaseList];
     const [movedMilestone] = reorderedPhase.splice(sourceIndex, 1);
     reorderedPhase.splice(targetIndex, 0, movedMilestone);
 
-    const ordered = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-    const phaseIndexes = ordered.flatMap((milestone, index) =>
-      STAGE_CODE_TO_PHASE[milestone.stageCode] === phase ? [index] : [],
-    );
-    phaseIndexes.forEach((index, phaseIndex) => {
-      ordered[index] = reorderedPhase[phaseIndex];
+    // 保持其餘階段順序不變，僅重排此 phase 的項目
+    const sortedAll = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+    let pIdx = 0;
+    const newOrderedAll = sortedAll.map((m) => {
+      const mPhase = STAGE_CODE_TO_PHASE[m.stageCode] || m.phase;
+      if (mPhase === phase) {
+        return reorderedPhase[pIdx++];
+      }
+      return m;
     });
-    const orderedIds = ordered.map(({ id }) => id);
-    setMilestones(ordered.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
+
+    const orderedIds = newOrderedAll.map(({ id }) => id);
+    const previousMilestones = milestones;
+    setMilestones(newOrderedAll.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
 
     try {
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
@@ -432,6 +436,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "更新順序失敗");
+      toast.success("里程碑順序已更新");
       if (result.project && result.milestones) {
         applyMilestonesData(result);
       } else {
@@ -440,7 +445,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("更新順序失敗", error);
       toast.error(error instanceof Error ? error.message : "更新順序失敗");
-      await refreshMilestonesOnly();
+      setMilestones(previousMilestones);
     }
   };
 
@@ -477,76 +482,32 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const handleDragStartItem = (e: React.DragEvent, id: string) => {
     if (!canReorderMilestones) return;
-    dragStartOrderRef.current = [...milestones];
     setDraggedMilestoneId(id);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", id);
   };
 
-  const handleDragOverItem = (targetMilestone: MilestoneWithLight) => {
-    if (!draggedMilestoneId || draggedMilestoneId === targetMilestone.id) return;
-    if (targetMilestone.status !== "PENDING") return;
-
-    const currentPhaseList = phaseGroups[activePhase];
-    const sourceIndex = currentPhaseList.findIndex((item) => item.id === draggedMilestoneId);
-    const targetIndex = currentPhaseList.findIndex((item) => item.id === targetMilestone.id);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    if (currentPhaseList[sourceIndex].status !== "PENDING" || currentPhaseList[targetIndex].status !== "PENDING") return;
-
-    // 即時預覽排序結果
-    const reorderedPhase = [...currentPhaseList];
-    const [moved] = reorderedPhase.splice(sourceIndex, 1);
-    reorderedPhase.splice(targetIndex, 0, moved);
-
-    const ordered = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-    const phaseIndexes = ordered.flatMap((item, index) =>
-      STAGE_CODE_TO_PHASE[item.stageCode] === activePhase ? [index] : []
-    );
-    phaseIndexes.forEach((idx, pIdx) => {
-      ordered[idx] = reorderedPhase[pIdx];
-    });
-
-    setMilestones(ordered.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
-  };
-
-  const commitReorderIfChanged = async () => {
-    if (!dragStartOrderRef.current) return;
-    const initial = dragStartOrderRef.current;
-    dragStartOrderRef.current = null;
-    setDraggedMilestoneId(null);
-
-    const currentOrderedIds = milestones.map((m) => m.id);
-    const initialOrderedIds = initial.map((m) => m.id);
-    const hasChanged = currentOrderedIds.some((id, idx) => id !== initialOrderedIds[idx]);
-    if (!hasChanged) return;
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/milestones`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reorder", orderedMilestoneIds: currentOrderedIds }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "更新順序失敗");
-      if (result.project && result.milestones) {
-        applyMilestonesData(result);
-      } else {
-        await refreshMilestonesOnly();
-      }
-    } catch (error) {
-      console.error("更新順序失敗", error);
-      toast.error(error instanceof Error ? error.message : "更新順序失敗");
-      setMilestones(initial);
+  const handleDragOverItem = (e: React.DragEvent, targetId: string) => {
+    if (!draggedMilestoneId || draggedMilestoneId === targetId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverMilestoneId !== targetId) {
+      setDragOverMilestoneId(targetId);
     }
   };
 
-  const handleDropItem = async (e: React.DragEvent) => {
+  const handleDropItem = async (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    await commitReorderIfChanged();
+    const sourceId = draggedMilestoneId;
+    setDraggedMilestoneId(null);
+    setDragOverMilestoneId(null);
+    if (!sourceId || sourceId === targetId) return;
+    await handleReorderMilestones(activePhase, sourceId, targetId);
   };
 
   const handleDragEndItem = () => {
-    void commitReorderIfChanged();
+    setDraggedMilestoneId(null);
+    setDragOverMilestoneId(null);
   };
 
   // 提交審核處理
@@ -998,6 +959,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const records = recordsMap[m.id] || [];
               const canDrag = canReorderMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
               const isBeingDragged = draggedMilestoneId === m.id;
+              const isDragOver = dragOverMilestoneId === m.id && draggedMilestoneId !== m.id;
 
               return (
                 <div
@@ -1008,26 +970,35 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     handleDragStartItem(event, m.id);
                   }}
                   onDragOver={(event) => {
-                    if (draggedMilestoneId && m.status === "PENDING") {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "move";
-                      handleDragOverItem(m);
+                    if (canDrag && draggedMilestoneId && m.status === "PENDING") {
+                      handleDragOverItem(event, m.id);
                     }
                   }}
-                  onDrop={handleDropItem}
+                  onDragLeave={() => {
+                    if (dragOverMilestoneId === m.id) {
+                      setDragOverMilestoneId(null);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    if (canDrag) {
+                      void handleDropItem(event, m.id);
+                    }
+                  }}
                   onDragEnd={handleDragEndItem}
                   className={`rounded-xl border p-4 transition-all duration-150 ${
-                    isBeingDragged
-                      ? "opacity-60 ring-2 ring-blue-500 border-blue-400 bg-blue-50/40 scale-[0.99]"
-                      : isProjectLost
-                        ? "border-slate-200 bg-slate-50/80 opacity-75"
-                        : isOverdue
-                          ? "border-red-200 bg-red-50/30"
-                          : m.status === "IN_PROGRESS"
-                            ? "border-blue-200 bg-blue-50/20 shadow-xs"
-                            : m.status === "COMPLETED"
-                              ? "border-emerald-100 bg-emerald-50/10"
-                              : "border-slate-200 bg-white"
+                    isDragOver
+                      ? "ring-2 ring-blue-500 border-blue-400 bg-blue-50/50 scale-[1.01]"
+                      : isBeingDragged
+                        ? "opacity-40 scale-[0.98] border-dashed border-blue-400 bg-slate-50"
+                        : isProjectLost
+                          ? "border-slate-200 bg-slate-50/80 opacity-75"
+                          : isOverdue
+                            ? "border-red-200 bg-red-50/30"
+                            : m.status === "IN_PROGRESS"
+                              ? "border-blue-200 bg-blue-50/20 shadow-xs"
+                              : m.status === "COMPLETED"
+                                ? "border-emerald-100 bg-emerald-50/10"
+                                : "border-slate-200 bg-white"
                   }`}
                 >
                   {isEditing && !isProjectLost ? (

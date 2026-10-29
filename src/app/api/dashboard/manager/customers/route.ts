@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.projectMilestone.findMany({
         where: {
-          stageCode: { in: ["7-2", "7-3"] },
+          stageCode: "7-2",
           status: "COMPLETED",
         },
         select: { projectId: true },

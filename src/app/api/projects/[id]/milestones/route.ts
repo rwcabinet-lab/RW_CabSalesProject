@@ -131,9 +131,7 @@ export async function PUT(
     }
 
     if (action === "reorder") {
-      const userPages = await getRolePages(user.role);
-      const canReorder = user.role === "ADMIN" || userPages.includes("milestone_reorder");
-      if (!canReorder) {
+      if (!isManager) {
         return NextResponse.json({ error: "您無權變更里程碑進度順序" }, { status: 403 });
       }
 
@@ -141,16 +139,21 @@ export async function PUT(
         return NextResponse.json({ error: "缺少 orderedMilestoneIds 排序資料" }, { status: 400 });
       }
 
-      const updatedMilestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
-      const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
-      const updatedProject = { ...project, isDelayed };
+      try {
+        const updatedMilestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
+        const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
+        const updatedProject = { ...project, isDelayed };
 
-      return NextResponse.json({
-        success: true,
-        project: updatedProject,
-        milestones: attachTrafficLights(evaluatedMilestones),
-        message: "里程碑進度順序已更新",
-      });
+        return NextResponse.json({
+          success: true,
+          project: updatedProject,
+          milestones: attachTrafficLights(evaluatedMilestones),
+          message: "里程碑進度順序已更新",
+        });
+      } catch (reorderError) {
+        console.error("更新里程碑順序錯誤:", reorderError);
+        return handleApiError(reorderError, "變更里程碑順序失敗");
+      }
     }
 
     const canReviewAudit = isManager || user.id === project.salesRepId;

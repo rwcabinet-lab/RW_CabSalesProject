@@ -37,7 +37,7 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
   // ⑥ 安裝及驗收
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
-  // ⑦ 結案/售後
+  // ⑦ 請款/售後
   "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE", "7-4": "CLOSURE",
   // 額外階段
   "X-1": "WRAP_UP", "X-2": "LOST",
@@ -90,14 +90,14 @@ export const ScheduleEngine = {
   },
 
   /**
-   * 判定專案是否已請款完成 (BILLED / CLOSED 階段，或 7-2 / 7-3 里程碑已完成)
+   * 判定專案是否已請款完成 (BILLED / CLOSED 階段，或 7-2 請款里程碑已完成)
    */
   isProjectClosed(
     project: { currentStage: string },
     milestones: ProjectMilestoneItem[] = [],
   ): boolean {
     if (project.currentStage === "BILLED" || project.currentStage === "CLOSED" || project.currentStage === "DONE") return true;
-    return milestones.some((m) => (m.stageCode === "7-2" || m.stageCode === "7-3") && m.status === "COMPLETED");
+    return milestones.some((m) => m.stageCode === "7-2" && m.status === "COMPLETED");
   },
 
   /**
