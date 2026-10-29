@@ -44,6 +44,9 @@ export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
 
   // 過濾條件：預設排除已流標與已立帳 (進行中)
+  const [dateMode, setDateMode] = useState<"DATE" | "MONTH">("DATE");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
   const [stageFilter, setStageFilter] = useState("ACTIVE");
@@ -57,7 +60,12 @@ export default function ManagerDashboardPage() {
     data: dashboardData,
     isLoading: dashboardLoading,
     error: dashboardError,
-  } = useManagerDashboardQuery(startMonth, endMonth);
+  } = useManagerDashboardQuery(
+    dateMode === "MONTH" ? startMonth : undefined,
+    dateMode === "MONTH" ? endMonth : undefined,
+    dateMode === "DATE" ? startDate : undefined,
+    dateMode === "DATE" ? endDate : undefined,
+  );
   const { data: users = [] } = useUsersQuery();
   const { data: sessionUser } = useSessionQuery();
   const { data: columnsData = DEFAULT_PROJECT_COLUMNS } = useColumnConfigQuery();
@@ -98,7 +106,12 @@ export default function ManagerDashboardPage() {
         return;
       }
       queryClient.setQueryData<ManagerDashboardDTO>(
-        QUERY_KEYS.managerDashboard(startMonth, endMonth),
+        QUERY_KEYS.managerDashboard(
+          dateMode === "MONTH" ? startMonth : undefined,
+          dateMode === "MONTH" ? endMonth : undefined,
+          dateMode === "DATE" ? startDate : undefined,
+          dateMode === "DATE" ? endDate : undefined,
+        ),
         (current) =>
           current
             ? {
@@ -127,7 +140,12 @@ export default function ManagerDashboardPage() {
       const result = await res.json() as ApiResponse<{ success: boolean }>;
       if (!res.ok) throw new Error(result.error || "刪除案件失敗");
       queryClient.setQueryData<ManagerDashboardDTO>(
-        QUERY_KEYS.managerDashboard(startMonth, endMonth),
+        QUERY_KEYS.managerDashboard(
+          dateMode === "MONTH" ? startMonth : undefined,
+          dateMode === "MONTH" ? endMonth : undefined,
+          dateMode === "DATE" ? startDate : undefined,
+          dateMode === "DATE" ? endDate : undefined,
+        ),
         (current) =>
           current
             ? {
@@ -151,7 +169,12 @@ export default function ManagerDashboardPage() {
 
   const handleTaskAssignedSuccess = (task: TaskDTO, isEditingTask: boolean) => {
     queryClient.setQueryData<ManagerDashboardDTO>(
-      QUERY_KEYS.managerDashboard(startMonth, endMonth),
+      QUERY_KEYS.managerDashboard(
+        dateMode === "MONTH" ? startMonth : undefined,
+        dateMode === "MONTH" ? endMonth : undefined,
+        dateMode === "DATE" ? startDate : undefined,
+        dateMode === "DATE" ? endDate : undefined,
+      ),
       (current) =>
         current
           ? {
@@ -179,16 +202,29 @@ export default function ManagerDashboardPage() {
       } else if (stageFilter && p.currentStage !== stageFilter) {
         return false;
       }
-      if (businessFilter && p.salesRepName !== businessFilter) return false;
+      if (businessFilter === "__UNASSIGNED__") {
+        if (p.salesRepName && p.salesRepName !== "未指派") return false;
+      } else if (businessFilter && p.salesRepName !== businessFilter) {
+        return false;
+      }
       const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
       if (statusFilter && projectStatus !== statusFilter) return false;
+
+      const projectDate = (p.expectedDate || "").slice(0, 10);
       const projectMonth = (p.expectedDate || "").slice(0, 7);
-      if (startMonth && projectMonth && projectMonth < startMonth) return false;
-      if (endMonth && projectMonth && projectMonth > endMonth) return false;
-      if ((startMonth || endMonth) && !projectMonth) return false;
+
+      if (dateMode === "DATE") {
+        if (startDate && projectDate && projectDate < startDate) return false;
+        if (endDate && projectDate && projectDate > endDate) return false;
+        if ((startDate || endDate) && !projectDate) return false;
+      } else {
+        if (startMonth && projectMonth && projectMonth < startMonth) return false;
+        if (endMonth && projectMonth && projectMonth > endMonth) return false;
+        if ((startMonth || endMonth) && !projectMonth) return false;
+      }
       return true;
     });
-  }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, startMonth, endMonth]);
+  }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, dateMode, startDate, endDate, startMonth, endMonth]);
 
   // 依完工日與狀態排序
   const sortedOverview = useMemo(() => {
@@ -352,12 +388,75 @@ export default function ManagerDashboardPage() {
           <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 所有案件狀態總覽</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
             <div className="flex items-center gap-1.5">
-              <span>月份：</span>
-              <input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
-              <span className="text-slate-400">至</span>
-              <input type="month" value={endMonth} onChange={(e) => setEndMonth(e.target.value)} className="border rounded px-2 py-1 text-xs" />
-              {(startMonth || endMonth) && (
-                <button type="button" onClick={() => { setStartMonth(""); setEndMonth(""); }} className="text-xs text-slate-400 hover:text-slate-600">✕ 清除</button>
+              <span>時間區間：</span>
+              <select
+                value={dateMode}
+                onChange={(e) => {
+                  setDateMode(e.target.value as "DATE" | "MONTH");
+                  setStartDate("");
+                  setEndDate("");
+                  setStartMonth("");
+                  setEndMonth("");
+                }}
+                className="border rounded px-1.5 py-0.5 text-xs bg-white text-slate-700 font-medium"
+              >
+                <option value="DATE">日期</option>
+                <option value="MONTH">月份</option>
+              </select>
+              {dateMode === "DATE" ? (
+                <>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs"
+                    title="起始日期"
+                  />
+                  <span className="text-slate-400">至</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs"
+                    title="結束日期"
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      type="button"
+                      onClick={() => { setStartDate(""); setEndDate(""); }}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      ✕ 清除
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <input
+                    type="month"
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs"
+                    title="起始月份"
+                  />
+                  <span className="text-slate-400">至</span>
+                  <input
+                    type="month"
+                    value={endMonth}
+                    onChange={(e) => setEndMonth(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs"
+                    title="結束月份"
+                  />
+                  {(startMonth || endMonth) && (
+                    <button
+                      type="button"
+                      onClick={() => { setStartMonth(""); setEndMonth(""); }}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      ✕ 清除
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <label className="flex items-center gap-2">
@@ -375,6 +474,7 @@ export default function ManagerDashboardPage() {
               業務：
               <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1">
                 <option value="">全部業務</option>
+                <option value="__UNASSIGNED__">未指定</option>
                 {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>

@@ -33,8 +33,8 @@ export const QUERY_KEYS = {
     ["projects", projectId, "tasks", isCompleted ? "completed" : "active"] as const,
   columnConfig: ["projects", "columns-config"] as const,
   workbench: ["dashboard", "workbench"] as const,
-  managerDashboard: (startMonth?: string, endMonth?: string) =>
-    ["dashboard", "manager", startMonth || "all", endMonth || "all"] as const,
+  managerDashboard: (startMonth?: string, endMonth?: string, startDate?: string, endDate?: string) =>
+    ["dashboard", "manager", startMonth || "all", endMonth || "all", startDate || "all", endDate || "all"] as const,
   managerCustomerStats: ["dashboard", "manager", "customers"] as const,
   viewsData: ["views", "data"] as const,
 };
@@ -128,11 +128,18 @@ export function useWorkbenchQuery() {
 /**
  * 主管監控室營運儀表板資料（依月份區間篩選，快取 30 秒）
  */
-export function useManagerDashboardQuery(startMonth?: string, endMonth?: string) {
+export function useManagerDashboardQuery(
+  startMonth?: string,
+  endMonth?: string,
+  startDate?: string,
+  endDate?: string,
+) {
   return useQuery({
-    queryKey: QUERY_KEYS.managerDashboard(startMonth, endMonth),
+    queryKey: QUERY_KEYS.managerDashboard(startMonth, endMonth, startDate, endDate),
     queryFn: async (): Promise<ManagerDashboardDTO> => {
       const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
       if (startMonth) params.set("startMonth", startMonth);
       if (endMonth) params.set("endMonth", endMonth);
       const queryStr = params.toString();

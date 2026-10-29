@@ -850,9 +850,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">客戶類型：</span><span className="font-semibold text-slate-700">{CUSTOMER_TYPE_LABELS[project.customerType] || project.customerType}</span></div>
             <div><span className="text-slate-400">客戶折數：</span><span className="font-semibold text-slate-700">{project.defaultDiscount === 1 ? "牌價" : `${(project.defaultDiscount * 10).toFixed(1)} 折`}</span></div>
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
-            <div><span className="text-slate-400">業務助理：</span><span className="font-semibold text-slate-700">{project.salesAssistantName || "未指派"}</span></div>
-            <div><span className="text-slate-400">案件階段：</span><span className="font-bold text-blue-700">{PROJECT_STAGE_LABELS[project.currentStage] || project.currentStage}</span></div>
-            <div><span className="text-slate-400">時程狀態：</span><span className={`font-semibold ${isProjectLost ? "text-slate-600" : project.isDelayed ? "text-red-700" : "text-emerald-700"}`}>{isProjectLost ? "已流標" : project.isDelayed ? "逾期" : "正常"}</span></div>
             <div><span className="text-slate-400">預計完工日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
             <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatTenThousands(project.quoteAmount) : project.totalAmount != null ? formatTenThousands(project.totalAmount) : "未填"}</span></div>
@@ -1053,7 +1050,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             onChange={(e) => setEditForm({ ...editForm, assignedToId: e.target.value })}
                             className="w-full border rounded p-1.5"
                           >
-                            <option value="">選擇人員</option>
+                            <option value="">未指定</option>
                             {assignees.map((u) => (
                               <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                             ))}
@@ -1287,7 +1284,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                     onChange={(e) => setNewRecordForm({ ...newRecordForm, assignedToId: e.target.value })}
                                     className="w-full border rounded p-1 bg-white"
                                   >
-                                    <option value="">選擇人員</option>
+                                    <option value="">未指定</option>
                                     {assignees.map((u) => (
                                       <option key={u.id} value={u.id}>
                                         {u.name}
@@ -1572,14 +1569,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">主責業務 *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">主責業務</label>
                   <select
-                    required
                     value={projectEditForm.salesRepId}
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, salesRepId: e.target.value })}
                     className="w-full border rounded p-2 text-xs bg-white"
                   >
-                    <option value="">選擇業務</option>
+                    <option value="">未指定</option>
                     {assignees.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}

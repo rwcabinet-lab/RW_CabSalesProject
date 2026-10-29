@@ -88,6 +88,9 @@ export default function VisualViewsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [dateMode, setDateMode] = useState<"DATE" | "MONTH">("DATE");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
 
@@ -140,18 +143,28 @@ export default function VisualViewsPage() {
       }
 
       // 3. 負責業務
-      if (salesFilter && p.salesRepName !== salesFilter) return false;
+      if (salesFilter === "__UNASSIGNED__") {
+        if (p.salesRepName && p.salesRepName !== "未指派") return false;
+      } else if (salesFilter && p.salesRepName !== salesFilter) {
+        return false;
+      }
 
       // 4. 客戶類型
       if (typeFilter && p.customerType !== typeFilter) return false;
 
-      // 5. 完工月份區間
-      if (startMonth || endMonth) {
-        const targetDate = p.expectedDate || p.milestones?.find((m) => m.plannedDueDate)?.plannedDueDate || "";
-        const month = targetDate.slice(0, 7);
-        if (!month) return false;
-        if (startMonth && month < startMonth) return false;
-        if (endMonth && month > endMonth) return false;
+      // 5. 時間區間 (依日期或依月份)
+      const targetDate = p.expectedDate || p.milestones?.find((m) => m.plannedDueDate)?.plannedDueDate || "";
+      const datePart = targetDate.slice(0, 10);
+      const monthPart = targetDate.slice(0, 7);
+
+      if (dateMode === "DATE") {
+        if (startDate && datePart && datePart < startDate) return false;
+        if (endDate && datePart && datePart > endDate) return false;
+        if ((startDate || endDate) && !datePart) return false;
+      } else {
+        if (startMonth && monthPart && monthPart < startMonth) return false;
+        if (endMonth && monthPart && monthPart > endMonth) return false;
+        if ((startMonth || endMonth) && !monthPart) return false;
       }
 
       // 6. 關鍵字搜尋 (案場名稱 / 業主名稱 / 案場地址 / 負責業務)
@@ -166,7 +179,7 @@ export default function VisualViewsPage() {
 
       return true;
     });
-  }, [projects, stageFilter, statusFilter, salesFilter, typeFilter, startMonth, endMonth, searchQuery]);
+  }, [projects, stageFilter, statusFilter, salesFilter, typeFilter, dateMode, startDate, endDate, startMonth, endMonth, searchQuery]);
 
   // 過濾任務列表 (與過濾後的案場連動)
   const filteredProjectIds = useMemo(() => new Set(filteredProjects.map((p) => p.id)), [filteredProjects]);
@@ -192,6 +205,8 @@ export default function VisualViewsPage() {
     typeFilter,
     stageFilter,
     statusFilter,
+    startDate,
+    endDate,
     startMonth,
     endMonth,
   ].filter(Boolean).length;
@@ -202,6 +217,8 @@ export default function VisualViewsPage() {
     setTypeFilter("");
     setStageFilter("");
     setStatusFilter("");
+    setStartDate("");
+    setEndDate("");
     setStartMonth("");
     setEndMonth("");
   };
@@ -309,6 +326,7 @@ export default function VisualViewsPage() {
                 className="w-full bg-transparent text-xs text-slate-700 font-medium focus:outline-none"
               >
                 <option value="">全部業務</option>
+                <option value="__UNASSIGNED__">未指定</option>
                 {salesOptions.map((rep) => (
                   <option key={rep} value={rep}>
                     {rep}
@@ -367,39 +385,87 @@ export default function VisualViewsPage() {
             </div>
           </div>
 
-          {/* 第二列：完工月份區間與重設篩選 */}
+          {/* 第二列：時間區間與重設篩選 */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
                 <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                <span>完工月份：</span>
+                <span>時間區間：</span>
               </div>
-              <input
-                type="month"
-                value={startMonth}
-                onChange={(e) => setStartMonth(e.target.value)}
-                className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
-                title="起始月份"
-              />
-              <span className="text-slate-400">至</span>
-              <input
-                type="month"
-                value={endMonth}
-                onChange={(e) => setEndMonth(e.target.value)}
-                className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
-                title="結束月份"
-              />
-              {(startMonth || endMonth) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartMonth("");
-                    setEndMonth("");
-                  }}
-                  className="text-xs text-slate-400 hover:text-slate-600 underline ml-1"
-                >
-                  清除月份
-                </button>
+              <select
+                value={dateMode}
+                onChange={(e) => {
+                  setDateMode(e.target.value as "DATE" | "MONTH");
+                  setStartDate("");
+                  setEndDate("");
+                  setStartMonth("");
+                  setEndMonth("");
+                }}
+                className="border border-slate-200 rounded-lg px-1.5 py-0.5 text-xs bg-slate-50/50 focus:bg-white text-slate-700 font-medium"
+              >
+                <option value="DATE">日期</option>
+                <option value="MONTH">月份</option>
+              </select>
+              {dateMode === "DATE" ? (
+                <>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
+                    title="起始日期"
+                  />
+                  <span className="text-slate-400">至</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
+                    title="結束日期"
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartDate("");
+                        setEndDate("");
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-600 underline ml-1"
+                    >
+                      清除區間
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <input
+                    type="month"
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
+                    title="起始月份"
+                  />
+                  <span className="text-slate-400">至</span>
+                  <input
+                    type="month"
+                    value={endMonth}
+                    onChange={(e) => setEndMonth(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-slate-50/50 focus:bg-white"
+                    title="結束月份"
+                  />
+                  {(startMonth || endMonth) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartMonth("");
+                        setEndMonth("");
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-600 underline ml-1"
+                    >
+                      清除區間
+                    </button>
+                  )}
+                </>
               )}
             </div>
 

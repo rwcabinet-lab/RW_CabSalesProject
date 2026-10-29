@@ -111,14 +111,13 @@ export function WorkbenchAddProjectPanel({
           </select>
         </label>
         <label>
-          主責業務 *
+          主責業務
           <select
-            required
             value={newProjectData.salesRepId || ""}
             onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
             className="w-full border rounded p-1.5 mt-1 bg-white"
           >
-            <option value="">選擇業務</option>
+            <option value="">未指定</option>
             {selectableUsers.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
@@ -339,14 +338,13 @@ export function WorkbenchEditProjectRow({
               </select>
             </label>
             <label className="font-semibold text-slate-700">
-              主責業務 *
+              主責業務
               <select
-                required
                 value={newProjectData.salesRepId || ""}
                 onChange={(e) => setNewProjectData({ salesRepId: e.target.value })}
                 className="w-full border rounded p-1.5 mt-1 bg-white"
               >
-                <option value="">選擇業務</option>
+                <option value="">未指定</option>
                 {selectableUsers.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name}

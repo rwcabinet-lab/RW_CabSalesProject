@@ -85,7 +85,7 @@ export function ManagerAssignTaskModal({
               onChange={(e) => setUserId(e.target.value)}
               className="w-full border p-2 mt-1 rounded bg-white"
             >
-              <option value="">選擇人員</option>
+              <option value="">未指定</option>
               {assignableUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name} (

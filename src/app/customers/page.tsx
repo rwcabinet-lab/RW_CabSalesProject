@@ -404,7 +404,7 @@ export default function CustomersPage() {
                   onChange={(e) => setFormData({ ...formData, salesRepId: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                 >
-                  <option value="">請選擇負責業務</option>
+                  <option value="">未指定</option>
                   {salesReps.map((salesRep) => (
                     <option key={salesRep.id} value={salesRep.id}>
                       {salesRep.name}（{salesRep.role === "SALES_MANAGER" ? "業務主管" : "業務專員"}）

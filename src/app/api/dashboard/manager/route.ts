@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     const monthFilter = searchParams.get("month");
     const startMonth = searchParams.get("startMonth");
     const endMonth = searchParams.get("endMonth");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
     const [projects, allAssignedTasks, milestonesByProject] = await Promise.all([
       DataService.getProjects(),
@@ -142,8 +144,8 @@ export async function GET(req: NextRequest) {
       PRODUCTION:  "生產施工期",
     };
 
-    // 依月份區間過濾（使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
-    const filteredProjects = (startMonth || endMonth || monthFilter)
+    // 依時間區間過濾（支援日期區間與月份區間，使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
+    const filteredProjects = (startDate || endDate || startMonth || endMonth || monthFilter)
       ? projects.filter((p) => {
           const milestones = milestonesByProject[p.id] || [];
           const activeMilestone = p.currentStage === "LOST"
@@ -151,7 +153,13 @@ export async function GET(req: NextRequest) {
             : milestones.find((m) => m.status === "IN_PROGRESS") ||
               milestones.find((m) => m.status === "OVERDUE");
           const dateToCheck = activeMilestone?.plannedDueDate || p.expectedDate || "";
-          const targetMonth = dateToCheck.slice(0, 7);
+          const targetDate = dateToCheck ? dateToCheck.slice(0, 10) : "";
+          const targetMonth = dateToCheck ? dateToCheck.slice(0, 7) : "";
+
+          if (startDate && targetDate && targetDate < startDate) return false;
+          if (endDate && targetDate && targetDate > endDate) return false;
+          if ((startDate || endDate) && !targetDate) return false;
+
           if (startMonth && targetMonth && targetMonth < startMonth) return false;
           if (endMonth && targetMonth && targetMonth > endMonth) return false;
           if ((startMonth || endMonth) && !targetMonth) return false;
