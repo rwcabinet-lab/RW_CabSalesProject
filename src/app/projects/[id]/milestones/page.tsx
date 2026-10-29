@@ -229,19 +229,24 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const applyMilestonesData = (data: { project?: ProjectDTO; milestones?: MilestoneWithLight[] }) => {
+  const applyMilestonesData = (
+    data: { project?: ProjectDTO; milestones?: MilestoneWithLight[] },
+    preserveActivePhase = false
+  ) => {
     if (data.project) {
       setProject(data.project);
-      const msList = Array.isArray(data.milestones) ? data.milestones : [];
-      const activeMs = msList.find((m) => m.status === "IN_PROGRESS" || m.status === "OVERDUE");
-      if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
-        setActivePhase("EXTRA");
-      } else if (activeMs && STAGE_CODE_TO_PHASE[activeMs.stageCode]) {
-        setActivePhase(STAGE_CODE_TO_PHASE[activeMs.stageCode]);
-      } else if (PHASE_ORDER.includes(data.project.currentStage as MilestonePhaseDTO)) {
-        setActivePhase(data.project.currentStage as MilestonePhaseDTO);
-      } else {
-        setActivePhase("DEVELOP");
+      if (!preserveActivePhase) {
+        const msList = Array.isArray(data.milestones) ? data.milestones : [];
+        const activeMs = msList.find((m) => m.status === "IN_PROGRESS" || m.status === "OVERDUE");
+        if (data.project.currentStage === "WRAP_UP" || data.project.currentStage === "LOST") {
+          setActivePhase("EXTRA");
+        } else if (activeMs && STAGE_CODE_TO_PHASE[activeMs.stageCode]) {
+          setActivePhase(STAGE_CODE_TO_PHASE[activeMs.stageCode]);
+        } else if (PHASE_ORDER.includes(data.project.currentStage as MilestonePhaseDTO)) {
+          setActivePhase(data.project.currentStage as MilestonePhaseDTO);
+        } else {
+          setActivePhase("DEVELOP");
+        }
       }
     }
     setMilestones(Array.isArray(data.milestones) ? data.milestones : []);
@@ -417,14 +422,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     const sortedAll = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
     let pIdx = 0;
     const newOrderedAll = sortedAll.map((m) => {
-      const mPhase = STAGE_CODE_TO_PHASE[m.stageCode] || m.phase;
+      const mPhase = STAGE_CODE_TO_PHASE[m.stageCode] || (m.phase as MilestonePhaseDTO) || "DEVELOP";
       if (mPhase === phase) {
-        return reorderedPhase[pIdx++];
+        return reorderedPhase[pIdx++] ?? m;
       }
       return m;
     });
 
-    const orderedIds = newOrderedAll.map(({ id }) => id);
+    const orderedIds = newOrderedAll.filter(Boolean).map(({ id }) => id);
     const previousMilestones = milestones;
     setMilestones(newOrderedAll.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
 
@@ -438,7 +443,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       if (!response.ok) throw new Error(result.error || "更新順序失敗");
       toast.success("里程碑順序已更新");
       if (result.project && result.milestones) {
-        applyMilestonesData(result);
+        applyMilestonesData(result, true);
       } else {
         await refreshMilestonesOnly();
       }
@@ -498,7 +503,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const handleDropItem = async (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    const sourceId = draggedMilestoneId;
+    const sourceId = draggedMilestoneId || e.dataTransfer.getData("text/plain");
     setDraggedMilestoneId(null);
     setDragOverMilestoneId(null);
     if (!sourceId || sourceId === targetId) return;
@@ -720,7 +725,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   };
 
   milestones.forEach((m) => {
-    const phase = STAGE_CODE_TO_PHASE[m.stageCode] || "DEVELOP";
+    const phase = STAGE_CODE_TO_PHASE[m.stageCode] || (m.phase as MilestonePhaseDTO) || "DEVELOP";
     if (phaseGroups[phase]) phaseGroups[phase].push(m);
   });
 

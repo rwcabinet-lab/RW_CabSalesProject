@@ -1163,67 +1163,78 @@ export const MilestoneService = {
   },
 
   async reorderMilestones(projectId: string, orderedMilestoneIds: string[]): Promise<ProjectMilestoneItem[]> {
-    return prisma.$transaction(async (tx) => {
-      const existing = await tx.projectMilestone.findMany({
-        where: { projectId },
-        select: { id: true, status: true, stageOrder: true },
-        orderBy: { stageOrder: "asc" },
-      });
-      const existingIdSet = new Set(existing.map((m) => m.id));
+    return prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.projectMilestone.findMany({
+          where: { projectId },
+          select: { id: true, status: true, stageOrder: true },
+          orderBy: { stageOrder: "asc" },
+        });
+        const existingIdSet = new Set(existing.map((m) => m.id));
 
-      for (const id of orderedMilestoneIds) {
-        if (!existingIdSet.has(id)) {
-          throw new BadRequestError(`里程碑項目不存在或不屬於此案件: ${id}`);
+        for (const id of orderedMilestoneIds) {
+          if (!existingIdSet.has(id)) {
+            throw new BadRequestError(`里程碑項目不存在或不屬於此案件: ${id}`);
+          }
         }
-      }
 
-      // 補足可能未在傳入清單中的其他項目（確保全量排序不遺漏）
-      const orderedSet = new Set(orderedMilestoneIds);
-      const fullOrderedIds = [...orderedMilestoneIds];
-      for (const m of existing) {
-        if (!orderedSet.has(m.id)) {
-          fullOrderedIds.push(m.id);
+        // 補足可能未在傳入清單中的其他項目（確保全量排序不遺漏）
+        const orderedSet = new Set(orderedMilestoneIds);
+        const fullOrderedIds = [...orderedMilestoneIds];
+        for (const m of existing) {
+          if (!orderedSet.has(m.id)) {
+            fullOrderedIds.push(m.id);
+          }
         }
-      }
 
-      await Promise.all(
-        fullOrderedIds.map((id, index) =>
-          tx.projectMilestone.update({
-            where: { id },
-            data: { stageOrder: index + 1 },
-          })
-        )
-      );
+        // 僅針對順序有實際變動的項目進行更新，大幅減少遠端資料庫負擔與避免交易超時 (Timeout)
+        const existingMap = new Map(existing.map((m) => [m.id, m.stageOrder]));
+        const toUpdate = fullOrderedIds
+          .map((id, index) => ({ id, targetOrder: index + 1 }))
+          .filter(({ id, targetOrder }) => existingMap.get(id) !== targetOrder);
 
-      const updated = await tx.projectMilestone.findMany({
-        where: { projectId },
-        include: milestoneInclude,
-        orderBy: { stageOrder: "asc" },
-      });
+        if (toUpdate.length > 0) {
+          await Promise.all(
+            toUpdate.map(({ id, targetOrder }) =>
+              tx.projectMilestone.update({
+                where: { id },
+                data: { stageOrder: targetOrder },
+              })
+            )
+          );
+        }
 
-      return updated.map((m) => {
-        const isAuditSubmitted = Boolean(
-          m.salesTask?.subject.startsWith("【需審核】") &&
-          !m.salesTask?.isCompleted &&
-          m.status !== "COMPLETED"
-        );
-        return {
-          id: m.id,
-          projectId: m.projectId,
-          stageCode: m.stageCode as MilestoneStageCode,
-          phase: m.phase as MilestonePhaseDTO,
-          stageOrder: m.stageOrder,
-          plannedDueDate: dateOnlyValue(m.plannedDueDate),
-          actualDueDate: dateOnlyValue(m.actualDueDate),
-          status: m.status,
-          priority: m.priority,
-          assignedToId: m.assignedToId || null,
-          assignedToName: m.assignedTo?.name || null,
-          attachments: m.attachments,
-          notes: m.notes,
-          auditSubmitted: isAuditSubmitted,
-        };
-      });
-    });
+        const updated = await tx.projectMilestone.findMany({
+          where: { projectId },
+          include: milestoneInclude,
+          orderBy: { stageOrder: "asc" },
+        });
+
+        return updated.map((m) => {
+          const isAuditSubmitted = Boolean(
+            m.salesTask?.subject.startsWith("【需審核】") &&
+            !m.salesTask?.isCompleted &&
+            m.status !== "COMPLETED"
+          );
+          return {
+            id: m.id,
+            projectId: m.projectId,
+            stageCode: m.stageCode as MilestoneStageCode,
+            phase: m.phase as MilestonePhaseDTO,
+            stageOrder: m.stageOrder,
+            plannedDueDate: dateOnlyValue(m.plannedDueDate),
+            actualDueDate: dateOnlyValue(m.actualDueDate),
+            status: m.status,
+            priority: m.priority,
+            assignedToId: m.assignedToId || null,
+            assignedToName: m.assignedTo?.name || null,
+            attachments: m.attachments,
+            notes: m.notes,
+            auditSubmitted: isAuditSubmitted,
+          };
+        });
+      },
+      { maxWait: 10000, timeout: 20000 }
+    );
   },
 };
