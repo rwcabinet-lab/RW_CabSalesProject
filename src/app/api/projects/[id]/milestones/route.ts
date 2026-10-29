@@ -119,6 +119,8 @@ export async function PUT(
     }
     const { project, milestones: initialMilestones } = combined;
     const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    const userPages = await getRolePages(user.role);
+    const canManageOrReorder = isManager || userPages.includes("milestone_reorder");
 
     if (action === "cancelLost") {
       if (!isManager) {
@@ -144,7 +146,7 @@ export async function PUT(
     }
 
     if (action === "reorder") {
-      if (!isManager) {
+      if (!canManageOrReorder) {
         return NextResponse.json({ error: "您無權變更里程碑進度順序" }, { status: 403 });
       }
 
@@ -339,8 +341,8 @@ export async function PUT(
     }
 
     if (action !== "advance") {
-      if (!isManager) {
-        return NextResponse.json({ error: "僅理級主管或業務主管可編輯里程碑" }, { status: 403 });
+      if (!canManageOrReorder) {
+        return NextResponse.json({ error: "您無權編輯里程碑時程與人員" }, { status: 403 });
       }
       if (
         !updates ||

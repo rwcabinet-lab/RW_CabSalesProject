@@ -103,7 +103,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
   const currentUserId = sessionUser?.id || "";
   const canManageMilestones = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(sessionUser?.role || "");
-  const canReorderMilestones = canManageMilestones;
+  const hasMilestoneReorderPermission =
+    sessionUser?.role === "ADMIN" ||
+    canManageMilestones ||
+    Boolean(sessionUser?.accessiblePages?.includes("milestone_reorder"));
+  const canReorderMilestones = hasMilestoneReorderPermission;
+  const canEditMilestones = hasMilestoneReorderPermission;
   const assignees = useMemo(() => {
     return users.filter((user: UserDTO) => isAssignableRole(user.role));
   }, [users]);
@@ -1200,7 +1205,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           </button>
 
                           {/* [編輯時程與負責人] */}
-                          {canManageMilestones && !isProjectLost && (
+                          {canEditMilestones && !isProjectLost && m.status !== "COMPLETED" && (
                             <button
                               type="button"
                               onClick={() => {
