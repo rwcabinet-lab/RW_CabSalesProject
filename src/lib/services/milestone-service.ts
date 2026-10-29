@@ -1162,12 +1162,16 @@ export const MilestoneService = {
     return prisma.milestoneRecord.delete({ where: { id: recordId } });
   },
 
-  async reorderMilestones(projectId: string, orderedMilestoneIds: string[]): Promise<ProjectMilestoneItem[]> {
+  async reorderMilestones(
+    projectId: string,
+    orderedMilestoneIds: string[],
+    milestoneDates?: Record<string, string | null>,
+  ): Promise<ProjectMilestoneItem[]> {
     return prisma.$transaction(
       async (tx) => {
         const existing = await tx.projectMilestone.findMany({
           where: { projectId },
-          select: { id: true, status: true, stageOrder: true },
+          select: { id: true, status: true, stageOrder: true, plannedDueDate: true },
           orderBy: { stageOrder: "asc" },
         });
         const existingIdSet = new Set(existing.map((m) => m.id));
@@ -1187,20 +1191,66 @@ export const MilestoneService = {
           }
         }
 
-        // 僅針對順序有實際變動的項目進行更新，大幅減少遠端資料庫負擔與避免交易超時 (Timeout)
-        const existingMap = new Map(existing.map((m) => [m.id, m.stageOrder]));
+        // 建立現有資料對照表（含 stageOrder 與 plannedDueDate）
+        const existingMap = new Map(
+          existing.map((m) => [
+            m.id,
+            {
+              stageOrder: m.stageOrder,
+              plannedDueDateStr: dateOnlyValue(m.plannedDueDate),
+            },
+          ])
+        );
+
+        // 僅針對順序或預定完成日有實際變動的項目進行更新，大幅減少遠端資料庫負擔與避免交易超時 (Timeout)
         const toUpdate = fullOrderedIds
-          .map((id, index) => ({ id, targetOrder: index + 1 }))
-          .filter(({ id, targetOrder }) => existingMap.get(id) !== targetOrder);
+          .map((id, index) => {
+            const targetOrder = index + 1;
+            const current = existingMap.get(id);
+            const targetDateStr = milestoneDates ? milestoneDates[id] : undefined;
+
+            const orderChanged = current ? current.stageOrder !== targetOrder : true;
+            const dateChanged =
+              targetDateStr !== undefined && current
+                ? (current.plannedDueDateStr ?? null) !== (targetDateStr ?? null)
+                : false;
+
+            if (!orderChanged && !dateChanged) return null;
+
+            const updateData: { stageOrder?: number; plannedDueDate?: Date | null } = {};
+            if (orderChanged) updateData.stageOrder = targetOrder;
+            if (dateChanged) {
+              if (!targetDateStr) {
+                updateData.plannedDueDate = null;
+              } else {
+                const dateOnly = targetDateStr.slice(0, 10);
+                updateData.plannedDueDate = /^\d{4}-\d{2}-\d{2}$/.test(dateOnly)
+                  ? new Date(`${dateOnly}T00:00:00.000Z`)
+                  : new Date(targetDateStr);
+              }
+            }
+
+            return { id, data: updateData };
+          })
+          .filter(
+            (item): item is { id: string; data: { stageOrder?: number; plannedDueDate?: Date | null } } =>
+              item !== null
+          );
 
         if (toUpdate.length > 0) {
           await Promise.all(
-            toUpdate.map(({ id, targetOrder }) =>
-              tx.projectMilestone.update({
+            toUpdate.map(async ({ id, data }) => {
+              await tx.projectMilestone.update({
                 where: { id },
-                data: { stageOrder: targetOrder },
-              })
-            )
+                data,
+              });
+              if (data.plannedDueDate !== undefined) {
+                await tx.salesTask.updateMany({
+                  where: { milestoneId: id },
+                  data: { dueDatetime: data.plannedDueDate || new Date() },
+                });
+              }
+            })
           );
         }
 

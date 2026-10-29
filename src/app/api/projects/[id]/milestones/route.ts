@@ -92,7 +92,20 @@ export async function PUT(
   try {
     const projectId = params.id;
     const body = await req.json();
-    const { action, milestoneId, notes, attachments, updates, stageCode, reason, actualDueDate, isCompleted, orderedMilestoneIds } = body;
+    const {
+      action,
+      milestoneId,
+      notes,
+      attachments,
+      updates,
+      stageCode,
+      reason,
+      actualDueDate,
+      isCompleted,
+      orderedMilestoneIds,
+      milestoneDates,
+      orderedMilestones,
+    } = body;
 
     const [user, combined] = await Promise.all([
       getUserFromRequest(req),
@@ -135,12 +148,32 @@ export async function PUT(
         return NextResponse.json({ error: "您無權變更里程碑進度順序" }, { status: 403 });
       }
 
-      if (!Array.isArray(orderedMilestoneIds) || orderedMilestoneIds.length === 0) {
+      const targetOrderedIds: string[] =
+        Array.isArray(orderedMilestoneIds) && orderedMilestoneIds.length > 0
+          ? orderedMilestoneIds
+          : Array.isArray(orderedMilestones)
+          ? orderedMilestones.map((m: any) => m?.id).filter(Boolean)
+          : [];
+
+      if (targetOrderedIds.length === 0) {
         return NextResponse.json({ error: "缺少 orderedMilestoneIds 排序資料" }, { status: 400 });
       }
 
+      const datesMap: Record<string, string | null> = { ...(milestoneDates || {}) };
+      if (Array.isArray(orderedMilestones)) {
+        for (const m of orderedMilestones) {
+          if (m && typeof m.id === "string" && m.plannedDueDate !== undefined) {
+            datesMap[m.id] = m.plannedDueDate;
+          }
+        }
+      }
+
       try {
-        const updatedMilestones = await DataService.reorderMilestones(projectId, orderedMilestoneIds);
+        const updatedMilestones = await DataService.reorderMilestones(
+          projectId,
+          targetOrderedIds,
+          Object.keys(datesMap).length > 0 ? datesMap : undefined
+        );
         const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
         const updatedProject = { ...project, isDelayed };
 

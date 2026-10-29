@@ -418,13 +418,20 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     const [movedMilestone] = reorderedPhase.splice(sourceIndex, 1);
     reorderedPhase.splice(targetIndex, 0, movedMilestone);
 
+    // 項目順序變更後，各順位之預定完成日 (plannedDueDate) 同步對調／隨順位排列
+    const slotDates = currentPhaseList.map((m) => m.plannedDueDate);
+    const reorderedPhaseWithDates = reorderedPhase.map((m, idx) => ({
+      ...m,
+      plannedDueDate: slotDates[idx],
+    }));
+
     // 保持其餘階段順序不變，僅重排此 phase 的項目
     const sortedAll = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
     let pIdx = 0;
     const newOrderedAll = sortedAll.map((m) => {
       const mPhase = STAGE_CODE_TO_PHASE[m.stageCode] || (m.phase as MilestonePhaseDTO) || "DEVELOP";
       if (mPhase === phase) {
-        return reorderedPhase[pIdx++] ?? m;
+        return reorderedPhaseWithDates[pIdx++] ?? m;
       }
       return m;
     });
@@ -434,10 +441,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     setMilestones(newOrderedAll.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
 
     try {
+      const milestoneDates: Record<string, string | null> = {};
+      newOrderedAll.forEach((m) => {
+        milestoneDates[m.id] = m.plannedDueDate ?? null;
+      });
+
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reorder", orderedMilestoneIds: orderedIds }),
+        body: JSON.stringify({
+          action: "reorder",
+          orderedMilestoneIds: orderedIds,
+          milestoneDates,
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "更新順序失敗");
