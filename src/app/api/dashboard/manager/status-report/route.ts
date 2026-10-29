@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
+import { MILESTONE_STAGE_LABELS, MilestoneStageCode } from "@/lib/constants";
 import type {
   ManagerProjectStatusReportDTO,
   ProjectStatusItemDTO,
@@ -40,47 +41,34 @@ function formatMillions(amount: number): string {
   return `$ ${m.toFixed(1)}M`;
 }
 
-/** 估價中進度推導 */
+/** 估價中進度推導：同步該案當前進行中里程碑項目 (如 1-1 客源開發、2-4 丈量、3-1 設計圖、3-2 報價單) */
 function deriveProgressNotes(
-  project: {
-    siteCondition?: string | null;
-    quoteAmount?: any;
-    estimatedBudget?: any;
-  },
   milestones: Array<{
     stageCode: string;
     status: string;
+    stageOrder?: number;
     notes?: string | null;
-    records?: any[];
   }>
 ): string {
-  const m32 = milestones.find((m) => m.stageCode === "3-2");
-  const m24 = milestones.find((m) => m.stageCode === "2-4");
-  const m23 = milestones.find((m) => m.stageCode === "2-3");
+  if (!milestones || milestones.length === 0) return "估價中";
 
-  // 1. 若 3-2 有自訂備忘，優先顯示
-  if (m32?.notes && m32.notes.trim()) {
-    return m32.notes.trim();
+  const sorted = [...milestones].sort((a, b) => (a.stageOrder ?? 0) - (b.stageOrder ?? 0));
+  const active =
+    sorted.find((m) => m.status === "OVERDUE") ||
+    sorted.find((m) => m.status === "IN_PROGRESS") ||
+    sorted.find((m) => m.status !== "COMPLETED");
+
+  if (!active) return "已完成";
+
+  const label =
+    MILESTONE_STAGE_LABELS[active.stageCode as MilestoneStageCode] || active.stageCode;
+  const stageName = `${active.stageCode} ${label}`;
+
+  if (active.notes && active.notes.trim()) {
+    return `${stageName} (${active.notes.trim()})`;
   }
 
-  // 2. 特殊情境辨識
-  if (m23?.status === "PENDING" || m23?.status === "OVERDUE") {
-    return "客戶圖面尚未提供";
-  }
-
-  if (m32?.status === "IN_PROGRESS") {
-    const amt = Number(project.quoteAmount) || Number(project.estimatedBudget) || 0;
-    if (amt > 0) {
-      return `核對中 $${amt.toLocaleString("en-US")}`;
-    }
-    return "核對中";
-  }
-
-  if (m24?.status === "COMPLETED" && ((m24.records && m24.records.length > 1) || m32?.status === "PENDING")) {
-    return "已丈量重估價";
-  }
-
-  return "估價中";
+  return stageName;
 }
 
 // 預設 2026 年經營會議目標
@@ -138,18 +126,17 @@ export async function GET(req: NextRequest) {
             select: { id: true, name: true, customerType: true },
           },
           milestones: {
-            where: {
-              stageCode: { in: ["2-3", "2-4", "3-1", "3-2", "3-4", "3-5", "7-2"] },
-            },
             select: {
               id: true,
               stageCode: true,
+              stageOrder: true,
               status: true,
               notes: true,
               plannedDueDate: true,
               actualDueDate: true,
               records: true,
             },
+            orderBy: { stageOrder: "asc" },
           },
         },
         orderBy: [{ expectedDate: "asc" }, { createdAt: "desc" }],
@@ -234,7 +221,7 @@ export async function GET(req: NextRequest) {
         unitCount,
         amount: category === "ESTIMATING" ? null : amt,
         progressNotes:
-          category === "ESTIMATING" ? deriveProgressNotes(p, p.milestones) : undefined,
+          category === "ESTIMATING" ? deriveProgressNotes(p.milestones) : undefined,
         expectedDate: p.expectedDate ? p.expectedDate.toISOString().slice(0, 10) : null,
         year,
         currentStage: p.currentStage,

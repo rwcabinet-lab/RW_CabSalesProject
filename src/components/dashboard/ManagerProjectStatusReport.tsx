@@ -745,13 +745,19 @@ export function ManagerProjectStatusReport() {
                           <td className="py-3 px-6 text-center">
                             <span
                               className={`inline-block px-3 py-1 rounded-md text-xs font-bold ${
-                                proj.progressNotes?.includes("核對中")
+                                !proj.progressNotes
+                                  ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                  : proj.progressNotes.includes("3-2") || proj.progressNotes.includes("核對中") || proj.progressNotes.includes("報價")
                                   ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                  : proj.progressNotes?.includes("已丈量")
+                                  : proj.progressNotes.startsWith("3-") || proj.progressNotes.includes("設計") || proj.progressNotes.includes("合約")
                                   ? "bg-blue-100 text-blue-800 border border-blue-300"
-                                  : proj.progressNotes?.includes("尚未提供")
+                                  : proj.progressNotes.startsWith("2-") || proj.progressNotes.includes("丈量") || proj.progressNotes.includes("需求") || proj.progressNotes.includes("場勘")
+                                  ? "bg-sky-100 text-sky-800 border border-sky-300"
+                                  : proj.progressNotes.startsWith("1-") || proj.progressNotes.includes("客源") || proj.progressNotes.includes("分配")
+                                  ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                  : proj.progressNotes.includes("尚未提供")
                                   ? "bg-rose-100 text-rose-800 border border-rose-300"
-                                  : "bg-slate-100 text-slate-700 border border-slate-300"
+                                  : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                               }`}
                             >
                               {proj.progressNotes || "估價中"}
