@@ -101,7 +101,7 @@ export default function VisualViewsPage() {
   const salesOptions = useMemo(() => {
     const reps = new Set<string>();
     projects.forEach((p) => {
-      if (p.salesRepName) reps.add(p.salesRepName);
+      if (p.salesRepName && p.salesRepName !== "未指定" && p.salesRepName !== "未指派") reps.add(p.salesRepName);
     });
     return Array.from(reps).sort((a, b) => a.localeCompare(b, "zh-TW"));
   }, [projects]);
@@ -143,9 +143,7 @@ export default function VisualViewsPage() {
       }
 
       // 3. 負責業務
-      if (salesFilter === "__UNASSIGNED__") {
-        if (p.salesRepName && p.salesRepName !== "未指派") return false;
-      } else if (salesFilter && p.salesRepName !== salesFilter) {
+      if (salesFilter && p.salesRepName !== salesFilter) {
         return false;
       }
 
@@ -326,7 +324,6 @@ export default function VisualViewsPage() {
                 className="w-full bg-transparent text-xs text-slate-700 font-medium focus:outline-none"
               >
                 <option value="">全部業務</option>
-                <option value="__UNASSIGNED__">未指定</option>
                 {salesOptions.map((rep) => (
                   <option key={rep} value={rep}>
                     {rep}

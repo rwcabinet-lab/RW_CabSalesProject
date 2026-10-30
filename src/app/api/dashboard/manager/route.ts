@@ -4,6 +4,7 @@ import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
 import { handleApiError } from "@/lib/errors";
+import { isAssignableRole } from "@/lib/page-access";
 
 const MANAGER_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"];
 
@@ -35,14 +36,15 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
-    const [projects, allAssignedTasks, milestonesByProject] = await Promise.all([
+    const [projects, allTasks, milestonesByProject, allUsers] = await Promise.all([
       DataService.getProjects(),
-      DataService.getTasks({ assignedById: user.id }),
+      DataService.getTasks(),
       DataService.getMilestonesByProjectIds(),
+      DataService.getLoginUsers(),
     ]);
 
     // 正規項目完成推進產生的里程碑待辦（含 milestoneId）不列入主管「已指派任務」列表
-    const assignedTasks = allAssignedTasks.filter((task) => !task.milestoneId);
+    const assignedTasks = allTasks.filter((task) => !task.milestoneId && task.assignedById === user.id);
 
     // Helper to evaluate if project is closed (依據 [請款] 里程碑是否完成)
     const isProjectClosed = (p: (typeof projects)[0]) => {
@@ -106,25 +108,111 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // 3. 業務負載分佈
-    const workloadMap: Record<string, { name: string; total: number; delayed: number }> = {};
-    const addWorkload = (key: string, name: string, isDelayed: boolean) => {
-      if (!workloadMap[key]) workloadMap[key] = { name, total: 0, delayed: 0 };
-      workloadMap[key].total++;
-      if (isDelayed) workloadMap[key].delayed++;
+    // 3. 人員案場負載與異常分佈 (含業務、業助、工務等現階段負責同仁)
+    const assignableUsers = allUsers.filter((u) => isAssignableRole(u.role));
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    const formatRoleLabel = (role?: string) => {
+      switch (role) {
+        case "SALES_MANAGER":
+          return "業務主管";
+        case "SALES":
+          return "業務";
+        case "ASSISTANT":
+          return "業助";
+        case "SITE_ENGINEER":
+          return "工務";
+        default:
+          return "同仁";
+      }
     };
+
+    const workloadMap: Record<string, {
+      name: string;
+      role: string;
+      roleLabel: string;
+      projectIds: Set<string>;
+      delayedProjectIds: Set<string>;
+    }> = {};
+
+    // 預先登記所有可指派人員
+    for (const u of assignableUsers) {
+      const roleLabel = formatRoleLabel(u.role);
+      workloadMap[u.id] = {
+        name: `${u.name}（${roleLabel}）`,
+        role: u.role,
+        roleLabel,
+        projectIds: new Set<string>(),
+        delayedProjectIds: new Set<string>(),
+      };
+    }
+
     for (const p of projects) {
-      const salesRepName = p.salesRepName || p.customerSalesRepName || "其他業務";
-      addWorkload(`sales:${p.salesRepId || p.customerSalesRepId}`, `${salesRepName}（業務）`, isProjectDelayed(p));
-      if (p.salesAssistantId && p.salesAssistantName) {
-        addWorkload(`assistant:${p.salesAssistantId}`, `${p.salesAssistantName}（業助）`, isProjectDelayed(p));
+      const ms = milestonesByProject[p.id] || [];
+      const delayed = isProjectDelayed(p);
+      const activeMilestone = p.currentStage === "LOST"
+        ? null
+        : ms.find((m) => m.status === "OVERDUE") ||
+          ms.find((m) => m.status === "IN_PROGRESS");
+
+      // 收集該案場於現階段涉入的負責同仁 (主責業務、業務助理、現階段進行中里程碑負責人、未完成待辦任務負責人)
+      const currentPersonnelIds = new Set<string>();
+
+      // 1. 主責業務
+      if (p.salesRepId) currentPersonnelIds.add(p.salesRepId);
+      else if (p.customerSalesRepId) currentPersonnelIds.add(p.customerSalesRepId);
+
+      // 2. 業務助理 (若專案主檔有指定)
+      if (p.salesAssistantId) currentPersonnelIds.add(p.salesAssistantId);
+
+      // 3. 現階段里程碑負責人 (如工務、業助等承接當前進度之同仁)
+      if (activeMilestone?.assignedToId) {
+        currentPersonnelIds.add(activeMilestone.assignedToId);
+      }
+
+      // 4. 現階段待辦任務負責人
+      for (const t of allTasks) {
+        if (t.projectId === p.id && !t.isCompleted && t.assignedToId) {
+          currentPersonnelIds.add(t.assignedToId);
+        }
+      }
+
+      for (const uid of currentPersonnelIds) {
+        if (!workloadMap[uid]) {
+          const u = userMap.get(uid);
+          const role = u?.role || (uid === p.salesRepId ? "SALES" : "ASSISTANT");
+          const roleLabel = formatRoleLabel(role);
+          const name = u?.name || (uid === p.salesRepId ? p.salesRepName || "業務" : "同仁");
+          workloadMap[uid] = {
+            name: `${name}（${roleLabel}）`,
+            role,
+            roleLabel,
+            projectIds: new Set<string>(),
+            delayedProjectIds: new Set<string>(),
+          };
+        }
+
+        workloadMap[uid].projectIds.add(p.id);
+        if (delayed || activeMilestone?.status === "OVERDUE") {
+          workloadMap[uid].delayedProjectIds.add(p.id);
+        }
       }
     }
-    const salesWorkload = Object.values(workloadMap).map((stat) => ({
-      salesRepName: stat.name,
-      totalProjects: stat.total,
-      delayedProjects: stat.delayed,
-    }));
+
+    // 依總案場數由多到少排序，負載較高與進行中案件優先呈現
+    const salesWorkload = Object.values(workloadMap)
+      .map((stat) => ({
+        salesRepName: stat.name,
+        role: stat.role,
+        roleLabel: stat.roleLabel,
+        totalProjects: stat.projectIds.size,
+        delayedProjects: stat.delayedProjectIds.size,
+      }))
+      .sort((a, b) => {
+        if (b.totalProjects !== a.totalProjects) return b.totalProjects - a.totalProjects;
+        if (b.delayedProjects !== a.delayedProjects) return b.delayedProjects - a.delayedProjects;
+        return a.salesRepName.localeCompare(b.salesRepName, "zh-TW");
+      });
 
     // 4. 所有案件狀態總覽 (含月份過濾)
     const stageLabels: Record<string, string> = {

@@ -19,6 +19,7 @@ function createMockMilestone(
     id,
     projectId: "proj-test",
     stageCode,
+    phase: "DEVELOP",
     stageOrder,
     status,
     plannedDueDate,
@@ -26,7 +27,7 @@ function createMockMilestone(
     notes: null,
     attachments: null,
     assignedToId: "user-1",
-    assignedTo: { id: "user-1", name: "王業務", role: "SALES" },
+    assignedToName: "王業務",
   };
 }
 

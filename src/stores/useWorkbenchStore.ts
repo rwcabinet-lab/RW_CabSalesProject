@@ -24,6 +24,7 @@ export interface TaskFormData {
 
 interface WorkbenchState {
   // 篩選與排序
+  searchQuery: string;
   startMonth: string;
   endMonth: string;
   statusFilter: string;
@@ -44,6 +45,7 @@ interface WorkbenchState {
   completionDate: string;
 
   // Actions
+  setSearchQuery: (val: string) => void;
   setStartMonth: (val: string) => void;
   setEndMonth: (val: string) => void;
   setStatusFilter: (val: string) => void;
@@ -96,6 +98,7 @@ const initialTaskForm: TaskFormData = {
 };
 
 export const useWorkbenchStore = create<WorkbenchState>((set) => ({
+  searchQuery: "",
   startMonth: "",
   endMonth: "",
   statusFilter: "",
@@ -113,6 +116,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   completionNotes: "",
   completionDate: getTodayDate(),
 
+  setSearchQuery: (val) => set({ searchQuery: val }),
   setStartMonth: (val) => set({ startMonth: val }),
   setEndMonth: (val) => set({ endMonth: val }),
   setStatusFilter: (val) => set({ statusFilter: val }),
@@ -134,6 +138,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
     })),
   resetFilters: () =>
     set({
+      searchQuery: "",
       startMonth: "",
       endMonth: "",
       statusFilter: "",

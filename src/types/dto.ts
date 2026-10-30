@@ -302,6 +302,8 @@ export interface SalesWorkloadDTO {
   salesRepName: string;
   totalProjects: number;
   delayedProjects: number;
+  role?: string;
+  roleLabel?: string;
 }
 
 export interface StageBottleneckDTO {

@@ -9,6 +9,7 @@ import {
   Edit3,
   CheckCircle2,
   X,
+  Search,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -45,6 +46,7 @@ export default function SalesWorkbenchPage() {
 
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制 - 使用細粒度 Selector 避免多餘 Re-render)
   const {
+    searchQuery,
     startMonth,
     endMonth,
     statusFilter,
@@ -55,6 +57,7 @@ export default function SalesWorkbenchPage() {
     editingProjectId,
   } = useWorkbenchStore(
     useShallow((s) => ({
+      searchQuery: s.searchQuery,
       startMonth: s.startMonth,
       endMonth: s.endMonth,
       statusFilter: s.statusFilter,
@@ -66,6 +69,7 @@ export default function SalesWorkbenchPage() {
     }))
   );
 
+  const setSearchQuery = useWorkbenchStore((s) => s.setSearchQuery);
   const setStartMonth = useWorkbenchStore((s) => s.setStartMonth);
   const setEndMonth = useWorkbenchStore((s) => s.setEndMonth);
   const setStatusFilter = useWorkbenchStore((s) => s.setStatusFilter);
@@ -114,9 +118,22 @@ export default function SalesWorkbenchPage() {
       if (startMonth && projectMonth && projectMonth < startMonth) match = false;
       if (endMonth && projectMonth && projectMonth > endMonth) match = false;
       if ((startMonth || endMonth) && !projectMonth) match = false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const mProject = p.projectName?.toLowerCase().includes(q);
+        const mCustomer = p.customerName?.toLowerCase().includes(q);
+        const mAddress = p.siteAddress?.toLowerCase().includes(q);
+        const mSales = p.salesRepName?.toLowerCase().includes(q);
+        const mAssistant = p.salesAssistantName?.toLowerCase().includes(q);
+        if (!mProject && !mCustomer && !mAddress && !mSales && !mAssistant) {
+          match = false;
+        }
+      }
+
       return match;
     });
-  }, [projects, stageFilter, statusFilter, startMonth, endMonth]);
+  }, [projects, stageFilter, statusFilter, startMonth, endMonth, searchQuery]);
 
   // 依完工日與狀態排序
   const sortedProjects = useMemo(() => {
@@ -326,7 +343,27 @@ export default function SalesWorkbenchPage() {
           </div>
         </div>
 
-        <div className="bg-white p-4 border-b flex flex-wrap gap-4 bg-slate-50/50">
+        <div className="bg-white p-4 border-b flex flex-wrap items-center gap-4 bg-slate-50/50">
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜尋案名/客戶/地址/業務..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="清除搜尋"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 text-sm font-semibold">
             <span>月份：</span>
             <input
@@ -445,8 +482,15 @@ export default function SalesWorkbenchPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {sortedProjects.map((p) => (
-                <Fragment key={p.id}>
+              {sortedProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumns.length} className="p-8 text-center text-slate-400">
+                    目前無符合條件的案件
+                  </td>
+                </tr>
+              ) : (
+                sortedProjects.map((p) => (
+                  <Fragment key={p.id}>
                   <tr
                     className={`hover:brightness-95 ${
                       editingProjectId === p.id
@@ -575,7 +619,7 @@ export default function SalesWorkbenchPage() {
                     />
                   )}
                 </Fragment>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

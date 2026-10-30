@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2 } from "lucide-react";
+import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
@@ -45,6 +45,7 @@ export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
 
   // 過濾條件：預設排除已流標與已立帳 (進行中)
+  const [searchQuery, setSearchQuery] = useState("");
   const [dateMode, setDateMode] = useState<"DATE" | "MONTH">("DATE");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -55,6 +56,8 @@ export default function ManagerDashboardPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
+  const [workloadRoleFilter, setWorkloadRoleFilter] = useState<"ALL" | "SALES" | "ASSISTANT" | "SITE_ENGINEER">("ALL");
+  const [workloadOnlyActive, setWorkloadOnlyActive] = useState(true);
 
   // 分頁切換：營運總覽分析 vs 案件現況統計
   const [activeTab, setActiveTab] = useState<"overview" | "status">("overview");
@@ -228,9 +231,7 @@ export default function ManagerDashboardPage() {
       } else if (stageFilter && p.currentStage !== stageFilter) {
         return false;
       }
-      if (businessFilter === "__UNASSIGNED__") {
-        if (p.salesRepName && p.salesRepName !== "未指派") return false;
-      } else if (businessFilter && p.salesRepName !== businessFilter) {
+      if (businessFilter && p.salesRepName !== businessFilter) {
         return false;
       }
       const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
@@ -248,9 +249,22 @@ export default function ManagerDashboardPage() {
         if (endMonth && projectMonth && projectMonth > endMonth) return false;
         if ((startMonth || endMonth) && !projectMonth) return false;
       }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const mProject = p.projectName?.toLowerCase().includes(q);
+        const mCustomer = p.customerName?.toLowerCase().includes(q);
+        const mAddress = p.siteAddress?.toLowerCase().includes(q);
+        const mSales = p.salesRepName?.toLowerCase().includes(q);
+        const mAssistant = p.salesAssistantName?.toLowerCase().includes(q);
+        if (!mProject && !mCustomer && !mAddress && !mSales && !mAssistant) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, dateMode, startDate, endDate, startMonth, endMonth]);
+  }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, dateMode, startDate, endDate, startMonth, endMonth, searchQuery]);
 
   // 依完工日與狀態排序
   const sortedOverview = useMemo(() => {
@@ -297,8 +311,36 @@ export default function ManagerDashboardPage() {
     );
   }, [sortedOverview]);
 
+  const displayedWorkload = useMemo(() => {
+    if (!data?.salesWorkload) return [];
+    let list = data.salesWorkload;
+
+    if (workloadRoleFilter === "SALES") {
+      list = list.filter((item) => item.role === "SALES" || item.role === "SALES_MANAGER");
+    } else if (workloadRoleFilter === "ASSISTANT") {
+      list = list.filter((item) => item.role === "ASSISTANT");
+    } else if (workloadRoleFilter === "SITE_ENGINEER") {
+      list = list.filter((item) => item.role === "SITE_ENGINEER");
+    }
+
+    if (workloadOnlyActive) {
+      const activeList = list.filter((item) => item.totalProjects > 0);
+      if (activeList.length > 0) {
+        list = activeList;
+      }
+    }
+
+    return list;
+  }, [data?.salesWorkload, workloadRoleFilter, workloadOnlyActive]);
+
   const businessOptions = useMemo(() => {
-    return Array.from(new Set(allProjectsOverview.map((project) => project.salesRepName))).sort();
+    return Array.from(
+      new Set(
+        allProjectsOverview
+          .map((project) => project.salesRepName)
+          .filter((name): name is string => Boolean(name && name !== "未指定" && name !== "未指派"))
+      )
+    ).sort((a, b) => a.localeCompare(b, "zh-TW"));
   }, [allProjectsOverview]);
 
   const visibleColumns = useMemo(() => {
@@ -402,23 +444,61 @@ export default function ManagerDashboardPage() {
 
       {/* 圖表區塊 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h3 className="text-base font-bold flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              人員案場負載與異常分佈
-            </h3>
-            <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-3.5 rounded bg-blue-400 inline-block"></span> 藍外柱：總案場數
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-3.5 rounded bg-red-500 inline-block"></span> 紅內柱：延誤案場數
-              </span>
+        <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                人員案場負載與異常分佈
+              </h3>
+              <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 rounded bg-blue-400 inline-block"></span> 藍外柱：總案場數
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-3.5 rounded bg-red-500 inline-block"></span> 紅內柱：延誤案場數
+                </span>
+              </div>
+            </div>
+
+            {/* 角色分類切換列 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-2 border-b border-slate-100">
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
+                {(
+                  [
+                    { key: "ALL", label: "全部人員" },
+                    { key: "SALES", label: "業務" },
+                    { key: "ASSISTANT", label: "業助" },
+                    { key: "SITE_ENGINEER", label: "工務" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setWorkloadRoleFilter(tab.key)}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors ${
+                      workloadRoleFilter === tab.key
+                        ? "bg-white text-blue-600 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs text-slate-500 hover:text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={workloadOnlyActive}
+                  onChange={(e) => setWorkloadOnlyActive(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-0 w-3.5 h-3.5"
+                />
+                僅顯示有承接案場
+              </label>
             </div>
           </div>
           <div className="h-64">
-            <SalesWorkloadChart data={data.salesWorkload} />
+            <SalesWorkloadChart data={displayedWorkload} />
           </div>
         </div>
 
@@ -438,6 +518,26 @@ export default function ManagerDashboardPage() {
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 篩選條件</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="搜尋案名/客戶/地址/業務..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  title="清除搜尋"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span>時間區間：</span>
               <select
@@ -525,7 +625,6 @@ export default function ManagerDashboardPage() {
               業務：
               <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1">
                 <option value="">全部業務</option>
-                <option value="__UNASSIGNED__">未指定</option>
                 {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
@@ -594,8 +693,15 @@ export default function ManagerDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {sortedOverview.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50">
+              {sortedOverview.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumns.length + 1} className="p-8 text-center text-slate-400">
+                    目前無符合條件的案件
+                  </td>
+                </tr>
+              ) : (
+                sortedOverview.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50">
                   {visibleColumns.map((col) => {
                     switch (col.key) {
                       case "trafficLight":
@@ -714,7 +820,7 @@ export default function ManagerDashboardPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

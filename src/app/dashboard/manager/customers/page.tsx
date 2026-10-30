@@ -44,7 +44,13 @@ export default function CustomerStatsPage() {
 
   const salesOptions = useMemo(() => {
     if (!data) return [];
-    return Array.from(new Set(data.customers.map((c) => c.salesRepName).filter(Boolean))).sort();
+    return Array.from(
+      new Set(
+        data.customers
+          .map((c) => c.salesRepName)
+          .filter((name): name is string => Boolean(name && name !== "未指定" && name !== "未指派"))
+      )
+    ).sort();
   }, [data]);
 
   const filteredCustomers = useMemo(() => {
