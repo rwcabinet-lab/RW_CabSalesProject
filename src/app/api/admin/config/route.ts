@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({ error: "無效的 key 參數" }, { status: 400 });
   } catch (err) {
-    console.error("Failed to get config:", err);
-    return NextResponse.json({ error: "讀取設定失敗" }, { status: 500 });
+    return handleApiError(err, "讀取設定失敗");
   }
 }
 
@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (err) {
-    console.error("Failed to save config:", err);
-    return NextResponse.json({ error: "儲存設定失敗" }, { status: 500 });
+    return handleApiError(err, "儲存設定失敗");
   }
 }

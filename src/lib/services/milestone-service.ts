@@ -85,7 +85,7 @@ export const MilestoneService = {
       where: { id: projectId },
       select: { salesRepId: true },
     });
-    if (!project) throw new Error("查無此案場資料");
+    if (!project) throw new NotFoundError("查無此案場資料");
 
     const defaultDays = await ConfigService.getMilestoneDefaultDays();
 
@@ -820,7 +820,7 @@ export const MilestoneService = {
         where: { id: projectId },
         select: { customer: { select: { salesRepId: true } } },
       });
-      if (!project) throw new Error("查無此案場資料");
+      if (!project) throw new NotFoundError("查無此案場資料");
 
       const existingMilestone = await tx.projectMilestone.findFirst({
         where: { projectId, stageCode },
@@ -910,9 +910,9 @@ export const MilestoneService = {
         where: { id: projectId },
         select: { id: true, currentStage: true },
       });
-      if (!project) throw new Error("查無此案場資料");
+      if (!project) throw new NotFoundError("查無此案場資料");
       if (project.currentStage !== ProjectStage.LOST) {
-        throw new Error("此案件非流標狀態，無法取消流標");
+        throw new ConflictError("此案件非流標狀態，無法取消流標");
       }
 
       // 1. 刪除 X-2 里程碑紀錄 (流標進度)
@@ -1074,7 +1074,7 @@ export const MilestoneService = {
       const firstIncomplete = productionMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
       const targetMilestone = firstIncomplete || productionMilestones[productionMilestones.length - 1];
       if (!targetMilestone) {
-        throw new Error(`Project ${projectId} has no production milestones to resume`);
+        throw new ConflictError(`專案 ${projectId} 無可復原的製造階段里程碑`);
       }
 
       for (const milestone of productionMilestones) {

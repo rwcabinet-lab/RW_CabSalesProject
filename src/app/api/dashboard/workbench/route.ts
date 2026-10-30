@@ -3,6 +3,7 @@ import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +121,6 @@ export async function GET(req: NextRequest) {
       tasks,
     });
   } catch (error) {
-    console.error("工作台資料錯誤:", error);
-    return NextResponse.json({ error: "無法取得業務工作台資料" }, { status: 500 });
+    return handleApiError(error, "無法取得業務工作台資料");
   }
 }

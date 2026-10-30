@@ -7,6 +7,7 @@ import {
 } from "@/lib/access-control";
 import { PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import { prisma } from "@/lib/prisma";
+import { handleApiError } from "@/lib/errors";
 
 async function requireAdmin(request: NextRequest) {
   const user = await getUserFromRequest(request);
@@ -32,8 +33,7 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    console.error("Failed to load role permissions:", error);
-    return NextResponse.json({ error: "無法載入頁面權限設定" }, { status: 500 });
+    return handleApiError(error, "無法載入頁面權限設定");
   }
 }
 
@@ -85,7 +85,6 @@ export async function PUT(request: NextRequest) {
     invalidateRoleAccessProfiles();
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to save role permissions:", error);
-    return NextResponse.json({ error: "儲存頁面權限失敗" }, { status: 500 });
+    return handleApiError(error, "儲存頁面權限失敗");
   }
 }

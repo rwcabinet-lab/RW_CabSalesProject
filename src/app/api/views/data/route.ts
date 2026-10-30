@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,6 @@ export async function GET(req: NextRequest) {
       staff,
     });
   } catch (error) {
-    console.error("Visual views data error:", error);
-    return NextResponse.json({ error: "無法取得可視化資料" }, { status: 500 });
+    return handleApiError(error, "無法取得可視化資料");
   }
 }

@@ -3,6 +3,7 @@ import { loadUserAccessProfile } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
 import { DataService } from "@/lib/data-service";
 import { SESSION_COOKIE_NAME, signSessionUserId } from "@/lib/session";
+import { handleApiError } from "@/lib/errors";
 
 const DEFAULT_LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
 
@@ -47,7 +48,6 @@ export async function POST(req: NextRequest) {
     });
     return response;
   } catch (error) {
-    console.error("Login failed:", error);
-    return NextResponse.json({ error: "登入失敗，請稍後重試" }, { status: 500 });
+    return handleApiError(error, "登入失敗，請稍後重試");
   }
 }

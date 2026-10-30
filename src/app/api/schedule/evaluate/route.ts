@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,8 +15,7 @@ export async function POST(req: NextRequest) {
       summary,
     });
   } catch (error) {
-    console.error("Failed to evaluate schedules:", error);
-    return NextResponse.json({ error: "時程檢核執行失敗" }, { status: 500 });
+    return handleApiError(error, "時程檢核執行失敗");
   }
 }
 
@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
       summary,
     });
   } catch (error) {
-    console.error("Failed to get schedule evaluation:", error);
-    return NextResponse.json({ error: "無法取得時程狀態" }, { status: 500 });
+    return handleApiError(error, "無法取得時程狀態");
   }
 }

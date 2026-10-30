@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import type { CustomerStatsDashboardDTO } from "@/types/dto";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -161,7 +162,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(responseData);
   } catch (error) {
-    console.error("取得客戶資料統計失敗:", error);
-    return NextResponse.json({ error: "無法取得客戶資料統計" }, { status: 500 });
+    return handleApiError(error, "無法取得客戶資料統計");
   }
 }

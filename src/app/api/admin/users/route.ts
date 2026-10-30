@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserFromRequest, invalidateUserAccessProfile } from "@/lib/access-control";
 import { invalidateLoginUsersCache } from "@/lib/data-service";
 import { ROLE_OPTIONS } from "@/lib/page-access";
+import { handleApiError } from "@/lib/errors";
 
 const validRoles = new Set<string>(ROLE_OPTIONS.map(({ value }) => value));
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -36,8 +37,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(users, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("Failed to load managed accounts:", error);
-    return NextResponse.json({ error: "無法載入帳號清單" }, { status: 500 });
+    return handleApiError(error, "無法載入帳號清單");
   }
 }
 
@@ -57,11 +57,9 @@ export async function POST(request: NextRequest) {
     invalidateLoginUsersCache();
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
-      return NextResponse.json({ error: "此電子郵件已被使用" }, { status: 409 });
-    }
-    console.error("Failed to create managed account:", error);
-    return NextResponse.json({ error: "新增帳號失敗" }, { status: 500 });
+    return handleApiError(error, "新增帳號失敗", {
+      prismaMessages: { P2002: "此電子郵件已被使用" },
+    });
   }
 }
 
@@ -97,10 +95,8 @@ export async function PATCH(request: NextRequest) {
     invalidateLoginUsersCache();
     return NextResponse.json(user);
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
-      return NextResponse.json({ error: "此電子郵件已被使用" }, { status: 409 });
-    }
-    console.error("Failed to update managed account:", error);
-    return NextResponse.json({ error: "更新帳號失敗" }, { status: 500 });
+    return handleApiError(error, "更新帳號失敗", {
+      prismaMessages: { P2002: "此電子郵件已被使用" },
+    });
   }
 }

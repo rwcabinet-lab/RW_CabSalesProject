@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { normalizeProjectColumns } from "@/lib/constants";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,6 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (error) {
-    console.error("Failed to get shared project columns:", error);
-    return NextResponse.json({ error: "讀取案件欄位設定失敗" }, { status: 500 });
+    return handleApiError(error, "讀取案件欄位設定失敗");
   }
 }

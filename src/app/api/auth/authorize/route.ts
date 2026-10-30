@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canUserAccessPath } from "@/lib/access-control";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
+import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,6 @@ export async function GET(request: NextRequest) {
     if (!allowed) return NextResponse.json({ error: "沒有權限存取此頁面" }, { status: 403 });
     return NextResponse.json({ allowed: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error("Page access lookup failed:", error);
-    return NextResponse.json({ error: "無法確認頁面權限" }, { status: 500 });
+    return handleApiError(error, "無法確認頁面權限");
   }
 }

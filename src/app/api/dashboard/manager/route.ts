@@ -3,6 +3,7 @@ import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 const MANAGER_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"];
 
@@ -266,8 +267,7 @@ export async function GET(req: NextRequest) {
       assignedTasks,
     });
   } catch (error) {
-    console.error("主管監控室資料錯誤:", error);
-    return NextResponse.json({ error: "無法取得主管監控室資料" }, { status: 500 });
+    return handleApiError(error, "無法取得主管監控室資料");
   }
 }
 
@@ -313,8 +313,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
-    console.error("指派任務失敗:", error);
-    return NextResponse.json({ error: "指派任務失敗" }, { status: 500 });
+    return handleApiError(error, "指派任務失敗");
   }
 }
 
@@ -349,7 +348,6 @@ export async function PATCH(req: NextRequest) {
     if (!task) return NextResponse.json({ error: "查無此任務" }, { status: 404 });
     return NextResponse.json({ task });
   } catch (error) {
-    console.error("修改指派任務失敗:", error);
-    return NextResponse.json({ error: "修改指派任務失敗" }, { status: 500 });
+    return handleApiError(error, "修改指派任務失敗");
   }
 }

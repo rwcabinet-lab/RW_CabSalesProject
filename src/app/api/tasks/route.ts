@@ -53,8 +53,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(tasks);
   } catch (error) {
-    console.error("Failed to get tasks:", error);
-    return NextResponse.json({ error: "無法取得待辦任務" }, { status: 500 });
+    return handleApiError(error, "無法取得待辦任務");
   }
 }
 
@@ -102,8 +101,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(newTask, { status: 201 });
   } catch (error) {
-    console.error("Failed to create task:", error);
-    return NextResponse.json({ error: "新增任務失敗" }, { status: 500 });
+    return handleApiError(error, "新增任務失敗");
   }
 }
 
@@ -209,7 +207,6 @@ export async function DELETE(req: NextRequest) {
     if (!deleted) return NextResponse.json({ error: "找不到此待辦" }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete task:", error);
-    return NextResponse.json({ error: "刪除待辦失敗" }, { status: 500 });
+    return handleApiError(error, "刪除待辦失敗");
   }
 }

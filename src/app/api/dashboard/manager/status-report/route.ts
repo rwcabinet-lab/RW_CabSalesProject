@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import { MILESTONE_STAGE_LABELS, MilestoneStageCode } from "@/lib/constants";
+import { handleApiError } from "@/lib/errors";
 import type {
   ManagerProjectStatusReportDTO,
   ProjectStatusItemDTO,
@@ -335,8 +336,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(report);
   } catch (error) {
-    console.error("Failed to generate project status report:", error);
-    return NextResponse.json({ error: "產出案件現況統計報告失敗" }, { status: 500 });
+    return handleApiError(error, "產出案件現況統計報告失敗");
   }
 }
 
@@ -398,7 +398,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "不支援的動作" }, { status: 400 });
   } catch (error) {
-    console.error("Failed to update status report config:", error);
-    return NextResponse.json({ error: "更新設定失敗" }, { status: 500 });
+    return handleApiError(error, "更新設定失敗");
   }
 }

@@ -3,6 +3,7 @@ import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
+import { handleApiError } from "@/lib/errors";
 
 async function requireAdmin(req: NextRequest) {
   const user = await getUserFromRequest(req);
@@ -23,8 +24,7 @@ export async function GET(req: NextRequest) {
     const customers = await DataService.getCustomers();
     return NextResponse.json(customers);
   } catch (error) {
-    console.error("Failed to fetch customers:", error);
-    return NextResponse.json({ error: "無法取得客戶資料" }, { status: 500 });
+    return handleApiError(error, "無法取得客戶資料");
   }
 }
 
@@ -84,8 +84,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(newCustomer, { status: 201 });
   } catch (error) {
-    console.error("Failed to create customer:", error);
-    return NextResponse.json({ error: "新增客戶失敗" }, { status: 500 });
+    return handleApiError(error, "新增客戶失敗");
   }
 }
 
@@ -154,8 +153,7 @@ export async function PATCH(req: NextRequest) {
     });
     return NextResponse.json(customer);
   } catch (error) {
-    console.error("Failed to update customer:", error);
-    return NextResponse.json({ error: "更新客戶失敗" }, { status: 500 });
+    return handleApiError(error, "更新客戶失敗");
   }
 }
 
@@ -178,10 +176,8 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete customer:", error);
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2003") {
-      return NextResponse.json({ error: "此客戶仍有關聯案件，請先刪除或重新指派案件" }, { status: 409 });
-    }
-    return NextResponse.json({ error: "刪除客戶失敗" }, { status: 500 });
+    return handleApiError(error, "刪除客戶失敗", {
+      prismaMessages: { P2003: "此客戶仍有關聯案件，請先刪除或重新指派案件" },
+    });
   }
 }

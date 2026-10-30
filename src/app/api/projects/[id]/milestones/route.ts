@@ -80,8 +80,7 @@ export async function GET(
       milestones: attachTrafficLights(evaluatedMilestones, isProjectLost),
     });
   } catch (error) {
-    console.error("Failed to get milestones:", error);
-    return NextResponse.json({ error: "無法讀取里程碑" }, { status: 500 });
+    return handleApiError(error, "無法讀取里程碑");
   }
 }
 

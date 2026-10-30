@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { DataService } from "@/lib/data-service";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
+import { handleApiError } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { oldPassword, newPassword, confirmPassword, targetUserId, userId: bodyUserId } = body;
+    const { oldPassword, newPassword, confirmPassword, targetUserId } = body;
     const sessionUserId = await getVerifiedUserIdFromRequest(req);
     if (!sessionUserId) {
       return NextResponse.json({ error: "未登入或操作逾時，請重新登入" }, { status: 401 });
@@ -51,7 +52,6 @@ export async function POST(req: NextRequest) {
       message: "密碼已成功更新！下次登入請使用新密碼。",
     });
   } catch (error) {
-    console.error("Change password error:", error);
-    return NextResponse.json({ error: "更新密碼失敗，請稍後重試" }, { status: 500 });
+    return handleApiError(error, "更新密碼失敗，請稍後重試");
   }
 }

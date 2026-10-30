@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
+import { handleApiError } from "@/lib/errors";
 
 // GET /api/projects — 主管取得所有案場，業務與業助僅取得相關案場
 export async function GET(req: NextRequest) {
@@ -28,8 +29,7 @@ export async function GET(req: NextRequest) {
     const projects = await DataService.getProjects(filter);
     return NextResponse.json(projects);
   } catch (error) {
-    console.error("取得案場清單失敗:", error);
-    return NextResponse.json({ error: "無法取得案場清單" }, { status: 500 });
+    return handleApiError(error, "無法取得案場清單");
   }
 }
 
@@ -60,8 +60,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "新增案場失敗" }, { status: 500 });
+    return handleApiError(err, "新增案場失敗");
   }
 }
 
@@ -96,8 +95,7 @@ export async function PATCH(req: NextRequest) {
     if (!updated) return NextResponse.json({ error: "找不到案場" }, { status: 404 });
     return NextResponse.json({ project: updated });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "修改案場失敗" }, { status: 500 });
+    return handleApiError(err, "修改案場失敗");
   }
 }
 
@@ -118,7 +116,6 @@ export async function DELETE(req: NextRequest) {
     if (!deleted) return NextResponse.json({ error: "找不到案件" }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("刪除案場失敗:", error);
-    return NextResponse.json({ error: "刪除案場失敗" }, { status: 500 });
+    return handleApiError(error, "刪除案場失敗");
   }
 }

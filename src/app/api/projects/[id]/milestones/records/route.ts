@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { getUserFromRequest } from "@/lib/access-control";
 import { QUOTE_STAGE_CODES } from "@/lib/constants";
+import { handleApiError } from "@/lib/errors";
 
 export async function GET(
   req: NextRequest,
@@ -20,8 +21,7 @@ export async function GET(
     const records = await DataService.getMilestoneRecords(milestoneId);
     return NextResponse.json(records);
   } catch (err) {
-    console.error("Failed to get milestone records:", err);
-    return NextResponse.json({ error: "讀取紀錄失敗" }, { status: 500 });
+    return handleApiError(err, "讀取紀錄失敗");
   }
 }
 
@@ -70,8 +70,7 @@ export async function POST(
     });
     return NextResponse.json({ success: true, record });
   } catch (err) {
-    console.error("Failed to add milestone record:", err);
-    return NextResponse.json({ error: "新增紀錄失敗" }, { status: 500 });
+    return handleApiError(err, "新增紀錄失敗");
   }
 }
 
@@ -92,7 +91,6 @@ export async function DELETE(
     await DataService.deleteMilestoneRecord(recordId);
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Failed to delete milestone record:", err);
-    return NextResponse.json({ error: "刪除紀錄失敗" }, { status: 500 });
+    return handleApiError(err, "刪除紀錄失敗");
   }
 }
