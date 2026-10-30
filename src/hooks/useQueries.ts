@@ -29,6 +29,7 @@ export const QUERY_KEYS = {
   users: ["users"] as const,
   customers: ["customers"] as const,
   projects: ["projects", "list"] as const,
+  projectOptions: ["projects", "options"] as const,
   projectMilestones: (projectId: string) => ["projects", projectId, "milestones"] as const,
   projectTasks: (projectId: string, isCompleted: boolean) =>
     ["projects", projectId, "tasks", isCompleted ? "completed" : "active"] as const,
@@ -215,7 +216,7 @@ export function useViewsDataQuery() {
 }
 
 /**
- * 取得所有專案清單（快取 1 分鐘，供里程碑切換下拉選單與選取器使用）
+ * 取得所有專案清單（快取 1 分鐘，供選取器使用）
  */
 export function useProjectsQuery() {
   return useQuery({
@@ -229,6 +230,30 @@ export function useProjectsQuery() {
       return data;
     },
     staleTime: 60 * 1000,
+  });
+}
+
+export interface ProjectOptionDTO {
+  id: string;
+  projectName: string;
+}
+
+/**
+ * 取得案場快速切換清單（輕量端點，僅撈取 id 與 projectName，快取 5 分鐘）
+ */
+export function useProjectOptionsQuery(enabled = true) {
+  return useQuery({
+    queryKey: QUERY_KEYS.projectOptions,
+    queryFn: async (): Promise<ProjectOptionDTO[]> => {
+      const res = await fetch("/api/projects?fields=options");
+      const data = (await res.json()) as ApiResponse<ProjectOptionDTO[]>;
+      if (!res.ok || !Array.isArray(data)) {
+        return [];
+      }
+      return data;
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

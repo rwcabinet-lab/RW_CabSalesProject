@@ -2,16 +2,8 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2 } from "lucide-react";
-
-const CustomerTypeDistributionChart = dynamic(
-  () => import("@/components/dashboard/ManagerCharts").then((mod) => mod.CustomerTypeDistributionChart),
-  {
-    ssr: false,
-    loading: () => <div className="h-64 bg-slate-50 animate-pulse rounded-xl" />,
-  }
-);
+import { CustomerTypeDistributionChart } from "@/components/dashboard/ManagerCharts";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";

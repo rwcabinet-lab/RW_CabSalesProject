@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSessionQuery, useUsersQuery, useProjectsQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useSessionQuery, useUsersQuery, useProjectOptionsQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { toast } from "@/stores/useToastStore";
 import {
   ArrowLeft,
@@ -96,7 +96,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectDTO | null>(null);
-  const { data: projects = [] } = useProjectsQuery();
+  const { data: projects = [] } = useProjectOptionsQuery();
 
   const { data: sessionUser } = useSessionQuery();
   const { data: users = [] } = useUsersQuery();

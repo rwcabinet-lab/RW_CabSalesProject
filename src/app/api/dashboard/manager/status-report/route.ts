@@ -118,11 +118,22 @@ export async function GET(req: NextRequest) {
     const selectedYear = parseInt(searchParams.get("year") || "2026", 10);
     const selectedMonth = parseInt(searchParams.get("month") || "10", 10);
 
-    // 1. 取得所有專案及相關里程碑
+    // 1. 取得所有專案及相關里程碑（精準欄位查詢，在資料庫端排除流標案場並剔除無用歷程記錄）
     const [projects, targetConfigRow, overrideRow] = await Promise.all([
       prisma.project.findMany({
         relationLoadStrategy: "join",
-        include: {
+        where: {
+          currentStage: { not: "LOST" },
+        },
+        select: {
+          id: true,
+          projectName: true,
+          siteAddress: true,
+          currentStage: true,
+          expectedDate: true,
+          unitCount: true,
+          quoteAmount: true,
+          estimatedBudget: true,
           customer: {
             select: { id: true, name: true, customerType: true },
           },
@@ -134,8 +145,6 @@ export async function GET(req: NextRequest) {
               status: true,
               notes: true,
               plannedDueDate: true,
-              actualDueDate: true,
-              records: true,
             },
             orderBy: { stageOrder: "asc" },
           },

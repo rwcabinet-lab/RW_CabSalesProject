@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import dynamic from "next/dynamic";
 import {
   BarChart3,
   Calendar,
@@ -14,30 +13,8 @@ import {
   CalendarDays,
   ShieldAlert,
 } from "lucide-react";
-
-const GanttChart = dynamic(
-  () => import("@/components/views/GanttChart").then((mod) => mod.GanttChart),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-96 bg-white border border-slate-200 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 text-sm font-medium">
-        載入甘特圖中...
-      </div>
-    ),
-  }
-);
-
-const CalendarView = dynamic(
-  () => import("@/components/views/CalendarView").then((mod) => mod.CalendarView),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-96 bg-white border border-slate-200 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 text-sm font-medium">
-        載入行事曆中...
-      </div>
-    ),
-  }
-);
+import { GanttChart } from "@/components/views/GanttChart";
+import { CalendarView } from "@/components/views/CalendarView";
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { useViewsDataQuery } from "@/hooks/useQueries";
 import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
