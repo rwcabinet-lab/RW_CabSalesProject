@@ -344,26 +344,6 @@ export default function SalesWorkbenchPage() {
         </div>
 
         <div className="bg-white p-4 border-b flex flex-wrap items-center gap-4 bg-slate-50/50">
-          <div className="relative flex items-center">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜尋案名/客戶/地址/業務..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                title="清除搜尋"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
           <div className="flex items-center gap-1.5 text-sm font-semibold">
             <span>月份：</span>
             <input
@@ -430,8 +410,28 @@ export default function SalesWorkbenchPage() {
           </label>
         </div>
 
-        {/* 篩選結果摘要 */}
-        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex justify-between items-center text-xs text-blue-900 font-semibold">
+        {/* 篩選結果摘要與關鍵字搜尋 */}
+        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex flex-wrap items-center gap-4 text-xs text-blue-900 font-semibold">
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜尋案名/客戶/地址/業務..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="清除搜尋"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div>
             篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedProjects.length}</span> 案，報價總額{" "}
             <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>

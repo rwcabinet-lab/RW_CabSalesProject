@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Users, LayoutDashboard, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X } from "lucide-react";
+import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
@@ -515,141 +515,138 @@ export default function ManagerDashboardPage() {
 
       {/* 統一案件清單 (套用全域欄位設定) */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-base font-bold flex items-center gap-2"><LayoutDashboard className="w-5 h-5 text-blue-600"/> 篩選條件</h2>
-          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
-            <div className="relative flex items-center">
-              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="搜尋案名/客戶/地址/業務..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  title="清除搜尋"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span>時間區間：</span>
-              <select
-                value={dateMode}
-                onChange={(e) => {
-                  setDateMode(e.target.value as "DATE" | "MONTH");
-                  setStartDate("");
-                  setEndDate("");
-                  setStartMonth("");
-                  setEndMonth("");
-                }}
-                className="border rounded px-1.5 py-0.5 text-xs bg-white text-slate-700 font-medium"
-              >
-                <option value="DATE">日期</option>
-                <option value="MONTH">月份</option>
-              </select>
-              {dateMode === "DATE" ? (
-                <>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                    title="起始日期"
-                  />
-                  <span className="text-slate-400">至</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                    title="結束日期"
-                  />
-                  {(startDate || endDate) && (
-                    <button
-                      type="button"
-                      onClick={() => { setStartDate(""); setEndDate(""); }}
-                      className="text-xs text-slate-400 hover:text-slate-600"
-                    >
-                      ✕ 清除
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <input
-                    type="month"
-                    value={startMonth}
-                    onChange={(e) => setStartMonth(e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                    title="起始月份"
-                  />
-                  <span className="text-slate-400">至</span>
-                  <input
-                    type="month"
-                    value={endMonth}
-                    onChange={(e) => setEndMonth(e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                    title="結束月份"
-                  />
-                  {(startMonth || endMonth) && (
-                    <button
-                      type="button"
-                      onClick={() => { setStartMonth(""); setEndMonth(""); }}
-                      className="text-xs text-slate-400 hover:text-slate-600"
-                    >
-                      ✕ 清除
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            <label className="flex items-center gap-2">
-              狀態：
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">全部狀態</option>
-                <option value="RED">逾期</option>
-                <option value="YELLOW">即將到期</option>
-                <option value="GREEN">正常</option>
-                <option value="GRAY">暫緩/未排定/已完成</option>
-                <option value="LOST">流標</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2">
-              業務：
-              <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">全部業務</option>
-                {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-2">
-              階段：
-              <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1">
-                <option value="ACTIVE">進行中案件</option>
-                <option value="">全部階段</option>
-                <option value="DEVELOP">第一階段：案件開發</option>
-                <option value="REQUIREMENT">第二階段：現況及需求確認</option>
-                <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
-                <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
-                <option value="PROD_SHIP">第五階段：生產及派送</option>
-                <option value="INSTALL">第六階段：安裝及驗收</option>
-                <option value="CLOSURE">第七階段：請款/售後</option>
-                <option value="WRAP_UP">收尾</option>
-                <option value="LOST">流標</option>
-                <option value="BILLED">請款</option>
-              </select>
-            </label>
+        <div className="bg-slate-50 px-6 py-4 border-b flex flex-wrap items-center gap-3 text-sm font-semibold">
+          <div className="flex items-center gap-1.5">
+            <span>時間區間：</span>
+            <select
+              value={dateMode}
+              onChange={(e) => {
+                setDateMode(e.target.value as "DATE" | "MONTH");
+                setStartDate("");
+                setEndDate("");
+                setStartMonth("");
+                setEndMonth("");
+              }}
+              className="border rounded px-1.5 py-0.5 text-xs bg-white text-slate-700 font-medium"
+            >
+              <option value="DATE">日期</option>
+              <option value="MONTH">月份</option>
+            </select>
+            {dateMode === "DATE" ? (
+              <>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border rounded px-2 py-1 text-xs"
+                  title="起始日期"
+                />
+                <span className="text-slate-400">至</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border rounded px-2 py-1 text-xs"
+                  title="結束日期"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => { setStartDate(""); setEndDate(""); }}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    ✕ 清除
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="month"
+                  value={startMonth}
+                  onChange={(e) => setStartMonth(e.target.value)}
+                  className="border rounded px-2 py-1 text-xs"
+                  title="起始月份"
+                />
+                <span className="text-slate-400">至</span>
+                <input
+                  type="month"
+                  value={endMonth}
+                  onChange={(e) => setEndMonth(e.target.value)}
+                  className="border rounded px-2 py-1 text-xs"
+                  title="結束月份"
+                />
+                {(startMonth || endMonth) && (
+                  <button
+                    type="button"
+                    onClick={() => { setStartMonth(""); setEndMonth(""); }}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    ✕ 清除
+                  </button>
+                )}
+              </>
+            )}
           </div>
+          <label className="flex items-center gap-2">
+            狀態：
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+              <option value="">全部狀態</option>
+              <option value="RED">逾期</option>
+              <option value="YELLOW">即將到期</option>
+              <option value="GREEN">正常</option>
+              <option value="GRAY">暫緩/未排定/已完成</option>
+              <option value="LOST">流標</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            業務：
+            <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+              <option value="">全部業務</option>
+              {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            階段：
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+              <option value="ACTIVE">進行中案件</option>
+              <option value="">全部階段</option>
+              <option value="DEVELOP">第一階段：案件開發</option>
+              <option value="REQUIREMENT">第二階段：現況及需求確認</option>
+              <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
+              <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
+              <option value="PROD_SHIP">第五階段：生產及派送</option>
+              <option value="INSTALL">第六階段：安裝及驗收</option>
+              <option value="CLOSURE">第七階段：請款/售後</option>
+              <option value="WRAP_UP">收尾</option>
+              <option value="LOST">流標</option>
+              <option value="BILLED">請款</option>
+            </select>
+          </label>
         </div>
 
-        {/* 篩選結果摘要 */}
-        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex justify-between items-center text-xs text-blue-900 font-semibold">
+        {/* 篩選結果摘要與關鍵字搜尋 */}
+        <div className="px-6 py-2.5 bg-blue-50/50 border-b flex flex-wrap items-center gap-4 text-xs text-blue-900 font-semibold">
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜尋案名/客戶/地址/業務..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="清除搜尋"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div>
             篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedOverview.length}</span> 案，報價總額{" "}
             <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
