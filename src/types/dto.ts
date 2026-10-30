@@ -380,6 +380,7 @@ export interface ProjectStatusItemDTO {
   year: string;
   currentStage?: string;
   overrideSection?: "SIGNED" | "ESTIMATING" | "QUOTED" | null;
+  salesRepName?: string;
 }
 
 export interface ProjectStatusYearGroupDTO {

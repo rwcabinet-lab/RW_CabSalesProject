@@ -90,7 +90,8 @@ export function ManagerProjectStatusReport() {
           const mCustomer = p.customerName.toLowerCase().includes(q);
           const mProject = p.projectName.toLowerCase().includes(q);
           const mRegion = p.region.toLowerCase().includes(q);
-          if (!mCustomer && !mProject && !mRegion) return false;
+          const mSales = p.salesRepName ? p.salesRepName.toLowerCase().includes(q) : false;
+          if (!mCustomer && !mProject && !mRegion && !mSales) return false;
         }
         return true;
       });
@@ -372,7 +373,7 @@ export function ManagerProjectStatusReport() {
             <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="搜尋案名、客戶或地區..."
+              placeholder="搜尋案名、客戶、業務或地區..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-48 sm:w-60"
@@ -1044,9 +1045,8 @@ export function ManagerProjectStatusReport() {
               </button>
             </div>
 
-            <div className="text-xs text-slate-500">
-              客戶：{actionMenuProject.customerName}｜地區：{actionMenuProject.region}｜
-              金額：${actionMenuProject.amount ? actionMenuProject.amount.toLocaleString("en-US") : "0"}
+            <div className="text-xs text-slate-500 leading-relaxed">
+              客戶：{actionMenuProject.customerName} ｜ 主責：{actionMenuProject.salesRepName || "未指定"} ｜ 地區：{actionMenuProject.region} ｜ 金額：${actionMenuProject.amount ? actionMenuProject.amount.toLocaleString("en-US") : "0"}
             </div>
 
             <div className="space-y-1.5 pt-1">

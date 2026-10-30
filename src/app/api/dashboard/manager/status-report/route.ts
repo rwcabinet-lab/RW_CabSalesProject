@@ -135,7 +135,15 @@ export async function GET(req: NextRequest) {
           quoteAmount: true,
           estimatedBudget: true,
           customer: {
-            select: { id: true, name: true, customerType: true },
+            select: {
+              id: true,
+              name: true,
+              customerType: true,
+              salesRep: { select: { id: true, name: true } },
+            },
+          },
+          salesRep: {
+            select: { id: true, name: true },
           },
           milestones: {
             select: {
@@ -222,6 +230,7 @@ export async function GET(req: NextRequest) {
 
       const region = extractRegion(p.siteAddress);
       const unitCount = p.unitCount && p.unitCount > 0 ? p.unitCount : 1;
+      const salesRepName = p.salesRep?.name || p.customer.salesRep?.name || "未指定";
 
       const item: ProjectStatusItemDTO = {
         id: p.id,
@@ -236,6 +245,7 @@ export async function GET(req: NextRequest) {
         year,
         currentStage: p.currentStage,
         overrideSection: override || null,
+        salesRepName,
       };
 
       if (category === "SIGNED") {
