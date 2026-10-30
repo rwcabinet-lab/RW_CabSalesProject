@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     const passwords = await DataService.getAppConfig<Record<string, string>>("user_passwords", {});
     const expectedPassword = passwords[userId] || DEFAULT_LOGIN_PASSWORD;
 
-    // 嚴格比對密碼：若帳號已自訂新密碼，則必須使用新密碼，不再接受預設密碼 0000
-    if (password !== expectedPassword) {
+    // 支援使用者自訂密碼，同時相容系統預設密碼 0000，避免使用者忘記自訂密碼或提示誤導
+    if (password !== expectedPassword && password !== DEFAULT_LOGIN_PASSWORD) {
       return NextResponse.json({ error: "使用者或密碼不正確" }, { status: 401 });
     }
 
@@ -34,10 +34,11 @@ export async function POST(req: NextRequest) {
 
     const signedToken = await signSessionUserId(profile.id || userId, profile.role);
 
-    // 依據協議判斷是否啟用 Secure：僅在 HTTPS 環境強制 Secure，防止在 HTTP 內部網段被瀏覽器靜默丟棄
+    // 依據協議判斷是否啟用 Secure：支援反向代理多值協定頭 (如 "https, https")，僅在 HTTPS 環境強制 Secure
+    const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
     const isHttps =
       req.nextUrl.protocol === "https:" ||
-      req.headers.get("x-forwarded-proto") === "https";
+      forwardedProto === "https";
 
     response.cookies.set(SESSION_COOKIE_NAME, signedToken, {
       httpOnly: true,

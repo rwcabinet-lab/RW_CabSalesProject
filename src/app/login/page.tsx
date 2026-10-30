@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { KeyRound, LogIn } from "lucide-react";
+import { KeyRound, LogIn, Loader2 } from "lucide-react";
 import type { ApiResponse, UserDTO } from "@/types/dto";
 import { ROLE_OPTIONS } from "@/lib/page-access";
 
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -38,6 +39,10 @@ export default function LoginPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!userId) {
+      setError("請先選擇登入帳號");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -48,10 +53,10 @@ export default function LoginPage() {
       });
       const data = await response.json() as ApiResponse<{ redirectTo?: string }>;
       if (!response.ok) throw new Error(data.error || "登入失敗");
-      window.location.replace(data.redirectTo || "/forbidden");
+      setRedirecting(true);
+      window.location.href = data.redirectTo || "/dashboard/workbench";
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "登入失敗");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -75,8 +80,11 @@ export default function LoginPage() {
               id="login-user"
               required
               value={userId}
-              onChange={(event) => setUserId(event.target.value)}
-              disabled={loadingUsers || users.length === 0}
+              onChange={(event) => {
+                setUserId(event.target.value);
+                if (error) setError("");
+              }}
+              disabled={loadingUsers || users.length === 0 || submitting}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
             >
               {loadingUsers && <option value="">載入使用者中...</option>}
@@ -97,11 +105,16 @@ export default function LoginPage() {
                 id="login-password"
                 type="password"
                 required
+                autoFocus
                 placeholder="請輸入密碼（預設：0000）"
                 autoComplete="current-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={submitting}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (error) setError("");
+                }}
+                className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               />
             </div>
           </div>
@@ -113,7 +126,16 @@ export default function LoginPage() {
             disabled={submitting || loadingUsers || users.length === 0}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <LogIn className="h-4 w-4" /> {submitting ? "登入中..." : "登入"}
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {redirecting ? "登入成功，跳轉中..." : "登入驗證中..."}
+              </>
+            ) : (
+              <>
+                <LogIn className="h-4 w-4" /> 登入
+              </>
+            )}
           </button>
         </form>
       </section>

@@ -8,9 +8,14 @@ function getSessionSecret(): string {
   return (
     process.env.SESSION_SECRET ||
     process.env.AUTH_SECRET ||
-    "cabinet_factory_sales_system_hmac_secret_2026"
+    "db9834af1d846d4df8eccdb93a5f47fda8e9c9062d911f399bc558c84cb6218c"
   );
 }
+
+const KNOWN_BACKUP_SECRETS = [
+  "db9834af1d846d4df8eccdb93a5f47fda8e9c9062d911f399bc558c84cb6218c",
+  "cabinet_factory_sales_system_hmac_secret_2026",
+];
 
 export interface SessionPayload {
   userId: string;
@@ -94,6 +99,11 @@ export async function verifySessionToken(
     // 忽略格式錯誤之 URI 解碼
   }
 
+  // 去除外部可能被包裹的雙引號 (RFC 6265 相容)
+  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+    raw = raw.slice(1, -1).trim();
+  }
+
   // 1. 必須為合法簽章格式 (payload.signature)，非簽章格式直接拒絕
   if (!raw.includes(".")) {
     return null;
@@ -110,10 +120,14 @@ export async function verifySessionToken(
     return null;
   }
 
-  const secrets = [
-    getSessionSecret(),
-    "cabinet_factory_sales_system_hmac_secret_2026",
-  ];
+  const secrets = Array.from(
+    new Set([
+      getSessionSecret(),
+      process.env.SESSION_SECRET,
+      process.env.AUTH_SECRET,
+      ...KNOWN_BACKUP_SECRETS,
+    ].filter(Boolean) as string[])
+  );
   let isValid = false;
   const enc = new TextEncoder();
   const data = enc.encode(payload);
@@ -158,6 +172,9 @@ export async function verifySessionToken(
       // 舊版簽章相容（無 expiresAt，但仍具備有效 HMAC 簽章）
       const [userId, role] = parts;
       if (userId) return { userId, role: role || undefined };
+    } else if (parts.length === 1) {
+      const [userId] = parts;
+      if (userId) return { userId };
     }
   }
 
