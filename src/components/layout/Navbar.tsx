@@ -28,7 +28,7 @@ export function Navbar() {
     router.refresh();
   };
 
-  const roleLabel = user?.role === "ADMIN" ? "管理員" : user?.role === "LEVEL_MANAGER" ? "理級主管" : user?.role === "SALES_MANAGER" ? "業務主管" : user?.role === "ASSISTANT" ? "業務助理" : user ? "業務專員" : "未登入";
+  const roleLabel = user?.role === "ADMIN" ? "管理員" : user?.role === "LEVEL_MANAGER" ? "理級主管" : user?.role === "SALES_MANAGER" ? "業務主管" : user?.role === "ASSISTANT" ? "業務助理" : user?.role === "SITE_ENGINEER" ? "工務人員" : user ? "業務專員" : "未登入";
 
   if (pathname === "/login") return null;
 

@@ -143,6 +143,8 @@ export default function SettingsPage() {
       ? "業務主管"
       : user?.role === "ASSISTANT"
       ? "業務助理"
+      : user?.role === "SITE_ENGINEER"
+      ? "工務人員"
       : "業務專員";
 
   if (loading) {
