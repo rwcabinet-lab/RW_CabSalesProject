@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import { formatTenThousands } from "@/lib/currency";
+import { getTaskScheduleStatus } from "@/lib/schedule-engine";
 import type {
   ApiResponse,
   TaskDTO,
@@ -248,44 +249,46 @@ export default function SalesWorkbenchPage() {
               </thead>
               <tbody className="divide-y">
                 {visibleTasks.map((task) => {
-                  const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
-                    .toISOString()
-                    .slice(0, 10);
                   const projectForTask = projects.find((p) => p.id === task.projectId);
                   const isProjectPaused = projectForTask?.trafficLight?.label === "暫緩";
                   const isPaused = Boolean(task.isPaused || isProjectPaused);
-                  const isOverdue =
-                    !task.isCompleted && !isPaused && task.dueDatetime && task.dueDatetime.slice(0, 10) < todayStr;
+                  const status = getTaskScheduleStatus({ ...task, isPaused });
+                  const isAlert = status.isOverdue || status.isDueToday;
 
                   return (
                     <tr
                       key={task.id}
                       className={
-                        isOverdue
+                        isAlert
                           ? "bg-red-50/80 hover:bg-red-100/70"
-                          : isPaused
+                          : status.isPaused
                           ? "bg-slate-50/60 hover:bg-slate-100/60"
                           : "hover:bg-slate-50"
                       }
                     >
                       <td className="p-3 font-bold">
                         <div className="flex items-center flex-wrap gap-1.5">
-                          <span className={isOverdue ? "text-red-900" : ""}>
+                          <span className={isAlert ? "text-red-900" : ""}>
                             [{task.projectName}] {task.subject}
                           </span>
-                          {task.isCompleted && (
+                          {status.isCompleted && (
                             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                               已完成
                             </span>
                           )}
-                          {isPaused && !task.isCompleted && (
+                          {status.isPaused && !status.isCompleted && (
                             <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
                               暫緩
                             </span>
                           )}
-                          {isOverdue && (
+                          {status.isOverdue && (
                             <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
                               已逾期
+                            </span>
+                          )}
+                          {status.isDueToday && (
+                            <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                              已到期
                             </span>
                           )}
                         </div>
@@ -295,8 +298,8 @@ export default function SalesWorkbenchPage() {
                           </div>
                         )}
                       </td>
-                      <td className={`p-3 font-medium ${isOverdue ? "text-red-600 font-bold" : isPaused ? "text-slate-400 italic" : ""}`}>
-                        {isPaused ? "暫緩" : task.dueDatetime.slice(0, 10)}
+                      <td className={`p-3 font-medium ${isAlert ? "text-red-600 font-bold" : status.isPaused ? "text-slate-400 italic font-medium" : ""}`}>
+                        {status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
                       </td>
                       <td className="p-3">{task.priority}</td>
                       <td className="p-3 text-center">

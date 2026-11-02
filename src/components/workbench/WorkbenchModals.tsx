@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
 import { QUERY_KEYS } from "@/hooks/useQueries";
+import { getTaiwanDateString } from "@/lib/schedule-engine";
 import type { ApiResponse, TaskDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
 
 interface WorkbenchModalsProps {
@@ -153,9 +154,7 @@ export function WorkbenchCompleteTaskModal({ onInvalidate }: CompleteTaskModalPr
     e.preventDefault();
     if (!taskToComplete) return;
 
-    const completedAt =
-      completionDate ||
-      new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+    const completedAt = completionDate || getTaiwanDateString();
     setCompletingTask(true);
     setCompletionError("");
 

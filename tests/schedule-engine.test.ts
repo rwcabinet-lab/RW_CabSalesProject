@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ScheduleEngine,
   getTaiwanDateString,
+  getTaskScheduleStatus,
   STAGE_CODE_TO_PROJECT_STAGE,
 } from "@/lib/schedule-engine";
 import { ProjectMilestoneItem } from "@/lib/constants";
@@ -41,6 +42,74 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       // UTC 2026-10-29 20:00:00 -> 台灣時間 2026-10-30 04:00:00 (跨日換算)
       const utcPrevDayNight = new Date("2026-10-29T20:00:00Z");
       expect(getTaiwanDateString(utcPrevDayNight)).toBe("2026-10-30");
+    });
+  });
+
+  describe("getTaskScheduleStatus (待辦事項時程與燈號狀態同步)", () => {
+    const fixedCurrentDate = new Date("2026-11-02T10:00:00+08:00");
+
+    it("當天到期的待辦事項應標示為已到期 (isDueToday: true, badgeLabel: 已到期)", () => {
+      const task = {
+        dueDatetime: "2026-11-02T18:00:00Z",
+        isCompleted: false,
+        isPaused: false,
+      };
+      const status = getTaskScheduleStatus(task, fixedCurrentDate);
+      expect(status.isDueToday).toBe(true);
+      expect(status.isOverdue).toBe(false);
+      expect(status.isPaused).toBe(false);
+      expect(status.badgeLabel).toBe("已到期");
+      expect(status.dueDateStr).toBe("2026-11-02");
+    });
+
+    it("昨天以前到期之待辦事項應標示為已逾期 (isOverdue: true, badgeLabel: 已逾期)", () => {
+      const task = {
+        dueDatetime: "2026-11-01T23:59:59Z",
+        isCompleted: false,
+        isPaused: false,
+      };
+      const status = getTaskScheduleStatus(task, fixedCurrentDate);
+      expect(status.isDueToday).toBe(false);
+      expect(status.isOverdue).toBe(true);
+      expect(status.badgeLabel).toBe("已逾期");
+    });
+
+    it("暫緩中之案件待辦事項即使逾期或到期亦應維持暫緩標記", () => {
+      const task = {
+        dueDatetime: "2026-11-01T00:00:00Z",
+        isCompleted: false,
+        isPaused: true,
+      };
+      const status = getTaskScheduleStatus(task, fixedCurrentDate);
+      expect(status.isDueToday).toBe(false);
+      expect(status.isOverdue).toBe(false);
+      expect(status.isPaused).toBe(true);
+      expect(status.badgeLabel).toBe("暫緩");
+    });
+
+    it("已完成之待辦事項應標記為已完成且不觸發逾期或當天到期", () => {
+      const task = {
+        dueDatetime: "2026-10-20T00:00:00Z",
+        isCompleted: true,
+        isPaused: false,
+      };
+      const status = getTaskScheduleStatus(task, fixedCurrentDate);
+      expect(status.isDueToday).toBe(false);
+      expect(status.isOverdue).toBe(false);
+      expect(status.isCompleted).toBe(true);
+      expect(status.badgeLabel).toBe("已完成");
+    });
+
+    it("未來日期之待辦事項正常進行，無警示標籤", () => {
+      const task = {
+        dueDatetime: "2026-11-05T00:00:00Z",
+        isCompleted: false,
+        isPaused: false,
+      };
+      const status = getTaskScheduleStatus(task, fixedCurrentDate);
+      expect(status.isDueToday).toBe(false);
+      expect(status.isOverdue).toBe(false);
+      expect(status.badgeLabel).toBeNull();
     });
   });
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
+import { getTaiwanDateString } from "@/lib/schedule-engine";
 
 interface CalendarProps {
   projects: ProjectWithMilestonesDTO[];
@@ -63,6 +64,7 @@ function taskStyle(task: TaskDTO, todayKey: string): string {
   if (task.isPaused) return "border-slate-200 bg-slate-100/70 text-slate-600";
   const dueKey = toDateKey(task.dueDatetime);
   if (dueKey && dueKey < todayKey) return "border-red-200 bg-red-100 text-red-800";
+  if (dueKey && dueKey === todayKey) return "border-red-200 bg-red-100 text-red-800 font-bold";
 
   switch (task.taskType) {
     case "SITE_VISIT":
@@ -92,7 +94,7 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
   const daysInMonth = new Date(month.year, month.month + 1, 0).getDate();
   const leadingBlanks = firstDay.getDay();
   const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
-  const todayKey = keyFromDate(new Date());
+  const todayKey = getTaiwanDateString();
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     const addEvent = (dateKey: string | null, event: CalendarEvent) => {
@@ -246,10 +248,12 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                         const { milestone, project } = event;
                         const label = milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode;
                         const isProjectLost = project.currentStage === "LOST";
+                        const isMilestoneOverdue = !isProjectLost && milestone.status === "OVERDUE";
+                        const isMilestoneDueToday = !isProjectLost && (milestone.trafficLight?.label === "已到期" || (milestone.plannedDueDate && toDateKey(milestone.plannedDueDate) === todayKey && milestone.status !== "COMPLETED"));
                         const milestoneStyle = isProjectLost
                           ? (milestone.status === "COMPLETED" ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700")
-                          : milestone.status === "OVERDUE"
-                          ? "border-red-200 bg-red-100 text-red-800"
+                          : (isMilestoneOverdue || isMilestoneDueToday || milestone.trafficLight?.color === "RED")
+                          ? "border-red-200 bg-red-100 text-red-800 font-bold"
                           : milestone.status === "COMPLETED"
                             ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                             : milestone.status === "IN_PROGRESS"
@@ -333,7 +337,20 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                   </div>
                   <div>
                     <span className="block font-semibold text-slate-400">狀態</span>
-                    <span className="font-medium text-slate-800">{activeEvent.milestone.status}</span>
+                    <span className="font-medium text-slate-800">
+                      {activeEvent.project.currentStage === "LOST"
+                        ? (activeEvent.milestone.status === "COMPLETED" ? "已完成" : "未進行")
+                        : activeEvent.milestone.trafficLight?.label ||
+                          (activeEvent.milestone.status === "COMPLETED"
+                            ? "已完成"
+                            : activeEvent.milestone.status === "OVERDUE"
+                            ? "已逾期"
+                            : (activeEvent.milestone.plannedDueDate && toDateKey(activeEvent.milestone.plannedDueDate) === todayKey)
+                            ? "已到期"
+                            : activeEvent.milestone.status === "IN_PROGRESS"
+                            ? "進行中"
+                            : "未開始")}
+                    </span>
                   </div>
                   <div>
                     <span className="block font-semibold text-slate-400">負責人</span>
@@ -379,7 +396,15 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                   <div>
                     <span className="block font-semibold text-slate-400">狀態</span>
                     <span className="font-medium text-slate-800">
-                      {activeEvent.task.isCompleted ? "已完成" : activeEvent.task.isPaused ? "暫緩" : toDateKey(activeEvent.task.dueDatetime)! < todayKey ? "逾期" : "待處理"}
+                      {activeEvent.task.isCompleted
+                        ? "已完成"
+                        : activeEvent.task.isPaused
+                        ? "暫緩"
+                        : toDateKey(activeEvent.task.dueDatetime)! < todayKey
+                        ? "已逾期"
+                        : toDateKey(activeEvent.task.dueDatetime) === todayKey
+                        ? "已到期"
+                        : "待處理"}
                     </span>
                   </div>
                   <div>

@@ -346,13 +346,32 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const projectTrafficLightMap = new Map<string, string>();
+    for (const p of projects) {
+      const ms = milestonesByProject[p.id] || [];
+      const activeMs = p.currentStage === "LOST" ? null : ms.find((m) => m.status === "OVERDUE") || ms.find((m) => m.status === "IN_PROGRESS");
+      const tl = activeMs ? ScheduleEngine.getTrafficLight(activeMs) : null;
+      if (tl?.label) {
+        projectTrafficLightMap.set(p.id, tl.label);
+      }
+    }
+
+    const assignedTasksWithStatus = assignedTasks.map((task) => {
+      const projectLabel = projectTrafficLightMap.get(task.projectId);
+      const isProjectPaused = projectLabel === "暫緩";
+      return {
+        ...task,
+        isPaused: Boolean(task.isPaused || isProjectPaused),
+      };
+    });
+
     return NextResponse.json({
       kpi: { totalProjects, signedTotal, conversionRate, delayedCount },
       alertList,
       salesWorkload,
       stageBottlenecks,
       allProjectsOverview,
-      assignedTasks,
+      assignedTasks: assignedTasksWithStatus,
     });
   } catch (error) {
     return handleApiError(error, "無法取得主管監控室資料");

@@ -23,6 +23,94 @@ export function getTaiwanDateString(date: Date = new Date()): string {
   return formatter.format(date);
 }
 
+export interface TaskScheduleStatus {
+  isOverdue: boolean;
+  isDueToday: boolean;
+  isPaused: boolean;
+  isCompleted: boolean;
+  dueDateStr: string;
+  badgeLabel: "已逾期" | "已到期" | "暫緩" | "已完成" | null;
+}
+
+/** 評估待辦事項時程狀態（逾期/當天到期/暫緩/完成） */
+export function getTaskScheduleStatus(
+  task: {
+    dueDatetime?: string | null;
+    isCompleted?: boolean;
+    isPaused?: boolean;
+  },
+  currentDate: Date = new Date()
+): TaskScheduleStatus {
+  const todayStr = getTaiwanDateString(currentDate);
+  const dueDateStr = task.dueDatetime ? task.dueDatetime.slice(0, 10) : "";
+  const isCompleted = Boolean(task.isCompleted);
+  const isPaused = Boolean(task.isPaused);
+
+  if (isCompleted) {
+    return {
+      isOverdue: false,
+      isDueToday: false,
+      isPaused,
+      isCompleted: true,
+      dueDateStr,
+      badgeLabel: "已完成",
+    };
+  }
+
+  if (isPaused) {
+    return {
+      isOverdue: false,
+      isDueToday: false,
+      isPaused: true,
+      isCompleted: false,
+      dueDateStr,
+      badgeLabel: "暫緩",
+    };
+  }
+
+  if (!dueDateStr) {
+    return {
+      isOverdue: false,
+      isDueToday: false,
+      isPaused: false,
+      isCompleted: false,
+      dueDateStr: "",
+      badgeLabel: null,
+    };
+  }
+
+  if (dueDateStr < todayStr) {
+    return {
+      isOverdue: true,
+      isDueToday: false,
+      isPaused: false,
+      isCompleted: false,
+      dueDateStr,
+      badgeLabel: "已逾期",
+    };
+  }
+
+  if (dueDateStr === todayStr) {
+    return {
+      isOverdue: false,
+      isDueToday: true,
+      isPaused: false,
+      isCompleted: false,
+      dueDateStr,
+      badgeLabel: "已到期",
+    };
+  }
+
+  return {
+    isOverdue: false,
+    isDueToday: false,
+    isPaused: false,
+    isCompleted: false,
+    dueDateStr,
+    badgeLabel: null,
+  };
+}
+
 /** 里程碑子進度代碼 → 專案大階段對應 */
 export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   // ① 案件開發

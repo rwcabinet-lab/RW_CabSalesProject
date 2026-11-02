@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
+import { getTaiwanDateString } from "@/lib/schedule-engine";
 
 interface GanttProps {
   projects: ProjectWithMilestonesDTO[];
@@ -59,7 +60,7 @@ function addDays(key: string, days: number): string {
 }
 
 export function GanttChart({ projects, tasks }: GanttProps) {
-  const todayKey = getDateKey(new Date().toISOString())!;
+  const todayKey = getTaiwanDateString();
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (projectId: string) => {
@@ -161,7 +162,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
 
   const markerColor = (row: TimelineRow) => {
     if (row.kind === "PROJECT") return "bg-violet-500";
-    if (row.status === "OVERDUE" || (row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED")) return "bg-red-500";
+    if (row.status === "OVERDUE" || (row.dateKey && row.dateKey <= todayKey && row.status !== "COMPLETED")) return "bg-red-500";
     if (row.status === "COMPLETED") return "bg-emerald-500";
     if (row.kind === "TASK") return "bg-amber-500";
     if (row.status === "IN_PROGRESS") return "bg-blue-500";
@@ -288,6 +289,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                         ) : (
                           rows.map((row) => {
                             const overdue = !isProjectLost && Boolean(row.dateKey && row.dateKey < todayKey && row.status !== "COMPLETED");
+                            const dueToday = !isProjectLost && Boolean(row.dateKey && row.dateKey === todayKey && row.status !== "COMPLETED");
                             const color = isProjectLost ? (row.status === "COMPLETED" ? "bg-emerald-500" : "bg-slate-400") : markerColor(row);
 
                             return (
@@ -303,11 +305,15 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                                   ) : (
                                     <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                   )}
-                                  <span className={`truncate text-xs ${row.kind === "PROJECT" ? "font-bold text-violet-700" : "font-medium text-slate-700"}`}>
+                                  <span className={`truncate text-xs ${row.kind === "PROJECT" ? "font-bold text-violet-700" : overdue || dueToday ? "font-bold text-red-900" : "font-medium text-slate-700"}`}>
                                     {row.label}
                                   </span>
                                   {row.kind === "TASK" && (
-                                    <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">
+                                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                                      overdue || dueToday
+                                        ? "bg-red-100 text-red-700 font-bold"
+                                        : "bg-amber-50 text-amber-700"
+                                    }`}>
                                       待辦
                                     </span>
                                   )}
@@ -347,9 +353,10 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                                 </div>
 
                                 <div className="text-right text-[10px]">
-                                  <div className={overdue ? "font-bold text-red-600" : "font-semibold text-slate-600"}>
+                                  <div className={overdue || dueToday ? "font-bold text-red-600" : "font-semibold text-slate-600"}>
                                     {row.dateKey ? formatDate(row.dateKey) : "未排定"}
                                     {overdue && "・逾期"}
+                                    {dueToday && "・已到期"}
                                   </div>
                                   <div className="truncate text-slate-400">
                                     {row.assignedToName || (row.kind === "PROJECT" ? "案場" : "未指定")}

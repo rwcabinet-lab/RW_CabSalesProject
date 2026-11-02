@@ -19,9 +19,9 @@ import {
 } from "@/hooks/useQueries";
 import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTaskModal";
 import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjectStatusReport";
+import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
 
-const todayDate = () =>
-  new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+const todayDate = () => getTaiwanDateString();
 
 const EMPTY_OVERVIEW: ManagerDashboardDTO["allProjectsOverview"] = [];
 
@@ -423,21 +423,59 @@ export default function ManagerDashboardPage() {
         </div>
         {data.assignedTasks.length ? (
           <div className="divide-y px-6">
-            {data.assignedTasks.map((task) => (
-              <article key={task.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div>
-                  <h3 className="font-semibold">{task.subject}</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "進行中"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>預定完成：{task.dueDatetime.slice(0, 10)}</span>
-                  <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
-                  <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
-                </div>
-              </article>
-            ))}
+            {data.assignedTasks.map((task) => {
+              const status = getTaskScheduleStatus(task);
+              const isAlert = status.isOverdue || status.isDueToday;
+
+              return (
+                <article
+                  key={task.id}
+                  className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm px-3 rounded-lg transition-colors ${
+                    isAlert
+                      ? "bg-red-50/70"
+                      : status.isPaused
+                      ? "bg-slate-50/70"
+                      : ""
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      <h3 className={`font-semibold ${isAlert ? "text-red-900" : ""}`}>{task.subject}</h3>
+                      {status.isCompleted && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                          已完成
+                        </span>
+                      )}
+                      {status.isPaused && !status.isCompleted && (
+                        <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                          暫緩
+                        </span>
+                      )}
+                      {status.isOverdue && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已逾期
+                        </span>
+                      )}
+                      {status.isDueToday && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已到期
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "進行中"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : ""}>
+                      預定完成：{status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
+                    </span>
+                    <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
+                    <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有已指派任務</p>}
       </section>

@@ -36,6 +36,7 @@ import {
   QUOTE_STAGE_CODES,
 } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
+import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
 import type {
   ApiResponse,
   MilestoneDTO,
@@ -865,7 +866,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           {PHASE_ORDER.map((phase) => {
             const progress = phaseProgress(phase);
             const count = phaseGroups[phase].length;
-            const hasOverdue = !isProjectLost && phaseGroups[phase].some((m) => m.status === "OVERDUE");
+            const hasOverdue = !isProjectLost && phaseGroups[phase].some((m) => m.status === "OVERDUE" || m.trafficLight?.color === "RED");
             const hasInProgress = !isProjectLost && phaseGroups[phase].some((m) => m.status === "IN_PROGRESS");
             const isActiveTab = activePhase === phase;
 
@@ -975,8 +976,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isEditing = editingId === m.id;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
-              const isOverdue = !isProjectLost && m.status === "OVERDUE";
-              const isActive = m.status === "IN_PROGRESS" || isOverdue;
+              const isDueToday = !isProjectLost && m.trafficLight?.label === "已到期";
+              const isOverdue = !isProjectLost && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾期"));
+              const isActive = m.status === "IN_PROGRESS" || isOverdue || isDueToday;
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
@@ -1015,7 +1017,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                         ? "opacity-40 scale-[0.98] border-dashed border-blue-400 bg-slate-50"
                         : isProjectLost
                           ? "border-slate-200 bg-slate-50/80 opacity-75"
-                          : isOverdue
+                          : isOverdue || isDueToday
                             ? "border-red-200 bg-red-50/30"
                             : m.status === "IN_PROGRESS"
                               ? "border-blue-200 bg-blue-50/20 shadow-xs"
@@ -1389,22 +1391,53 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         </div>
         {tasks.length ? (
           <div className="divide-y">
-            {tasks.map((task) => (
-              <div key={task.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                <div>
-                  <p className="font-semibold text-slate-800">{task.subject}</p>
-                  <p className="mt-1 text-slate-500">
-                    負責人：{task.assignedToName || "—"}
-                    {task.milestoneId ? " · 里程碑待辦" : ""}
-                    {task.assignedByName ? ` · 指派者：${task.assignedByName}` : ""}
-                  </p>
+            {tasks.map((task) => {
+              const status = getTaskScheduleStatus(task);
+              const isAlert = status.isOverdue || status.isDueToday;
+
+              return (
+                <div
+                  key={task.id}
+                  className={`grid gap-2 px-5 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center ${
+                    isAlert ? "bg-red-50/70" : status.isPaused ? "bg-slate-50/70" : ""
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      <p className={`font-semibold ${isAlert ? "text-red-900" : "text-slate-800"}`}>
+                        {task.subject}
+                      </p>
+                      {status.isPaused && !status.isCompleted && (
+                        <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                          暫緩
+                        </span>
+                      )}
+                      {status.isOverdue && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已逾期
+                        </span>
+                      )}
+                      {status.isDueToday && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已到期
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-slate-500">
+                      負責人：{task.assignedToName || "—"}
+                      {task.milestoneId ? " · 里程碑待辦" : ""}
+                      {task.assignedByName ? ` · 指派者：${task.assignedByName}` : ""}
+                    </p>
+                  </div>
+                  <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : "text-slate-500"}>
+                    到期：{status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
+                  </span>
+                  <span className={`font-semibold ${task.priority === "HIGH" ? "text-red-600" : task.priority === "MEDIUM" ? "text-amber-600" : "text-slate-500"}`}>
+                    優先度：{task.priority === "HIGH" ? "高" : task.priority === "MEDIUM" ? "中" : "低"}
+                  </span>
                 </div>
-                <span className="text-slate-500">到期：{task.dueDatetime.slice(0, 10)}</span>
-                <span className={`font-semibold ${task.priority === "HIGH" ? "text-red-600" : task.priority === "MEDIUM" ? "text-amber-600" : "text-slate-500"}`}>
-                  優先度：{task.priority === "HIGH" ? "高" : task.priority === "MEDIUM" ? "中" : "低"}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="px-5 py-8 text-center text-xs text-slate-400">目前沒有待辦事項</p>
