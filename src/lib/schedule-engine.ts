@@ -134,7 +134,7 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
 export const ScheduleEngine = {
   /**
    * 計算特定里程碑的時程燈號
-   * 🔴 逾期卡關  🟡 3天內到期  🟢 正常進行中  ⚪ 已完成/未啟動
+   * 🔴 逾期卡關  🟡 3天內到期  🟢 正常進行中  ⚪ 已完成/未啟動/暫緩/未排定
    */
   getTrafficLight(
     milestone: ProjectMilestoneItem,
@@ -149,11 +149,12 @@ export const ScheduleEngine = {
       return { color: "GRAY", label: "已完成", daysDiff: 0 };
     }
 
-    if (!milestone.plannedDueDate) {
-      if (milestone.status === "IN_PROGRESS") {
-        return { color: "GRAY", label: "暫緩", daysDiff: 999 };
-      }
+    if (milestone.isSubsequentToPaused) {
       return { color: "GRAY", label: "未排定時程", daysDiff: 999 };
+    }
+
+    if (!milestone.plannedDueDate) {
+      return { color: "GRAY", label: "暫緩", daysDiff: 999 };
     }
 
     const [dy, dm, dd] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -212,7 +213,7 @@ export const ScheduleEngine = {
   },
 
   /**
-   * 重新評估整份里程碑清單，標記逾期項目
+   * 重新評估整份里程碑清單，標記逾期項目與暫緩後續項目
    */
   evaluateMilestones(
     milestones: ProjectMilestoneItem[],
@@ -228,32 +229,51 @@ export const ScheduleEngine = {
       // 流標案件：各進度不再顯示逾期，時程狀態亦不標示逾期
       const sanitized = milestones.map((m) => {
         if (m.status === "OVERDUE") {
-          return { ...m, status: "IN_PROGRESS" as const };
+          return { ...m, status: "IN_PROGRESS" as const, isSubsequentToPaused: false };
         }
-        return m;
+        return { ...m, isSubsequentToPaused: false };
       });
       return { milestones: sanitized, isDelayed: false };
     }
+
+    // 尋找第一個未完成且未設定/已清空預定完成日之暫緩進度項目
+    const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+    const pausedMilestone = sorted.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
+    const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
 
     let hasOverdue = false;
     const curDateOnly = getTaiwanDateString(currentDate);
 
     const evaluated = milestones.map((m) => {
-      if (m.status === "COMPLETED") return m;
+      const isSubsequentToPaused = Boolean(
+        pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED"
+      );
+
+      if (m.status === "COMPLETED") {
+        return { ...m, isSubsequentToPaused: false };
+      }
+
+      // 若為暫緩進度的後續項目：不計算逾期，並標記 isSubsequentToPaused = true
+      if (isSubsequentToPaused) {
+        if (m.status === "OVERDUE") {
+          return { ...m, status: "IN_PROGRESS" as const, isSubsequentToPaused: true };
+        }
+        return { ...m, isSubsequentToPaused: true };
+      }
 
       if (m.plannedDueDate && m.status !== "PENDING") {
         const dueDateOnly = m.plannedDueDate.slice(0, 10);
         if (dueDateOnly < curDateOnly) {
           hasOverdue = true;
-          return { ...m, status: "OVERDUE" as const };
+          return { ...m, status: "OVERDUE" as const, isSubsequentToPaused: false };
         } else if (m.status === "OVERDUE") {
-          return { ...m, status: "IN_PROGRESS" as const };
+          return { ...m, status: "IN_PROGRESS" as const, isSubsequentToPaused: false };
         }
       } else if (!m.plannedDueDate && m.status === "OVERDUE") {
-        return { ...m, status: "IN_PROGRESS" as const };
+        return { ...m, status: "IN_PROGRESS" as const, isSubsequentToPaused: false };
       }
 
-      return m;
+      return { ...m, isSubsequentToPaused: false };
     });
 
     return { milestones: evaluated, isDelayed: hasOverdue };

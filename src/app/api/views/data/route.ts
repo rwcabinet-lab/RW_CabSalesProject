@@ -34,12 +34,15 @@ export async function GET(req: NextRequest) {
 
     const projectsWithMilestones = projects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
-      const milestonesWithLights = milestones.map((m) => ({
+      const { milestones: evaluatedMilestones, isDelayed: evaluatedDelayed } =
+        ScheduleEngine.evaluateMilestones(milestones, new Date(), p.currentStage === "LOST");
+
+      const milestonesWithLights = evaluatedMilestones.map((m) => ({
         ...m,
-        trafficLight: ScheduleEngine.getTrafficLight(m),
+        trafficLight: ScheduleEngine.getTrafficLight(m, new Date(), p.currentStage === "LOST"),
       }));
 
-      const isDelayed = ScheduleEngine.isProjectDelayed(p, milestones);
+      const isDelayed = p.currentStage === "LOST" ? false : (evaluatedDelayed || ScheduleEngine.isProjectDelayed(p, evaluatedMilestones));
 
       return {
         ...p,

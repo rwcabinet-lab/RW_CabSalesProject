@@ -17,14 +17,22 @@ function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTraff
   milestones: T[],
   isProjectLost = false,
 ) {
+  const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+  const pausedMilestone = sorted.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
+  const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
+
   return milestones.map((m) => {
-    const status = isProjectLost && m.status === "OVERDUE" ? ("IN_PROGRESS" as const) : m.status;
+    const isSubsequentToPaused = Boolean(
+      m.isSubsequentToPaused ?? (pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED")
+    );
+    const itemWithSubsequent = { ...m, isSubsequentToPaused };
+    const status = isProjectLost && itemWithSubsequent.status === "OVERDUE" ? ("IN_PROGRESS" as const) : itemWithSubsequent.status;
     return {
-      ...m,
+      ...itemWithSubsequent,
       status,
       trafficLight: isProjectLost
-        ? { color: "GRAY" as const, label: m.status === "COMPLETED" ? "已完成" : "流標", daysDiff: 0 }
-        : ScheduleEngine.getTrafficLight(m),
+        ? { color: "GRAY" as const, label: itemWithSubsequent.status === "COMPLETED" ? "已完成" : "流標", daysDiff: 0 }
+        : ScheduleEngine.getTrafficLight(itemWithSubsequent),
     };
   });
 }

@@ -106,7 +106,16 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
     };
 
     for (const project of projects) {
+      const sortedMilestones = [...project.milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+      const pausedM = sortedMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
+      const pausedOrder = pausedM ? pausedM.stageOrder : null;
+
       for (const milestone of project.milestones) {
+        const isSubsequent = Boolean(
+          milestone.isSubsequentToPaused ??
+          (pausedOrder !== null && milestone.stageOrder > pausedOrder && milestone.status !== "COMPLETED")
+        );
+        if (isSubsequent) continue;
         if (milestone.assignedToId && hiddenStaffIds.has(milestone.assignedToId)) continue;
         addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });
       }

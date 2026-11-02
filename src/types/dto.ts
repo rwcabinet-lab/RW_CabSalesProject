@@ -202,6 +202,7 @@ export interface MilestoneDTO {
   plannedEnd?: string | null;
   stageName?: string;
   records?: MilestoneRecordDTO[];
+  isSubsequentToPaused?: boolean;
 }
 
 export interface ColumnItemDTO {

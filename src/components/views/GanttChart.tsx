@@ -95,16 +95,26 @@ export function GanttChart({ projects, tasks }: GanttProps) {
     }
 
     const rowsData = projects.map((project) => {
-      const rows: TimelineRow[] = project.milestones.map((milestone) => ({
-        id: `milestone-${milestone.id}`,
-        label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
-        kind: "MILESTONE",
-        dateKey: getDateKey(milestone.plannedDueDate),
-        actualDateKey: getDateKey(milestone.actualDueDate),
-        status: milestone.status,
-        assignedToName: milestone.assignedToName,
-        projectId: project.id,
-      }));
+      const sortedMilestones = [...project.milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+      const pausedM = sortedMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
+      const pausedOrder = pausedM ? pausedM.stageOrder : null;
+
+      const rows: TimelineRow[] = project.milestones.map((milestone) => {
+        const isSubsequent = Boolean(
+          milestone.isSubsequentToPaused ??
+          (pausedOrder !== null && milestone.stageOrder > pausedOrder && milestone.status !== "COMPLETED")
+        );
+        return {
+          id: `milestone-${milestone.id}`,
+          label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
+          kind: "MILESTONE",
+          dateKey: isSubsequent ? null : getDateKey(milestone.plannedDueDate),
+          actualDateKey: getDateKey(milestone.actualDueDate),
+          status: isSubsequent ? undefined : milestone.status,
+          assignedToName: milestone.assignedToName,
+          projectId: project.id,
+        };
+      });
 
       const projectTasks = taskByProject.get(project.id) || [];
       for (const task of projectTasks) {

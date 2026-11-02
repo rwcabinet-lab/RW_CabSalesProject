@@ -730,6 +730,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const canRollback = canManageMilestones || (!!project && currentUserId === project.salesRepId);
 
   const sortedAllMilestones = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+  const pausedMilestone = sortedAllMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
+  const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
   const lastCompletedMilestone = [...sortedAllMilestones].reverse().find((m) => m.status === "COMPLETED");
 
   // 依大階段分組
@@ -983,11 +985,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           <div className="space-y-3">
             {phaseGroups[activePhase].map((m) => {
               const isEditing = editingId === m.id;
+              const isSubsequent = Boolean(
+                m.isSubsequentToPaused ??
+                (pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED")
+              );
+              const isPaused = !isProjectLost && m.status !== "COMPLETED" && (!m.plannedDueDate || m.trafficLight?.label === "暫緩") && !isSubsequent;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
-              const isDueToday = !isProjectLost && m.trafficLight?.label === "已到期";
-              const isOverdue = !isProjectLost && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾期"));
-              const isActive = m.status === "IN_PROGRESS" || isOverdue || isDueToday;
+              const isDueToday = !isProjectLost && !isSubsequent && m.trafficLight?.label === "已到期";
+              const isOverdue = !isProjectLost && !isSubsequent && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾期"));
+              const isActive = (m.status === "IN_PROGRESS" || isOverdue || isDueToday) && !isSubsequent;
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
@@ -1028,11 +1035,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           ? "border-slate-200 bg-slate-50/80 opacity-75"
                           : isOverdue || isDueToday
                             ? "border-red-200 bg-red-50/30"
-                            : m.status === "IN_PROGRESS"
-                              ? "border-blue-200 bg-blue-50/20 shadow-xs"
-                              : m.status === "COMPLETED"
-                                ? "border-emerald-100 bg-emerald-50/10"
-                                : "border-slate-200 bg-white"
+                            : isPaused
+                              ? "border-slate-300 bg-slate-50/50"
+                              : m.status === "IN_PROGRESS"
+                                ? "border-blue-200 bg-blue-50/20 shadow-xs"
+                                : m.status === "COMPLETED"
+                                  ? "border-emerald-100 bg-emerald-50/10"
+                                  : "border-slate-200 bg-white"
                   }`}
                 >
                   {isEditing && !isProjectLost ? (
@@ -1126,36 +1135,44 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               <span className="font-bold text-sm text-slate-900">
                                 {MILESTONE_STAGE_LABELS[m.stageCode]}
                               </span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                isProjectLost
-                                  ? m.status === "COMPLETED"
-                                    ? `${STATUS_MAP.COMPLETED.bg} ${STATUS_MAP.COMPLETED.text}`
-                                    : `${STATUS_MAP.PENDING.bg} ${STATUS_MAP.PENDING.text}`
-                                  : `${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`
-                              }`}>
-                                {isProjectLost
-                                  ? m.status === "COMPLETED" ? "已完成" : "未進行"
-                                  : STATUS_MAP[m.status].label}
-                              </span>
-                              {isAuditStage && !isProjectLost && (
+                              {!isSubsequent && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                  isProjectLost
+                                    ? m.status === "COMPLETED"
+                                      ? `${STATUS_MAP.COMPLETED.bg} ${STATUS_MAP.COMPLETED.text}`
+                                      : `${STATUS_MAP.PENDING.bg} ${STATUS_MAP.PENDING.text}`
+                                    : isPaused
+                                      ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                      : `${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`
+                                }`}>
+                                  {isProjectLost
+                                    ? m.status === "COMPLETED" ? "已完成" : "未進行"
+                                    : isPaused
+                                      ? "暫緩"
+                                      : STATUS_MAP[m.status].label}
+                                </span>
+                              )}
+                              {isAuditStage && !isProjectLost && !isSubsequent && (
                                 <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
                                   {isAuditSubmitted ? "等待審核" : "需審核"}
                                 </span>
                               )}
-                              {!isProjectLost && m.trafficLight?.color === "RED" && (
+                              {!isProjectLost && !isSubsequent && m.trafficLight?.color === "RED" && (
                                 <span className="text-[10px] text-red-600 font-black">● {m.trafficLight.label}</span>
                               )}
-                              {!isProjectLost && m.trafficLight?.color === "YELLOW" && (
+                              {!isProjectLost && !isSubsequent && m.trafficLight?.color === "YELLOW" && (
                                 <span className="text-[10px] text-amber-600 font-bold">● {m.trafficLight.label}</span>
                               )}
-                              {!isProjectLost && m.trafficLight?.label === "暫緩" && (
+                              {!isProjectLost && !isSubsequent && isPaused && (
                                 <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full font-bold">● 暫緩</span>
                               )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
                               <span>負責人：<b className="text-slate-700">{m.assignedToName || "未指派"}</b></span>
-                              <span>預定完成：<b>{m.plannedDueDate || "未設定"}</b></span>
+                              {!isSubsequent && (
+                                <span>預定完成：<b>{m.plannedDueDate || (isPaused ? "暫緩" : "未設定")}</b></span>
+                              )}
                               {m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>}
                               {m.notes && <span className="italic text-slate-400">({m.notes})</span>}
                             </div>
