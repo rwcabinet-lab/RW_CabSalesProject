@@ -251,13 +251,22 @@ export default function SalesWorkbenchPage() {
                   const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
                     .toISOString()
                     .slice(0, 10);
+                  const projectForTask = projects.find((p) => p.id === task.projectId);
+                  const isProjectPaused = projectForTask?.trafficLight?.label === "暫緩";
+                  const isPaused = Boolean(task.isPaused || isProjectPaused);
                   const isOverdue =
-                    !task.isCompleted && task.dueDatetime && task.dueDatetime.slice(0, 10) < todayStr;
+                    !task.isCompleted && !isPaused && task.dueDatetime && task.dueDatetime.slice(0, 10) < todayStr;
 
                   return (
                     <tr
                       key={task.id}
-                      className={isOverdue ? "bg-red-50/80 hover:bg-red-100/70" : "hover:bg-slate-50"}
+                      className={
+                        isOverdue
+                          ? "bg-red-50/80 hover:bg-red-100/70"
+                          : isPaused
+                          ? "bg-slate-50/60 hover:bg-slate-100/60"
+                          : "hover:bg-slate-50"
+                      }
                     >
                       <td className="p-3 font-bold">
                         <div className="flex items-center flex-wrap gap-1.5">
@@ -267,6 +276,11 @@ export default function SalesWorkbenchPage() {
                           {task.isCompleted && (
                             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                               已完成
+                            </span>
+                          )}
+                          {isPaused && !task.isCompleted && (
+                            <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                              暫緩
                             </span>
                           )}
                           {isOverdue && (
@@ -281,8 +295,8 @@ export default function SalesWorkbenchPage() {
                           </div>
                         )}
                       </td>
-                      <td className={`p-3 font-medium ${isOverdue ? "text-red-600 font-bold" : ""}`}>
-                        {task.dueDatetime.slice(0, 10)}
+                      <td className={`p-3 font-medium ${isOverdue ? "text-red-600 font-bold" : isPaused ? "text-slate-400 italic" : ""}`}>
+                        {isPaused ? "暫緩" : task.dueDatetime.slice(0, 10)}
                       </td>
                       <td className="p-3">{task.priority}</td>
                       <td className="p-3 text-center">

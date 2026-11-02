@@ -17,11 +17,24 @@ export const TaskService = {
       relationLoadStrategy: "join",
       include: {
         project: { select: { projectName: true } },
+        milestone: {
+          select: {
+            id: true,
+            stageCode: true,
+            status: true,
+            plannedDueDate: true,
+          },
+        },
         assignedTo: { select: { name: true } },
         assignedBy: { select: { name: true } },
       },
     });
     if (!task) return null;
+    const isPaused = Boolean(
+      task.milestone &&
+      !task.milestone.plannedDueDate &&
+      task.milestone.status !== "COMPLETED"
+    );
     return {
       id: task.id,
       projectId: task.projectId,
@@ -38,6 +51,7 @@ export const TaskService = {
       isCompleted: task.isCompleted,
       resultNotes: task.resultNotes,
       completedAt: dateValue(task.completedAt) || null,
+      isPaused,
     };
   },
 
@@ -62,29 +76,45 @@ export const TaskService = {
       relationLoadStrategy: "join",
       include: {
         project: { select: { projectName: true } },
+        milestone: {
+          select: {
+            id: true,
+            stageCode: true,
+            status: true,
+            plannedDueDate: true,
+          },
+        },
         assignedTo: { select: { name: true } },
         assignedBy: { select: { name: true } },
       },
       orderBy: { dueDatetime: "asc" },
     });
 
-    return tasks.map((t) => ({
-      id: t.id,
-      projectId: t.projectId,
-      projectName: t.project.projectName,
-      assignedToId: t.assignedToId,
-      assignedToName: t.assignedTo.name,
-      assignedById: t.assignedById,
-      assignedByName: t.assignedBy?.name || null,
-      milestoneId: t.milestoneId,
-      taskType: t.taskType,
-      subject: t.subject,
-      dueDatetime: t.dueDatetime.toISOString(),
-      priority: t.priority,
-      isCompleted: t.isCompleted,
-      resultNotes: t.resultNotes,
-      completedAt: dateValue(t.completedAt) || null,
-    }));
+    return tasks.map((t) => {
+      const isPaused = Boolean(
+        t.milestone &&
+        !t.milestone.plannedDueDate &&
+        t.milestone.status !== "COMPLETED"
+      );
+      return {
+        id: t.id,
+        projectId: t.projectId,
+        projectName: t.project.projectName,
+        assignedToId: t.assignedToId,
+        assignedToName: t.assignedTo.name,
+        assignedById: t.assignedById,
+        assignedByName: t.assignedBy?.name || null,
+        milestoneId: t.milestoneId,
+        taskType: t.taskType,
+        subject: t.subject,
+        dueDatetime: t.dueDatetime.toISOString(),
+        priority: t.priority,
+        isCompleted: t.isCompleted,
+        resultNotes: t.resultNotes,
+        completedAt: dateValue(t.completedAt) || null,
+        isPaused,
+      };
+    });
   },
 
   async updateTask(

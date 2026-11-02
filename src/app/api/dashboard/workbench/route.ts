@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
           OR: [
             { salesRepId: currentUser.id },
             { salesAssistantId: currentUser.id },
-            { customer: { salesRepId: currentUser.id } },
             { milestones: { some: { assignedToId: currentUser.id } } },
             { tasks: { some: { assignedToId: currentUser.id } } },
           ],
@@ -115,10 +114,26 @@ export async function GET(req: NextRequest) {
 
     const filteredProjects = projectsWithDetails.filter(Boolean);
 
+    const projectTrafficLightMap = new Map<string, string>();
+    for (const p of filteredProjects) {
+      if (p) {
+        projectTrafficLightMap.set(p.id, p.trafficLight.label);
+      }
+    }
+
+    const tasksWithPausedStatus = tasks.map((task) => {
+      const projectLabel = projectTrafficLightMap.get(task.projectId);
+      const isProjectPaused = projectLabel === "暫緩";
+      return {
+        ...task,
+        isPaused: Boolean(task.isPaused || isProjectPaused),
+      };
+    });
+
     return NextResponse.json({
       currentUser,
       myProjects: filteredProjects,
-      tasks,
+      tasks: tasksWithPausedStatus,
     });
   } catch (error) {
     return handleApiError(error, "無法取得業務工作台資料");

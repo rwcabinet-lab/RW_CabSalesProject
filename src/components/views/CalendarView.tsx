@@ -60,6 +60,7 @@ function taskTypeLabel(task: TaskDTO): string {
 
 function taskStyle(task: TaskDTO, todayKey: string): string {
   if (task.isCompleted) return "border-slate-200 bg-slate-100 text-slate-600";
+  if (task.isPaused) return "border-slate-200 bg-slate-100/70 text-slate-600";
   const dueKey = toDateKey(task.dueDatetime);
   if (dueKey && dueKey < todayKey) return "border-red-200 bg-red-100 text-red-800";
 
@@ -378,7 +379,7 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                   <div>
                     <span className="block font-semibold text-slate-400">狀態</span>
                     <span className="font-medium text-slate-800">
-                      {activeEvent.task.isCompleted ? "已完成" : toDateKey(activeEvent.task.dueDatetime)! < todayKey ? "逾期" : "待處理"}
+                      {activeEvent.task.isCompleted ? "已完成" : activeEvent.task.isPaused ? "暫緩" : toDateKey(activeEvent.task.dueDatetime)! < todayKey ? "逾期" : "待處理"}
                     </span>
                   </div>
                   <div>

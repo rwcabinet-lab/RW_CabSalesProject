@@ -255,7 +255,7 @@ export const MilestoneService = {
       const newDue = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
       const today = getTaiwanDateString();
       if (currentMilestone.status === MilestoneStatus.OVERDUE) {
-        if (newDue && newDue >= today) {
+        if (!newDue || newDue >= today) {
           targetStatus = MilestoneStatus.IN_PROGRESS;
         }
       } else if (currentMilestone.status === MilestoneStatus.IN_PROGRESS) {

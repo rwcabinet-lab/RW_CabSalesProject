@@ -240,6 +240,7 @@ export interface TaskDTO {
   isCompleted: boolean;
   resultNotes?: string | null;
   completedAt?: string | null;
+  isPaused?: boolean;
 }
 
 export interface WorkbenchDashboardDTO {
