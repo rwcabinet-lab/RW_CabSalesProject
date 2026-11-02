@@ -13,6 +13,7 @@ import {
 import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 interface CalendarProps {
   projects: ProjectWithMilestonesDTO[];
@@ -139,6 +140,7 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-blue-600" />
           <h3 className="text-base font-bold text-slate-900">業務與專案時程排程行事曆</h3>
+          <SectionHelpButton sectionId="views-calendar" />
           <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
             {monthLabel(month.year, month.month)}
           </span>

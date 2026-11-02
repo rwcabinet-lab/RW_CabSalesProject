@@ -37,6 +37,7 @@ import {
 } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type {
   ApiResponse,
   MilestoneDTO,
@@ -808,6 +809,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black text-slate-900">{project.projectName}</h1>
+                <SectionHelpButton sectionId="milestones-header" />
                 {isProjectLost && (
                   <span className="flex items-center gap-1 bg-red-600 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm">
                     <Lock className="w-3 h-3" /> 流標（不可編輯）
@@ -862,6 +864,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
       {/* 7 大階段 + 額外階段 Tabs (水平捲動) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-slate-50/70 px-4 py-2 border-b flex items-center justify-between text-xs text-slate-600 font-bold">
+          <div className="flex items-center gap-1.5">
+            <span>七大階段工程推進導覽</span>
+            <SectionHelpButton sectionId="milestones-phases" />
+          </div>
+        </div>
         <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar">
           {PHASE_ORDER.map((phase) => {
             const progress = phaseProgress(phase);
@@ -906,8 +914,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         {/* 當前大階段之子進度列表 */}
         <div className="p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-800">
-              {PHASE_LABELS[activePhase]}
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span>{PHASE_LABELS[activePhase]}</span>
+              <SectionHelpButton sectionId="milestones-cards" />
             </h2>
             <span className="text-xs text-slate-400">拖曳圖卡可即時預覽調整未開始子進度順序</span>
           </div>
@@ -1361,6 +1370,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         <div className="flex items-center gap-2 border-b bg-slate-50 px-5 py-4">
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           <h2 className="text-sm font-bold text-slate-800">已完成待辦備查</h2>
+          <SectionHelpButton sectionId="milestones-completed-tasks" />
         </div>
         {completedTasks.length ? (
           <div className="divide-y">
@@ -1388,6 +1398,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         <div className="flex items-center gap-2 border-b bg-slate-50 px-5 py-4">
           <Clock className="h-5 w-5 text-blue-600" />
           <h2 className="text-sm font-bold text-slate-800">待辦事項</h2>
+          <SectionHelpButton sectionId="milestones-pending-tasks" />
         </div>
         {tasks.length ? (
           <div className="divide-y">

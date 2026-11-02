@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles } from "lucide-react";
 import type { UserDTO } from "@/types/dto";
 import { useSessionQuery } from "@/hooks/useQueries";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 type UserSession = UserDTO;
 
@@ -167,10 +168,11 @@ export default function SettingsPage() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              {user?.name || "未知使用者"}
+              <span>{user?.name || "未知使用者"}</span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 {roleLabel}
               </span>
+              <SectionHelpButton sectionId="settings-account" />
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">使用者 ID: {user?.id}</p>
           </div>
@@ -184,6 +186,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 border-b pb-3 mb-4">
               <Lock className="w-5 h-5 text-blue-600" />
               <h3 className="font-bold text-base text-slate-800">更改登入密碼</h3>
+              <SectionHelpButton sectionId="settings-password" />
             </div>
 
             <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
@@ -263,6 +266,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 <Palette className="w-5 h-5 text-indigo-600" />
                 <h3 className="font-bold text-base text-slate-800">介面風格與配色</h3>
+                <SectionHelpButton sectionId="settings-appearance" />
               </div>
               {themeSaved && (
                 <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 animate-pulse">

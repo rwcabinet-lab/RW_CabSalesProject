@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useManagerProjectStatusQuery } from "@/hooks/useQueries";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { toast } from "@/stores/useToastStore";
 import type {
   ManagerProjectStatusReportDTO,
@@ -483,10 +484,11 @@ export function ManagerProjectStatusReport() {
       {/* 報表單頁主體 (全寬拉大展開版面) */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm print:p-0 print:border-none print:shadow-none space-y-8 w-full">
         {/* 頂部標題 */}
-        <div className="text-center py-2 border-b pb-4">
+        <div className="text-center py-2 border-b pb-4 flex items-center justify-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-black text-rose-600 tracking-wider inline-block">
             {selectedMonth} 月份系統櫃部經營會議報告
           </h1>
+          <SectionHelpButton sectionId="manager-status-report" />
         </div>
 
         {/* 1. 頂部：目標與業績達成率卡片 (全寬大氣呈現) */}

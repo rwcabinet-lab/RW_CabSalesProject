@@ -19,6 +19,7 @@ import {
 } from "@/hooks/useQueries";
 import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTaskModal";
 import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjectStatusReport";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
 
 const todayDate = () => getTaiwanDateString();
@@ -397,6 +398,12 @@ export default function ManagerDashboardPage() {
         <ManagerProjectStatusReport />
       ) : (
         <>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <span>營運核心指標</span>
+          <SectionHelpButton sectionId="manager-kpi" />
+        </h2>
+      </div>
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">進行中總案場數</div>
@@ -418,7 +425,9 @@ export default function ManagerDashboardPage() {
 
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="flex items-center gap-2 border-b px-6 py-4 font-bold">
-          <CheckSquare className="h-5 w-5 text-blue-600" />已指派任務
+          <CheckSquare className="h-5 w-5 text-blue-600" />
+          <span>已指派任務</span>
+          <SectionHelpButton sectionId="manager-assigned-tasks" />
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">{data.assignedTasks.length}</span>
         </div>
         {data.assignedTasks.length ? (
@@ -487,7 +496,8 @@ export default function ManagerDashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h3 className="text-base font-bold flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-600" />
-                人員案場負載與異常分佈
+                <span>人員案場負載與異常分佈</span>
+                <SectionHelpButton sectionId="manager-workload" />
               </h3>
               <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                 <span className="flex items-center gap-1.5">
@@ -543,7 +553,8 @@ export default function ManagerDashboardPage() {
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <h3 className="text-base font-bold flex items-center gap-2 mb-6">
             <TrendingUp className="w-5 h-5 text-emerald-600" />
-            案件階段分佈與卡關瓶頸
+            <span>案件階段分佈與卡關瓶頸</span>
+            <SectionHelpButton sectionId="manager-bottlenecks" />
           </h3>
           <div className="h-64">
             <StageBottlenecksChart data={data.stageBottlenecks} />
@@ -554,6 +565,10 @@ export default function ManagerDashboardPage() {
       {/* 統一案件清單 (套用全域欄位設定) */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex flex-wrap items-center gap-3 text-sm font-semibold">
+          <div className="flex items-center gap-2 mr-2">
+            <span className="font-bold text-slate-800">全案場總覽列表</span>
+            <SectionHelpButton sectionId="manager-all-projects" />
+          </div>
           <div className="flex items-center gap-1.5">
             <span>時間區間：</span>
             <select

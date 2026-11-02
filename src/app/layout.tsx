@@ -3,6 +3,7 @@ import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ToastContainer } from "@/components/ui/ToastContainer";
+import { SectionHelpModal } from "@/components/common/SectionHelpModal";
 
 export const metadata: Metadata = {
   title: "正道工業系統櫃事業部 - 業務時程追蹤系統",
@@ -37,6 +38,7 @@ export default function RootLayout({
             {children}
           </main>
           <ToastContainer />
+          <SectionHelpModal />
         </QueryProvider>
       </body>
     </html>

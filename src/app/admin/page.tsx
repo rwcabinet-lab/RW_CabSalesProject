@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS, normalizeProjectColumns } from "@/lib/constants";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO } from "@/types/dto";
 
 type ManagedUser = { id: string; name: string; email: string; role: AppRole };
@@ -315,6 +316,7 @@ export default function AdminPage() {
           <div className="flex items-center gap-2">
             <Sliders className="h-5 w-5 text-blue-600" />
             <h2 className="text-lg font-bold">案件清單欄位項目與順序（全域表格視圖調整）</h2>
+            <SectionHelpButton sectionId="admin-columns" />
           </div>
           <button
             type="button"
@@ -476,6 +478,7 @@ export default function AdminPage() {
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-indigo-600" />
             <h2 className="text-lg font-bold">各階段進度預設天數設定</h2>
+            <SectionHelpButton sectionId="admin-stage-days" />
           </div>
           <button
             type="button"
@@ -521,6 +524,7 @@ export default function AdminPage() {
         <div className="mb-3 flex items-center gap-2">
           <Palette className="h-5 w-5 text-amber-600" />
           <h2 className="text-lg font-bold">系統介面風格自訂</h2>
+          <SectionHelpButton sectionId="admin-theme" />
         </div>
         <p className="mb-4 text-xs text-slate-500">
           切換主題色彩與畫面佈局密度，偏好設定將儲存於此瀏覽器。
@@ -578,6 +582,7 @@ export default function AdminPage() {
         <div className="mb-5 flex items-center gap-2">
           <UserRound className="h-5 w-5 text-blue-600" />
           <h2 className="text-lg font-bold">帳號清單與權限設定</h2>
+          <SectionHelpButton sectionId="admin-users" />
         </div>
         <form onSubmit={saveAccount} className="grid gap-4 md:grid-cols-4">
           <div>
@@ -648,6 +653,7 @@ export default function AdminPage() {
         <div className="mb-2 flex items-center gap-2">
           <Check className="h-5 w-5 text-emerald-600" />
           <h2 className="text-lg font-bold">各層級可瀏覽頁面</h2>
+          <SectionHelpButton sectionId="admin-permissions" />
         </div>
         <p className="mb-5 text-sm text-slate-600">權限同時套用於頁面和相關資料 API；管理者設定僅限管理員，且管理員至少保留一個。</p>
         <div className="space-y-5">

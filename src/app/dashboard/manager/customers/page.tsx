@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2 } from "lucide-react";
 import { CustomerTypeDistributionChart } from "@/components/dashboard/ManagerCharts";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
@@ -140,6 +141,12 @@ export default function CustomerStatsPage() {
       </div>
 
       {/* KPI 卡片 */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <span>客戶營運總覽指標</span>
+          <SectionHelpButton sectionId="manager-customers-kpi" />
+        </h2>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border shadow-sm">
           <div className="text-slate-500 text-xs font-bold mb-1 flex items-center gap-1.5">
@@ -187,7 +194,8 @@ export default function CustomerStatsPage() {
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
         <h3 className="text-base font-bold flex items-center gap-2 mb-4 text-slate-800">
           <Users className="w-5 h-5 text-blue-600" />
-          客戶類型與案場金額分佈
+          <span>客戶類型與案場金額分佈</span>
+          <SectionHelpButton sectionId="manager-customers-chart" />
         </h3>
         <div className="h-64">
           <CustomerTypeDistributionChart data={data.customerTypeDistribution} />
@@ -201,6 +209,7 @@ export default function CustomerStatsPage() {
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-blue-600" />
             <h2 className="text-base font-bold text-slate-800">客戶清單與案場彙整</h2>
+            <SectionHelpButton sectionId="manager-customers-table" />
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-sm">

@@ -14,6 +14,7 @@ import {
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 interface GanttProps {
   projects: ProjectWithMilestonesDTO[];
@@ -174,7 +175,10 @@ export function GanttChart({ projects, tasks }: GanttProps) {
       {/* 圖例與展開/收合控制列 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="font-bold text-slate-800">時程標記：</span>
+          <span className="font-bold text-slate-800 flex items-center gap-1.5">
+            時程標記：
+            <SectionHelpButton sectionId="views-gantt" />
+          </span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />里程碑期限</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />待辦期限</span>
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />已完成／實際日期</span>

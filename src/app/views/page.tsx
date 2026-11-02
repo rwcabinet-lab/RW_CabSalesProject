@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { useViewsDataQuery } from "@/hooks/useQueries";
 import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
@@ -267,6 +268,13 @@ export default function VisualViewsPage() {
 
       {/* 篩選條件工具列 */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-slate-50/70 px-4 py-2 border-b flex items-center justify-between text-xs text-slate-600 font-bold">
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-blue-600" />
+            <span>時程綜合篩選條件</span>
+            <SectionHelpButton sectionId="views-filters" />
+          </div>
+        </div>
         <div className="p-4 space-y-3">
           {/* 第一列：搜尋輸入框與下拉篩選選單 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

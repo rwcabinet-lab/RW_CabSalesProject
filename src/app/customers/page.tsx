@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse, CustomerDTO } from "@/types/dto";
 import { isAssignableRole } from "@/lib/page-access";
 import { useCustomersQuery, useUsersQuery, useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { toast } from "@/stores/useToastStore";
 
 export default function CustomersPage() {
@@ -203,7 +204,9 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <Users className="w-7 h-7 text-blue-600" /> 客戶主檔管理 (Customer Management)
+            <Users className="w-7 h-7 text-blue-600" />
+            <span>客戶主檔管理 (Customer Management)</span>
+            <SectionHelpButton sectionId="customers-management" />
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             支援 B2B (設計師、公關、經銷) 與 B2C (一般業主)，設定預設折率與付款帳期，報價單將自動連動套用。

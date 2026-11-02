@@ -27,6 +27,7 @@ import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
 import { WorkbenchCreateTaskModal, WorkbenchCompleteTaskModal } from "@/components/workbench/WorkbenchModals";
 import { WorkbenchAddProjectPanel, WorkbenchEditProjectRow } from "@/components/workbench/WorkbenchProjectForms";
+import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { toast } from "@/stores/useToastStore";
 
 const EMPTY_PROJECTS: WorkbenchProjectDTO[] = [];
@@ -228,6 +229,7 @@ export default function SalesWorkbenchPage() {
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-blue-600" /> 待辦事項
+            <SectionHelpButton sectionId="workbench-tasks" />
           </h2>
           <button
             onClick={() => setShowTaskModal(true)}
@@ -343,6 +345,7 @@ export default function SalesWorkbenchPage() {
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-600" /> 案件清單
+            <SectionHelpButton sectionId="workbench-projects" />
           </h2>
           <div className="flex items-center gap-3">
             <button
