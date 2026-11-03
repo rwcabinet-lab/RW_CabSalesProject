@@ -24,7 +24,14 @@ export default function RootLayout({
               try {
                 var c = localStorage.getItem('app_theme_color');
                 var d = localStorage.getItem('app_theme_density');
-                if (c && c !== 'blue') document.documentElement.classList.add('theme-' + c);
+                var valid = ['classic', 'paper', 'dark', 'green', 'sunset', 'blue'];
+                if (!c || valid.indexOf(c) === -1) {
+                  if (c === 'emerald' || c === 'slate') c = 'classic';
+                  else if (c === 'amber') c = 'paper';
+                  else c = 'classic';
+                  localStorage.setItem('app_theme_color', c);
+                }
+                document.documentElement.classList.add('theme-' + c);
                 if (d === 'compact') document.documentElement.classList.add('density-compact');
               } catch(e) {}
             `,

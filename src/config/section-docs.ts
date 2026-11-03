@@ -581,8 +581,8 @@ export const SECTION_DOCS: Record<string, SectionDoc> = {
       "提供多款介面主題色彩與表格版面顯示密度切換，點擊按鈕後畫面即刻套用，並自動記憶於目前使用的瀏覽器中。",
     keyPoints: [
       {
-        label: "五款主題色彩",
-        desc: "提供【經典藍 (預設)】、【森林綠】、【暖陽橘】、【質樸灰】與【極簡深色】五種配色。",
+        label: "六款主題色彩",
+        desc: "提供【經典清爽 (預設)】、【Notion 紙感】、【Spotify 深色】、【LINE 綠意】、【Instagram 夕陽】與【Messenger 藍海】六種配色，且狀態燈號保持獨立語意不受主題影響。",
       },
       {
         label: "兩種版面顯示密度",
@@ -674,8 +674,8 @@ export const SECTION_DOCS: Record<string, SectionDoc> = {
       "每位同仁可依個人工作環境與螢幕尺寸，自由選擇主題配色方案與表格顯示密度。點擊選項後立即生效並自動儲存於個人瀏覽器，不影響其他同仁畫面。",
     keyPoints: [
       {
-        label: "五款主題配色方案",
-        desc: "提供【經典商務藍】（系統預設）、【翡翠森林綠】、【溫潤暖木褐】、【專業極簡灰】與低光源適用的【夜間深色模式】。",
+        label: "六款主題配色方案",
+        desc: "提供【經典清爽】（系統預設）、【Notion 紙感】、【Spotify 深色】、【LINE 綠意】、【Instagram 夕陽】與【Messenger 藍海】。各配色風格均經特別校準，絕不影響紅／黃／綠／灰狀態時程燈號的判讀。",
       },
       {
         label: "表格顯示密度",

@@ -9,11 +9,54 @@ import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 type UserSession = UserDTO;
 
 const THEME_OPTIONS = [
-  { id: "blue", name: "經典商務藍", bg: "bg-blue-600", border: "border-blue-600", desc: "系統預設，清晰穩重" },
-  { id: "emerald", name: "翡翠森林綠", bg: "bg-emerald-600", border: "border-emerald-600", desc: "柔和護眼，自然清新" },
-  { id: "amber", name: "溫潤暖木褐", bg: "bg-amber-600", border: "border-amber-600", desc: "溫暖木質調，典雅細緻" },
-  { id: "slate", name: "專業極簡灰", bg: "bg-slate-700", border: "border-slate-700", desc: "簡約幹練，高對比易讀" },
-  { id: "dark", name: "夜間深色模式", bg: "bg-slate-900", border: "border-slate-900", desc: "低光源環境適用" },
+  {
+    id: "classic",
+    name: "經典清爽",
+    sub: "Classic",
+    bg: "bg-[#1A6357]",
+    border: "border-[#1A6357]",
+    desc: "沉穩松石墨綠，典雅清爽（系統預設）",
+  },
+  {
+    id: "paper",
+    name: "Notion 紙感",
+    sub: "Paper",
+    bg: "bg-[#685338]",
+    border: "border-[#685338]",
+    desc: "溫潤胡桃木與米白紙感，人文護眼",
+  },
+  {
+    id: "dark",
+    name: "Spotify 深色",
+    sub: "Dark",
+    bg: "bg-[#22C55E]",
+    border: "border-[#22C55E]",
+    desc: "沉浸曜石黑與螢光綠，夜間專用",
+  },
+  {
+    id: "green",
+    name: "LINE 綠意",
+    sub: "Green",
+    bg: "bg-[#06C755]",
+    border: "border-[#06C755]",
+    desc: "明亮翡翠草本綠，清新親和",
+  },
+  {
+    id: "sunset",
+    name: "Instagram 夕陽",
+    sub: "Gradient",
+    bg: "bg-[#BC3C68]",
+    border: "border-[#BC3C68]",
+    desc: "暮光玫瑰與薄暮紫藍，當代設計感",
+  },
+  {
+    id: "blue",
+    name: "Messenger 藍海",
+    sub: "Blue",
+    bg: "bg-[#0084FF]",
+    border: "border-[#0084FF]",
+    desc: "現代旗艦皇家藍，通透清晰",
+  },
 ];
 
 export default function SettingsPage() {
@@ -27,17 +70,26 @@ export default function SettingsPage() {
   const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  // 外觀風格狀態
-  const [currentTheme, setCurrentTheme] = useState("blue");
+  // 外觀風格狀態 (預設: 經典清爽)
+  const [currentTheme, setCurrentTheme] = useState("classic");
   const [currentDensity, setCurrentDensity] = useState("normal");
   const [themeSaved, setThemeSaved] = useState(false);
 
   useEffect(() => {
     // 讀取目前主題設定
     try {
-      const savedTheme = localStorage.getItem("app_theme_color") || "blue";
+      const savedTheme = localStorage.getItem("app_theme_color");
       const savedDensity = localStorage.getItem("app_theme_density") || "normal";
-      setCurrentTheme(savedTheme);
+      const validIds = THEME_OPTIONS.map((t) => t.id);
+      let resolvedTheme = "classic";
+      if (savedTheme && validIds.includes(savedTheme)) {
+        resolvedTheme = savedTheme;
+      } else if (savedTheme === "emerald" || savedTheme === "slate") {
+        resolvedTheme = "classic";
+      } else if (savedTheme === "amber") {
+        resolvedTheme = "paper";
+      }
+      setCurrentTheme(resolvedTheme);
       setCurrentDensity(savedDensity);
     } catch (e) {
       console.error(e);
@@ -48,18 +100,15 @@ export default function SettingsPage() {
     setCurrentTheme(themeId);
     try {
       localStorage.setItem("app_theme_color", themeId);
-      // 移除舊的 theme class
-      THEME_OPTIONS.forEach((t) => {
-        if (t.id !== "blue") {
-          document.documentElement.classList.remove(`theme-${t.id}`);
-          document.body.classList.remove(`theme-${t.id}`);
-        }
+      // 移除所有舊與新的 theme class
+      const allKnownThemes = ["classic", "paper", "dark", "green", "sunset", "blue", "emerald", "amber", "slate"];
+      allKnownThemes.forEach((id) => {
+        document.documentElement.classList.remove(`theme-${id}`);
+        document.body.classList.remove(`theme-${id}`);
       });
       // 加入新的 theme class
-      if (themeId !== "blue") {
-        document.documentElement.classList.add(`theme-${themeId}`);
-        document.body.classList.add(`theme-${themeId}`);
-      }
+      document.documentElement.classList.add(`theme-${themeId}`);
+      document.body.classList.add(`theme-${themeId}`);
       setThemeSaved(true);
       setTimeout(() => setThemeSaved(false), 2500);
     } catch (e) {
@@ -282,7 +331,7 @@ export default function SettingsPage() {
                 <label className="block text-xs font-bold text-slate-700 mb-2">
                   主題配色方案（點擊即時套用）：
                 </label>
-                <div className="grid grid-cols-1 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {THEME_OPTIONS.map((theme) => {
                     const isSelected = currentTheme === theme.id;
                     return (
@@ -292,19 +341,22 @@ export default function SettingsPage() {
                         onClick={() => handleApplyTheme(theme.id)}
                         className={`flex items-center justify-between p-3 rounded-xl border text-left transition ${
                           isSelected
-                            ? "border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20"
+                            ? "border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-sm"
                             : "border-slate-200 hover:bg-slate-50"
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-5 h-5 rounded-full ${theme.bg} shadow-sm shrink-0`} />
                           <div>
-                            <div className="font-bold text-xs text-slate-800">{theme.name}</div>
-                            <div className="text-[10px] text-slate-400">{theme.desc}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-xs text-slate-800">{theme.name}</span>
+                              <span className="text-[10px] font-mono font-semibold text-slate-400">{theme.sub}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{theme.desc}</div>
                           </div>
                         </div>
                         {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
                             <Check className="w-3 h-3" />
                           </div>
                         )}

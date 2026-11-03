@@ -3,94 +3,78 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
+  --background: #f8fafa;
   --foreground: #0f172a;
 }
 
 /* ==========================================================================
-   主題色彩體系 (全站整體配色更換，而非僅更換背景)
+   主題色彩體系 (6大風格全面更換系統色彩，依附圖規格精準配置)
    ========================================================================== */
 
-/* 1. 翡翠森林綠 (Emerald) */
-body.theme-emerald,
-html.theme-emerald {
-  --background: #f0fdf4;
+/* 1. 經典清爽 (Classic - 沉穩松石墨綠，系統預設) */
+body.theme-classic,
+html.theme-classic {
+  --background: #f8fafa;
+  --foreground: #0f172a;
 }
-.theme-emerald .bg-blue-600 { background-color: #059669 !important; }
-.theme-emerald .hover\:bg-blue-700:hover { background-color: #047857 !important; }
-.theme-emerald .text-blue-600,
-.theme-emerald .text-blue-700,
-.theme-emerald .text-blue-800 { color: #047857 !important; }
-.theme-emerald .bg-blue-50,
-.theme-emerald .bg-blue-100 { background-color: #ecfdf5 !important; color: #065f46 !important; }
-.theme-emerald .border-blue-200,
-.theme-emerald .border-blue-300,
-.theme-emerald .border-blue-600 { border-color: #10b981 !important; }
-.theme-emerald .ring-blue-500\/20 { --tw-ring-color: rgba(16, 185, 129, 0.25) !important; }
-.theme-emerald header { border-bottom-color: #d1fae5 !important; }
+.theme-classic .bg-blue-600 { background-color: #1a6357 !important; }
+.theme-classic .hover\:bg-blue-700:hover { background-color: #134e44 !important; }
+.theme-classic .text-blue-600,
+.theme-classic .text-blue-700,
+.theme-classic .text-blue-800 { color: #1a6357 !important; }
+.theme-classic .bg-blue-50,
+.theme-classic .bg-blue-100 { background-color: #e7f0ed !important; color: #1a6357 !important; }
+.theme-classic .border-blue-200,
+.theme-classic .border-blue-300,
+.theme-classic .border-blue-600 { border-color: #1a6357 !important; }
+.theme-classic .ring-blue-500\/20 { --tw-ring-color: rgba(26, 99, 87, 0.25) !important; }
+.theme-classic header { border-bottom-color: #d4dcd6 !important; }
 
-/* 2. 溫潤暖木褐 (Amber / Warm Wood) */
-body.theme-amber,
-html.theme-amber {
-  --background: #fefdf9;
+/* 2. Notion 紙感 (Paper - 溫潤胡桃木與米白紙感，人文護眼) */
+body.theme-paper,
+html.theme-paper {
+  --background: #faf7f0;
+  --foreground: #2e261d;
 }
-.theme-amber .bg-blue-600 { background-color: #d97706 !important; }
-.theme-amber .hover\:bg-blue-700:hover { background-color: #b45309 !important; }
-.theme-amber .text-blue-600,
-.theme-amber .text-blue-700,
-.theme-amber .text-blue-800 { color: #b45309 !important; }
-.theme-amber .bg-blue-50,
-.theme-amber .bg-blue-100 { background-color: #fef3c7 !important; color: #78350f !important; }
-.theme-amber .border-blue-200,
-.theme-amber .border-blue-300,
-.theme-amber .border-blue-600 { border-color: #f59e0b !important; }
-.theme-amber .ring-blue-500\/20 { --tw-ring-color: rgba(245, 158, 11, 0.25) !important; }
-.theme-amber header { border-bottom-color: #fde68a !important; }
+.theme-paper .bg-blue-600 { background-color: #685338 !important; }
+.theme-paper .hover\:bg-blue-700:hover { background-color: #54422b !important; }
+.theme-paper .text-blue-600,
+.theme-paper .text-blue-700,
+.theme-paper .text-blue-800 { color: #685338 !important; }
+.theme-paper .bg-blue-50,
+.theme-paper .bg-blue-100 { background-color: #f4ede2 !important; color: #5c472e !important; }
+.theme-paper .border-blue-200,
+.theme-paper .border-blue-300,
+.theme-paper .border-blue-600 { border-color: #685338 !important; }
+.theme-paper .ring-blue-500\/20 { --tw-ring-color: rgba(104, 83, 56, 0.25) !important; }
+.theme-paper header { border-bottom-color: #e8decf !important; }
 
-/* 3. 專業極簡灰 (Slate / Neutral Steel) */
-body.theme-slate,
-html.theme-slate {
-  --background: #f8fafc;
-}
-.theme-slate .bg-blue-600 { background-color: #475569 !important; }
-.theme-slate .hover\:bg-blue-700:hover { background-color: #334155 !important; }
-.theme-slate .text-blue-600,
-.theme-slate .text-blue-700,
-.theme-slate .text-blue-800 { color: #1e293b !important; }
-.theme-slate .bg-blue-50,
-.theme-slate .bg-blue-100 { background-color: #f1f5f9 !important; color: #334155 !important; }
-.theme-slate .border-blue-200,
-.theme-slate .border-blue-300,
-.theme-slate .border-blue-600 { border-color: #64748b !important; }
-.theme-slate .ring-blue-500\/20 { --tw-ring-color: rgba(100, 116, 139, 0.25) !important; }
-.theme-slate header { border-bottom-color: #e2e8f0 !important; }
-
-/* 4. 夜間深色模式 (Dark Theme - 全站沉浸式深色) */
+/* 3. Spotify 深色 (Dark - 沉浸曜石黑與螢光亮綠，夜間專用) */
 body.theme-dark,
 html.theme-dark {
-  --background: #0b1120;
+  --background: #101613;
   --foreground: #f8fafc;
-  background-color: #0b1120 !important;
+  background-color: #101613 !important;
   color: #f8fafc !important;
 }
 .theme-dark header {
-  background-color: #0f172a !important;
-  border-bottom-color: #1e293b !important;
+  background-color: #18221d !important;
+  border-bottom-color: #27382f !important;
 }
 .theme-dark .bg-white {
-  background-color: #151e32 !important;
+  background-color: #18221d !important;
   color: #f8fafc !important;
-  border-color: #22304a !important;
+  border-color: #27382f !important;
 }
 .theme-dark .bg-slate-50,
 .theme-dark .bg-slate-100 {
-  background-color: #1a253c !important;
+  background-color: #1e2b24 !important;
   color: #f1f5f9 !important;
 }
 .theme-dark .bg-slate-50\/50,
 .theme-dark .bg-slate-50\/60,
 .theme-dark .bg-slate-50\/80 {
-  background-color: #1a253c !important;
+  background-color: #1e2b24 !important;
 }
 .theme-dark .text-slate-900,
 .theme-dark .text-slate-800,
@@ -109,37 +93,213 @@ html.theme-dark {
 .theme-dark .border-t,
 .theme-dark .border-slate-200,
 .theme-dark .border-slate-100 {
-  border-color: #22304a !important;
+  border-color: #27382f !important;
 }
 .theme-dark .divide-y > * + * {
-  border-color: #22304a !important;
+  border-color: #27382f !important;
 }
 .theme-dark input,
 .theme-dark select,
 .theme-dark textarea {
-  background-color: #0b1120 !important;
+  background-color: #101613 !important;
   color: #f8fafc !important;
-  border-color: #334155 !important;
+  border-color: #364a3e !important;
 }
 .theme-dark tr:hover,
 .theme-dark tr.hover\:bg-slate-50:hover {
-  background-color: #1c2944 !important;
+  background-color: #213028 !important;
 }
 .theme-dark thead.bg-slate-100,
 .theme-dark tr.bg-slate-50 {
-  background-color: #1a253c !important;
+  background-color: #1e2b24 !important;
   color: #94a3b8 !important;
+}
+.theme-dark .bg-blue-600 {
+  background-color: #22c55e !important;
+  color: #052e16 !important;
+}
+.theme-dark .hover\:bg-blue-700:hover {
+  background-color: #16a34a !important;
 }
 .theme-dark .bg-blue-50,
 .theme-dark .bg-blue-100 {
-  background-color: #1e2d4d !important;
-  color: #93c5fd !important;
-  border-color: #1e3a8a !important;
+  background-color: #173022 !important;
+  color: #4ade80 !important;
+  border-color: #27382f !important;
 }
 .theme-dark .text-blue-600,
 .theme-dark .text-blue-700,
 .theme-dark .text-blue-800 {
-  color: #60a5fa !important;
+  color: #4ade80 !important;
+}
+.theme-dark .border-blue-200,
+.theme-dark .border-blue-300,
+.theme-dark .border-blue-600 {
+  border-color: #22c55e !important;
+}
+.theme-dark .ring-blue-500\/20 {
+  --tw-ring-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+/* 4. LINE 綠意 (Green - 明亮草本綠搭配深海青藍，清新親和) */
+body.theme-green,
+html.theme-green {
+  --background: #f4faf6;
+  --foreground: #0f172a;
+}
+.theme-green .bg-blue-600 { background-color: #06c755 !important; }
+.theme-green .hover\:bg-blue-700:hover { background-color: #05a847 !important; }
+.theme-green .text-blue-600,
+.theme-green .text-blue-700,
+.theme-green .text-blue-800 { color: #047835 !important; }
+.theme-green .bg-blue-50,
+.theme-green .bg-blue-100 { background-color: #e6f9ee !important; color: #047835 !important; }
+.theme-green .border-blue-200,
+.theme-green .border-blue-300,
+.theme-green .border-blue-600 { border-color: #06c755 !important; }
+.theme-green .ring-blue-500\/20 { --tw-ring-color: rgba(6, 199, 85, 0.25) !important; }
+.theme-green header { border-bottom-color: #cfeed9 !important; }
+
+/* 5. Instagram 夕陽 (Gradient - 暮光玫瑰與薄暮紫藍，當代設計感) */
+body.theme-sunset,
+html.theme-sunset {
+  --background: #fff9fa;
+  --foreground: #29161f;
+}
+.theme-sunset .bg-blue-600 { background-color: #bc3c68 !important; }
+.theme-sunset .hover\:bg-blue-700:hover { background-color: #9e2952 !important; }
+.theme-sunset .text-blue-600,
+.theme-sunset .text-blue-700,
+.theme-sunset .text-blue-800 { color: #bc3c68 !important; }
+.theme-sunset .bg-blue-50,
+.theme-sunset .bg-blue-100 { background-color: #fdf0f4 !important; color: #9e2952 !important; }
+.theme-sunset .border-blue-200,
+.theme-sunset .border-blue-300,
+.theme-sunset .border-blue-600 { border-color: #bc3c68 !important; }
+.theme-sunset .ring-blue-500\/20 { --tw-ring-color: rgba(188, 60, 104, 0.25) !important; }
+.theme-sunset header { border-bottom-color: #fce2e9 !important; }
+
+/* 6. Messenger 藍海 (Blue - 現代旗艦皇家藍，通透清晰) */
+body.theme-blue,
+html.theme-blue {
+  --background: #f5f9ff;
+  --foreground: #0f172a;
+}
+.theme-blue .bg-blue-600 { background-color: #0084ff !important; }
+.theme-blue .hover\:bg-blue-700:hover { background-color: #006ed4 !important; }
+.theme-blue .text-blue-600,
+.theme-blue .text-blue-700,
+.theme-blue .text-blue-800 { color: #006ed4 !important; }
+.theme-blue .bg-blue-50,
+.theme-blue .bg-blue-100 { background-color: #ebf5ff !important; color: #0062bd !important; }
+.theme-blue .border-blue-200,
+.theme-blue .border-blue-300,
+.theme-blue .border-blue-600 { border-color: #0084ff !important; }
+.theme-blue .ring-blue-500\/20 { --tw-ring-color: rgba(0, 132, 255, 0.25) !important; }
+.theme-blue header { border-bottom-color: #cce4ff !important; }
+
+/* ==========================================================================
+   狀態燈號絕對保護規則 (Status Traffic Lights Protection)
+   規則2：配色風格不可影響狀態燈號。
+   鎖定紅、黃、綠、灰四色燈號與標籤之背景、邊框與文字色彩，確保業務時程語意絕對清晰。
+   ========================================================================== */
+
+/* 🔴 紅燈 / 逾期 / 警告 */
+.bg-red-100,
+.theme-classic .bg-red-100,
+.theme-paper .bg-red-100,
+.theme-green .bg-red-100,
+.theme-sunset .bg-red-100,
+.theme-blue .bg-red-100 {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+}
+.text-red-700, .theme-classic .text-red-700, .theme-paper .text-red-700, .theme-green .text-red-700, .theme-sunset .text-red-700, .theme-blue .text-red-700,
+.text-red-600, .theme-classic .text-red-600, .theme-paper .text-red-600, .theme-green .text-red-600, .theme-sunset .text-red-600, .theme-blue .text-red-600 {
+  color: #dc2626 !important;
+}
+.border-red-200, .theme-classic .border-red-200, .theme-paper .border-red-200, .theme-green .border-red-200, .theme-sunset .border-red-200, .theme-blue .border-red-200 {
+  border-color: #fecaca !important;
+}
+
+/* 🟡 黃燈 / 即將到期 / 提醒 */
+.bg-amber-100,
+.theme-classic .bg-amber-100,
+.theme-paper .bg-amber-100,
+.theme-green .bg-amber-100,
+.theme-sunset .bg-amber-100,
+.theme-blue .bg-amber-100 {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+}
+.text-amber-700, .theme-classic .text-amber-700, .theme-paper .text-amber-700, .theme-green .text-amber-700, .theme-sunset .text-amber-700, .theme-blue .text-amber-700,
+.text-amber-600, .theme-classic .text-amber-600, .theme-paper .text-amber-600, .theme-green .text-amber-600, .theme-sunset .text-amber-600, .theme-blue .text-amber-600 {
+  color: #d97706 !important;
+}
+.border-amber-200, .theme-classic .border-amber-200, .theme-paper .border-amber-200, .theme-green .border-amber-200, .theme-sunset .border-amber-200, .theme-blue .border-amber-200 {
+  border-color: #fde68a !important;
+}
+
+/* 🟢 綠燈 / 進度正常 / 提前完成 */
+.bg-emerald-100,
+.theme-classic .bg-emerald-100,
+.theme-paper .bg-emerald-100,
+.theme-green .bg-emerald-100,
+.theme-sunset .bg-emerald-100,
+.theme-blue .bg-emerald-100 {
+  background-color: #d1fae5 !important;
+  color: #047857 !important;
+}
+.text-emerald-700, .theme-classic .text-emerald-700, .theme-paper .text-emerald-700, .theme-green .text-emerald-700, .theme-sunset .text-emerald-700, .theme-blue .text-emerald-700,
+.text-emerald-600, .theme-classic .text-emerald-600, .theme-paper .text-emerald-600, .theme-green .text-emerald-600, .theme-sunset .text-emerald-600, .theme-blue .text-emerald-600 {
+  color: #059669 !important;
+}
+.border-emerald-200, .theme-classic .border-emerald-200, .theme-paper .border-emerald-200, .theme-green .border-emerald-200, .theme-sunset .border-emerald-200, .theme-blue .border-emerald-200 {
+  border-color: #a7f3d0 !important;
+}
+
+/* ⚪ 灰燈 / 暫緩 / 未排定 / 流標 */
+.theme-classic .bg-slate-100.text-slate-600,
+.theme-paper .bg-slate-100.text-slate-600,
+.theme-green .bg-slate-100.text-slate-600,
+.theme-sunset .bg-slate-100.text-slate-600,
+.theme-blue .bg-slate-100.text-slate-600 {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+/* 夜間模式 (Spotify 深色) 下的狀態燈號自適應保護：維持高對比與語意明確 */
+.theme-dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(239, 68, 68, 0.45) !important;
+}
+.theme-dark .text-red-600,
+.theme-dark .text-red-700 {
+  color: #f87171 !important;
+}
+.theme-dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.22) !important;
+  color: #fde68a !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+}
+.theme-dark .text-amber-600,
+.theme-dark .text-amber-700 {
+  color: #fbbf24 !important;
+}
+.theme-dark .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.22) !important;
+  color: #a7f3d0 !important;
+  border: 1px solid rgba(16, 185, 129, 0.45) !important;
+}
+.theme-dark .text-emerald-600,
+.theme-dark .text-emerald-700 {
+  color: #34d399 !important;
+}
+.theme-dark .bg-slate-100.text-slate-600 {
+  background-color: rgba(148, 163, 184, 0.18) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
 }
 body.density-compact,
 html.density-compact {
