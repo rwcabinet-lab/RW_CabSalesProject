@@ -268,7 +268,7 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                           : milestone.status === "COMPLETED"
                             ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                             : milestone.status === "IN_PROGRESS"
-                              ? "border-blue-100 bg-blue-50 text-blue-800"
+                              ? "border-sky-200 bg-sky-50 text-sky-800"
                               : "border-slate-200 bg-slate-50 text-slate-700";
 
                         return (

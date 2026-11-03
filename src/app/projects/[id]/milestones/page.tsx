@@ -59,7 +59,7 @@ interface MilestoneWithLight extends MilestoneDTO {
 
 const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
   COMPLETED:   { label: "已完成",    bg: "bg-emerald-100", text: "text-emerald-800" },
-  IN_PROGRESS: { label: "進行中",    bg: "bg-blue-100",    text: "text-blue-800" },
+  IN_PROGRESS: { label: "進行中",    bg: "bg-sky-100",     text: "text-sky-800" },
   OVERDUE:     { label: "已逾期",    bg: "bg-red-100",     text: "text-red-800" },
   PENDING:     { label: "待開始",    bg: "bg-slate-100",   text: "text-slate-600" },
 };
@@ -932,11 +932,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="truncate">{PHASE_LABELS[phase]?.split("：")[1] || PHASE_LABELS[phase]}</span>
                   {hasOverdue ? (
-                    <span className="text-red-600 text-[10px] font-black">🔴</span>
+                    <span className="text-red-600 text-[10px] font-black" title="該階段有逾期或已到期項目">🔴</span>
                   ) : hasInProgress ? (
-                    <span className="text-blue-600 text-[10px]">●</span>
+                    <span className="status-dot-inprogress text-[11px] font-black inline-flex items-center leading-none" style={{ color: "#0284c7" }} title="進行中項目（藍色燈號）">●</span>
                   ) : progress === 100 && count > 0 ? (
-                    <span className="text-emerald-600 text-[10px]">✓</span>
+                    <span className="text-emerald-600 text-[10px] font-bold" title="該階段子進度已全數完成">✓</span>
                   ) : null}
                 </div>
                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">

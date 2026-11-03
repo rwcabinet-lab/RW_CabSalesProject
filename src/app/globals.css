@@ -268,6 +268,59 @@ html.theme-blue {
   color: #475569 !important;
 }
 
+/* 🔵 進行中 / 進度執行中燈號與標籤 (藍燈) - 絕對隔離保護，防止受主題主色干擾 */
+.status-dot-inprogress,
+.text-sky-600,
+.theme-classic .text-sky-600,
+.theme-paper .text-sky-600,
+.theme-green .text-sky-600,
+.theme-sunset .text-sky-600,
+.theme-blue .text-sky-600 {
+  color: #0284c7 !important;
+}
+.text-sky-700,
+.text-sky-800,
+.theme-classic .text-sky-700, .theme-classic .text-sky-800,
+.theme-paper .text-sky-700, .theme-paper .text-sky-800,
+.theme-green .text-sky-700, .theme-green .text-sky-800,
+.theme-sunset .text-sky-700, .theme-sunset .text-sky-800,
+.theme-blue .text-sky-700, .theme-blue .text-sky-800 {
+  color: #0369a1 !important;
+}
+.bg-sky-100,
+.theme-classic .bg-sky-100,
+.theme-paper .bg-sky-100,
+.theme-green .bg-sky-100,
+.theme-sunset .bg-sky-100,
+.theme-blue .bg-sky-100 {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+}
+.border-sky-200,
+.theme-classic .border-sky-200,
+.theme-paper .border-sky-200,
+.theme-green .border-sky-200,
+.theme-sunset .border-sky-200,
+.theme-blue .border-sky-200 {
+  border-color: #bae6fd !important;
+}
+.bg-sky-50,
+.theme-classic .bg-sky-50,
+.theme-paper .bg-sky-50,
+.theme-green .bg-sky-50,
+.theme-sunset .bg-sky-50,
+.theme-blue .bg-sky-50 {
+  background-color: #f0f9ff !important;
+}
+.bg-sky-500,
+.theme-classic .bg-sky-500,
+.theme-paper .bg-sky-500,
+.theme-green .bg-sky-500,
+.theme-sunset .bg-sky-500,
+.theme-blue .bg-sky-500 {
+  background-color: #0ea5e9 !important;
+}
+
 /* 夜間模式 (Spotify 深色) 下的狀態燈號自適應保護：維持高對比與語意明確 */
 .theme-dark .bg-red-100 {
   background-color: rgba(239, 68, 68, 0.22) !important;
@@ -300,6 +353,26 @@ html.theme-blue {
   background-color: rgba(148, 163, 184, 0.18) !important;
   color: #cbd5e1 !important;
   border: 1px solid rgba(148, 163, 184, 0.35) !important;
+}
+.theme-dark .status-dot-inprogress,
+.theme-dark .text-sky-600,
+.theme-dark .text-sky-700,
+.theme-dark .text-sky-800 {
+  color: #38bdf8 !important;
+}
+.theme-dark .bg-sky-100 {
+  background-color: rgba(2, 132, 199, 0.22) !important;
+  color: #7dd3fc !important;
+  border: 1px solid rgba(2, 132, 199, 0.45) !important;
+}
+.theme-dark .bg-sky-50 {
+  background-color: rgba(2, 132, 199, 0.12) !important;
+}
+.theme-dark .border-sky-200 {
+  border-color: rgba(2, 132, 199, 0.4) !important;
+}
+.theme-dark .bg-sky-500 {
+  background-color: #38bdf8 !important;
 }
 body.density-compact,
 html.density-compact {

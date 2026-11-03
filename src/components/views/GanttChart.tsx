@@ -176,7 +176,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
     if (row.status === "OVERDUE" || (row.dateKey && row.dateKey <= todayKey && row.status !== "COMPLETED")) return "bg-red-500";
     if (row.status === "COMPLETED") return "bg-emerald-500";
     if (row.kind === "TASK") return "bg-amber-500";
-    if (row.status === "IN_PROGRESS") return "bg-blue-500";
+    if (row.status === "IN_PROGRESS") return "bg-sky-500";
     return "bg-slate-400";
   };
 

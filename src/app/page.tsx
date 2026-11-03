@@ -26,8 +26,8 @@ function getStageStyle(stage: string) {
   }
   if (["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(stage)) {
     return {
-      row: "bg-blue-50/40 border-blue-200",
-      badge: "bg-blue-100 text-blue-700 border border-blue-200",
+      row: "bg-sky-50/40 border-sky-200",
+      badge: "bg-sky-100 text-sky-700 border border-sky-200",
     };
   }
   // 案件開發、現況及需求確認 等前期階段
