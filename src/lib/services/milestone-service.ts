@@ -236,12 +236,26 @@ export const MilestoneService = {
     updates: Partial<ProjectMilestoneItem>,
     existingMilestones?: ProjectMilestoneItem[],
     customerSalesRep?: { id: string; name: string },
-  ) {
-    const currentMilestone = existingMilestones
-      ? existingMilestones.find((m) => m.id === milestoneId)
-      : await prisma.projectMilestone.findFirst({
+    cascadeShift: boolean = false,
+  ): Promise<{ milestone: ProjectMilestoneItem; allMilestones: ProjectMilestoneItem[] }> {
+    const fullMilestones = existingMilestones
+      ? existingMilestones
+      : await MilestoneService.getMilestonesByProjectId(projectId);
+
+    const currentMilestone = fullMilestones.find((m) => m.id === milestoneId)
+      ?? await prisma.projectMilestone.findFirst({
           where: { id: milestoneId, projectId },
-          select: { status: true, stageCode: true, phase: true, plannedDueDate: true, actualDueDate: true, priority: true, assignedToId: true },
+          select: {
+            id: true,
+            status: true,
+            stageCode: true,
+            phase: true,
+            plannedDueDate: true,
+            actualDueDate: true,
+            priority: true,
+            assignedToId: true,
+            stageOrder: true,
+          },
         });
     if (!currentMilestone) {
       throw new NotFoundError("找不到此里程碑");
@@ -261,6 +275,45 @@ export const MilestoneService = {
       } else if (currentMilestone.status === MilestoneStatus.IN_PROGRESS) {
         if (newDue && newDue < today) {
           targetStatus = MilestoneStatus.OVERDUE;
+        }
+      }
+    }
+
+    // 計算連鎖平移天數
+    const oldDueStr = currentMilestone.plannedDueDate
+      ? typeof currentMilestone.plannedDueDate === "string"
+        ? currentMilestone.plannedDueDate.slice(0, 10)
+        : currentMilestone.plannedDueDate.toISOString().slice(0, 10)
+      : null;
+    const newDueStr = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
+
+    let diffDays = 0;
+    if (cascadeShift && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
+      const [oy, om, od] = oldDueStr.split("-").map(Number);
+      const [ny, nm, nd] = newDueStr.split("-").map(Number);
+      diffDays = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / (1000 * 60 * 60 * 24));
+    }
+
+    // 找出後續需平移的未完成里程碑 (排除 X-1, X-2)
+    const shiftedMilestoneUpdates: { id: string; newDateStr: string }[] = [];
+    if (diffDays !== 0) {
+      const todayStr = getTaiwanDateString();
+      const currentOrder = currentMilestone.stageOrder ?? 0;
+      for (const m of fullMilestones) {
+        if (
+          m.id !== milestoneId &&
+          m.stageOrder > currentOrder &&
+          m.status !== MilestoneStatus.COMPLETED &&
+          !["X-1", "X-2"].includes(m.stageCode) &&
+          m.plannedDueDate
+        ) {
+          const [my, mm, md] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const nextPlanned = new Date(Date.UTC(my, mm - 1, md));
+          nextPlanned.setUTCDate(nextPlanned.getUTCDate() + diffDays);
+          const nextDateStr = nextPlanned.toISOString().slice(0, 10);
+          // 若提前平移，確保日期不早於今日
+          const finalDateStr = diffDays < 0 && nextDateStr < todayStr ? todayStr : nextDateStr;
+          shiftedMilestoneUpdates.push({ id: m.id, newDateStr: finalDateStr });
         }
       }
     }
@@ -327,6 +380,12 @@ export const MilestoneService = {
             });
           }
         }
+      } else if (updates.plannedDueDate !== undefined) {
+        const nextDue = updates.plannedDueDate ? new Date(updates.plannedDueDate) : new Date();
+        await tx.salesTask.updateMany({
+          where: { milestoneId },
+          data: { dueDatetime: nextDue },
+        });
       } else if (updates.priority !== undefined) {
         await tx.salesTask.updateMany({
           where: { milestoneId },
@@ -334,26 +393,47 @@ export const MilestoneService = {
         });
       }
 
+      // 執行後續進度日期同步平移
+      if (shiftedMilestoneUpdates.length > 0) {
+        for (const shift of shiftedMilestoneUpdates) {
+          const shiftDate = new Date(`${shift.newDateStr}T00:00:00.000Z`);
+          await tx.projectMilestone.update({
+            where: { id: shift.id },
+            data: { plannedDueDate: shiftDate },
+          });
+          await tx.salesTask.updateMany({
+            where: { milestoneId: shift.id },
+            data: { dueDatetime: shiftDate },
+          });
+        }
+      }
+
       return milestone;
     });
 
-    const currentList = existingMilestones
-      ? existingMilestones.map((m) =>
-          m.id === milestoneId
-            ? {
-                ...m,
-                plannedDueDate: dateOnlyValue(updatedRow.plannedDueDate),
-                actualDueDate: dateOnlyValue(updatedRow.actualDueDate),
-                status: updatedRow.status,
-                priority: updatedRow.priority,
-                assignedToId: updatedRow.assignedToId || (customerSalesRep ? customerSalesRep.id : m.assignedToId),
-                assignedToName: updatedRow.assignedTo?.name || (customerSalesRep ? customerSalesRep.name : m.assignedToName),
-                attachments: updatedRow.attachments,
-                notes: updatedRow.notes,
-              }
-            : m
-        )
-      : await MilestoneService.getMilestonesByProjectId(projectId);
+    const shiftedDateMap = new Map(shiftedMilestoneUpdates.map((u) => [u.id, u.newDateStr]));
+    const currentList = fullMilestones.map((m) => {
+      if (m.id === milestoneId) {
+        return {
+          ...m,
+          plannedDueDate: dateOnlyValue(updatedRow.plannedDueDate),
+          actualDueDate: dateOnlyValue(updatedRow.actualDueDate),
+          status: updatedRow.status,
+          priority: updatedRow.priority,
+          assignedToId: updatedRow.assignedToId || (customerSalesRep ? customerSalesRep.id : m.assignedToId),
+          assignedToName: updatedRow.assignedTo?.name || (customerSalesRep ? customerSalesRep.name : m.assignedToName),
+          attachments: updatedRow.attachments,
+          notes: updatedRow.notes,
+        };
+      }
+      if (shiftedDateMap.has(m.id)) {
+        return {
+          ...m,
+          plannedDueDate: shiftedDateMap.get(m.id)!,
+        };
+      }
+      return m;
+    });
 
     const evaluated = ScheduleEngine.evaluateMilestones(currentList);
     await prisma.project
@@ -363,11 +443,13 @@ export const MilestoneService = {
       })
       .catch((err) => console.error("Failed to sync project isDelayed on milestone update:", err));
 
-    if (existingMilestones && customerSalesRep) {
-      return evaluated.milestones.find((m) => m.id === milestoneId);
-    }
+    const evaluatedTarget = evaluated.milestones.find((m) => m.id === milestoneId)
+      || (currentList.find((m) => m.id === milestoneId) as ProjectMilestoneItem);
 
-    return (await MilestoneService.getMilestonesByProjectId(projectId)).find((m) => m.id === milestoneId);
+    return {
+      milestone: evaluatedTarget,
+      allMilestones: evaluated.milestones,
+    };
   },
 
   async advanceMilestone(

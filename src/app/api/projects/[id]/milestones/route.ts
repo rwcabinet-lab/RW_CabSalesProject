@@ -112,6 +112,7 @@ export async function PUT(
       orderedMilestoneIds,
       milestoneDates,
       orderedMilestones,
+      cascadeShift,
     } = body;
 
     const [user, combined] = await Promise.all([
@@ -456,7 +457,11 @@ export async function PUT(
         updates.notes = updates.notes.trim();
       }
     }
-    const updated = await DataService.updateMilestone(
+    if (cascadeShift && !canManageOrReorder) {
+      return NextResponse.json({ error: "您無權使用後續日期同步平移功能" }, { status: 403 });
+    }
+
+    const { milestone: updated, allMilestones } = await DataService.updateMilestone(
       projectId,
       milestoneId,
       updates || {},
@@ -465,9 +470,9 @@ export async function PUT(
         id: project.salesRepId || project.customerSalesRepId || "",
         name: project.salesRepName || project.customerSalesRepName || "",
       },
+      Boolean(cascadeShift),
     );
-    const updatedMilestones = initialMilestones.map((m) => (m.id === milestoneId && updated ? updated : m));
-    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
+    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(allMilestones);
     const updatedProject = { ...project, isDelayed };
 
     return NextResponse.json({
@@ -475,6 +480,9 @@ export async function PUT(
       milestone: updated,
       project: updatedProject,
       milestones: attachTrafficLights(evaluatedMilestones),
+      message: cascadeShift && updates?.plannedDueDate
+        ? "已儲存進度設定，並同步平移後續未完成進度之預定完成日"
+        : undefined,
     });
   } catch (error) {
     return handleApiError(error, "更新里程碑失敗");

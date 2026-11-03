@@ -125,6 +125,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [cancellingLost, setCancellingLost] = useState(false);
 
   // 行內編輯
+  const [syncCascadeShift, setSyncCascadeShift] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     plannedDueDate: "", assignedToId: "", priority: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW", notes: ""
@@ -629,6 +630,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             priority: editForm.priority,
             notes: editForm.notes,
           },
+          cascadeShift: syncCascadeShift,
         }),
       });
       const data = await res.json();
@@ -642,6 +644,13 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           .catch(() => {});
       } else {
         await refreshMilestonesOnly();
+      }
+      if (data.message) {
+        toast.success(data.message);
+      } else if (syncCascadeShift) {
+        toast.success("已儲存設定並同步平移後續進度預定日");
+      } else {
+        toast.success("已儲存進度設定");
       }
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
@@ -871,6 +880,35 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <span>七大階段工程推進導覽</span>
             <SectionHelpButton sectionId="milestones-phases" />
           </div>
+          {/* 附圖紅圈處：後續日期同步平移 */}
+          <div className="flex items-center">
+            {canReorderMilestones ? (
+              <label
+                className="inline-flex items-center gap-1.5 cursor-pointer select-none rounded px-2 py-0.5 text-slate-700 hover:text-blue-700 hover:bg-slate-200/50 transition"
+                title="勾選後，手動修改任一進度預定完成日，將以該項目調整前後的天數差，同步平移其後所有未完成進度的預定完成日"
+              >
+                <input
+                  type="checkbox"
+                  checked={syncCascadeShift}
+                  onChange={(e) => setSyncCascadeShift(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="font-semibold text-xs text-slate-700">後續日期同步平移</span>
+              </label>
+            ) : (
+              <div
+                className="inline-flex items-center gap-1.5 text-slate-400 cursor-not-allowed select-none px-2 py-0.5"
+                title="需具備［里程碑各進度項目拖曳變更順序］權限"
+              >
+                <input
+                  type="checkbox"
+                  disabled
+                  className="h-3.5 w-3.5 rounded border-slate-200 text-slate-300 cursor-not-allowed"
+                />
+                <span className="text-xs text-slate-400">後續日期同步平移</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar">
           {PHASE_ORDER.map((phase) => {
@@ -1062,6 +1100,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             onChange={(e) => setEditForm({ ...editForm, plannedDueDate: e.target.value })}
                             className="w-full border rounded p-1.5"
                           />
+                          {syncCascadeShift && (
+                            <p className="mt-1 text-[11px] text-blue-600 font-semibold">
+                              ℹ️ 已啟用［後續日期同步平移］
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-slate-600 mb-1 font-semibold">負責人員</label>
