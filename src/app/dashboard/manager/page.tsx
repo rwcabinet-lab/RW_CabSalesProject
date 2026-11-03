@@ -751,7 +751,7 @@ export default function ManagerDashboardPage() {
                 </tr>
               ) : (
                 sortedOverview.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.id} className="hover:bg-slate-50 [&>td]:align-middle">
                   {visibleColumns.map((col) => {
                     switch (col.key) {
                       case "trafficLight":
@@ -828,46 +828,50 @@ export default function ManagerDashboardPage() {
                         );
                       case "actions":
                         return (
-                          <td key={col.key} className="p-3 text-center">
-                            <Link
-                              href={`/projects/${p.id}/milestones`}
-                              prefetch={true}
-                              className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                            >
-                              案件細節
-                            </Link>
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteProject(p)}
-                                disabled={deletingProjectId !== null}
-                                className="ml-2 inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                          <td key={col.key} className="p-3 text-center align-middle">
+                            <div className="flex items-center justify-center gap-2">
+                              <Link
+                                href={`/projects/${p.id}/milestones`}
+                                prefetch={true}
+                                className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />刪除
-                              </button>
-                            )}
+                                案件細節
+                              </Link>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteProject(p)}
+                                  disabled={deletingProjectId !== null}
+                                  className="inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors whitespace-nowrap"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />刪除
+                                </button>
+                              )}
+                            </div>
                           </td>
                         );
                       default:
                         return null;
                     }
                   })}
-                  <td className="p-3 text-center">
-                    <button
-                      onClick={() => setAssignModal({
-                        open: true,
-                        projectId: p.id,
-                        projectName: p.projectName,
-                        taskId: "",
-                        userId: "",
-                        subject: "",
-                        priority: "MEDIUM",
-                        dueDate: todayDate(),
-                      })}
-                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors"
-                    >
-                      指派任務
-                    </button>
+                  <td className="p-3 text-center align-middle">
+                    <div className="flex items-center justify-center">
+                      <button
+                        onClick={() => setAssignModal({
+                          open: true,
+                          projectId: p.id,
+                          projectName: p.projectName,
+                          taskId: "",
+                          userId: "",
+                          subject: "",
+                          priority: "MEDIUM",
+                          dueDate: todayDate(),
+                        })}
+                        className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
+                      >
+                        指派任務
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )))}

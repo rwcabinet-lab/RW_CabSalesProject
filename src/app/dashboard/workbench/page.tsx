@@ -579,7 +579,7 @@ export default function SalesWorkbenchPage() {
                 sortedProjects.map((p) => (
                   <Fragment key={p.id}>
                   <tr
-                    className={`hover:brightness-95 ${
+                    className={`hover:brightness-95 [&>td]:align-middle ${
                       editingProjectId === p.id
                         ? "bg-emerald-50/70 ring-1 ring-emerald-500"
                         : p.currentStage === "LOST"
@@ -666,7 +666,7 @@ export default function SalesWorkbenchPage() {
                           );
                         case "actions":
                           return (
-                            <td key={col.key} className="p-3 text-center">
+                            <td key={col.key} className="p-3 text-center align-middle">
                               <div className="flex items-center justify-center gap-2">
                                 <button
                                   type="button"
