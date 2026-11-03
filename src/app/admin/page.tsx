@@ -12,8 +12,6 @@ import {
   KeyRound,
   Sliders,
   Calendar,
-  ArrowUp,
-  ArrowDown,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -32,15 +30,23 @@ function roleLabel(role: string) {
 export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [permissions, setPermissions] = useState<RolePermission[]>([]);
-  const [accountId, setAccountId] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AppRole>("SALES");
   const [loading, setLoading] = useState(true);
-  const [savingAccount, setSavingAccount] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // 新增人員帳號（最上方表單專用）
+  const [newName, setNewName] = useState("");
+  const [newEmployeeId, setNewEmployeeId] = useState("");
+  const [newRole, setNewRole] = useState<AppRole>("SALES");
+  const [savingNewAccount, setSavingNewAccount] = useState(false);
+
+  // 列表行內即時編輯帳號
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmployeeId, setEditEmployeeId] = useState("");
+  const [editRole, setEditRole] = useState<AppRole>("SALES");
+  const [savingInlineUserId, setSavingInlineUserId] = useState<string | null>(null);
 
   // 更改密碼彈窗
   const [passwordModal, setPasswordModal] = useState<{ open: boolean; user: ManagedUser | null; newPass: string; confirmPass: string }>({
@@ -48,9 +54,11 @@ export default function AdminPage() {
   });
   const [passwordNotice, setPasswordNotice] = useState("");
 
-  // 案件清單欄位設定
+  // 案件清單欄位設定與拖曳預覽
   const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
   const [savingColumns, setSavingColumns] = useState(false);
+  const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
+  const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
 
   // 階段預設天數設定
   const [stageDays, setStageDays] = useState<Record<string, number>>(MILESTONE_DEFAULT_DAYS);
@@ -96,42 +104,84 @@ export default function AdminPage() {
     }
   };
 
-  const resetAccountForm = () => {
-    setAccountId("");
-    setName("");
-    setEmail("");
-    setRole("SALES");
-  };
-
-  const editAccount = (user: ManagedUser) => {
-    setAccountId(user.id);
-    setName(user.name);
-    setEmail(user.email);
-    setRole(user.role);
-    setNotice("");
-    setError("");
-  };
-
-  const saveAccount = async (event: FormEvent<HTMLFormElement>) => {
+  // 新增人員帳號（最上方表單專用）
+  const handleCreateAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSavingAccount(true);
+    if (!newName.trim()) {
+      setError("請輸入姓名");
+      return;
+    }
+    if (!newEmployeeId.trim()) {
+      setError("請輸入員工編號");
+      return;
+    }
+    setSavingNewAccount(true);
     setError("");
     setNotice("");
     try {
       const response = await fetch("/api/admin/users", {
-        method: accountId ? "PATCH" : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: accountId || undefined, name, email, role }),
+        body: JSON.stringify({ name: newName.trim(), email: newEmployeeId.trim(), role: newRole }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "儲存帳號失敗");
-      resetAccountForm();
+      if (!response.ok) throw new Error(data.error || "新增帳號失敗");
+      setNewName("");
+      setNewEmployeeId("");
+      setNewRole("SALES");
       await loadAdminData();
-      setNotice(accountId ? "帳號資料已更新。" : "帳號已新增。");
+      setNotice(`帳號「${data.name}」（員工編號：${data.email}）已新增。`);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "儲存帳號失敗");
+      setError(saveError instanceof Error ? saveError.message : "新增帳號失敗");
     } finally {
-      setSavingAccount(false);
+      setSavingNewAccount(false);
+    }
+  };
+
+  // 列表行內即時編輯帳號
+  const startEditInlineUser = (user: ManagedUser) => {
+    setEditingUserId(user.id);
+    setEditName(user.name);
+    setEditEmployeeId(user.email);
+    setEditRole(user.role);
+    setError("");
+    setNotice("");
+  };
+
+  const cancelEditInlineUser = () => {
+    setEditingUserId(null);
+    setEditName("");
+    setEditEmployeeId("");
+    setEditRole("SALES");
+  };
+
+  const handleSaveInlineUser = async (targetId: string) => {
+    if (!editName.trim()) {
+      setError("請輸入姓名");
+      return;
+    }
+    if (!editEmployeeId.trim()) {
+      setError("請輸入員工編號");
+      return;
+    }
+    setSavingInlineUserId(targetId);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: targetId, name: editName.trim(), email: editEmployeeId.trim(), role: editRole }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "更新帳號失敗");
+      cancelEditInlineUser();
+      await loadAdminData();
+      setNotice(`帳號「${data.name}」資料已更新。`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "更新帳號失敗");
+    } finally {
+      setSavingInlineUserId(null);
     }
   };
 
@@ -169,23 +219,11 @@ export default function AdminPage() {
     }
   };
 
-  // 欄位開關與上移下移
+  // 欄位顯隱開關
   const toggleColumnVisible = (key: string) => {
     setColumns((cols) =>
       cols.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c))
     );
-  };
-
-  const moveColumn = (index: number, direction: "up" | "down") => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= columns.length) return;
-    const newCols = [...columns];
-    const temp = newCols[index];
-    newCols[index] = newCols[targetIndex];
-    newCols[targetIndex] = temp;
-    // 重設 order
-    newCols.forEach((c, idx) => (c.order = idx));
-    setColumns(newCols);
   };
 
   const saveColumnsConfig = async () => {
@@ -294,7 +332,7 @@ export default function AdminPage() {
           </button>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          以主管監控室表格樣式預覽。您可以點擊表頭的 <b>👁️ 圖示</b> 開關欄位顯示，或點擊 <b>◀ / ▶ 箭頭或直接拖曳表頭</b> 調整欄位左右順序。儲存後工作台與主管監控室將同步套用。
+          以主管監控室表格樣式預覽。您可以點擊表頭的 <b>👁️ 圖示</b> 開關欄位顯示，或<b>直接按住並拖曳表頭</b>即時預覽調整欄位左右順序。儲存後工作台與主管監控室將同步套用。
         </p>
 
         {/* 模擬即時預覽表格 */}
@@ -302,70 +340,89 @@ export default function AdminPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 text-slate-700">
               <tr>
-                {columns.map((col, idx) => (
-                  <th
-                    key={col.key}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData("text/plain", idx.toString())}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const fromIdx = Number(e.dataTransfer.getData("text/plain"));
-                      if (!isNaN(fromIdx) && fromIdx !== idx) {
-                        const newCols = [...columns];
-                        const [moved] = newCols.splice(fromIdx, 1);
-                        newCols.splice(idx, 0, moved);
-                        newCols.forEach((c, i) => (c.order = i));
-                        setColumns(newCols);
-                      }
-                    }}
-                    className={`p-3 border-r border-slate-200 transition cursor-grab active:cursor-grabbing select-none ${
-                      col.visible ? "bg-white text-slate-800" : "bg-slate-100/70 text-slate-400 line-through"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-bold flex items-center gap-1">
-                        ⋮⋮ {col.label}
-                      </span>
-                      <div className="flex items-center gap-1">
+                {columns.map((col, idx) => {
+                  const isBeingDragged = draggedColIdx === idx;
+                  const isDragOver = dragOverColIdx === idx && draggedColIdx !== idx;
+
+                  return (
+                    <th
+                      key={col.key}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", idx.toString());
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggedColIdx(idx);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverColIdx !== idx) {
+                          setDragOverColIdx(idx);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverColIdx === idx) {
+                          setDragOverColIdx(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromIdx = draggedColIdx !== null ? draggedColIdx : Number(e.dataTransfer.getData("text/plain"));
+                        setDraggedColIdx(null);
+                        setDragOverColIdx(null);
+                        if (!isNaN(fromIdx) && fromIdx !== idx) {
+                          const newCols = [...columns];
+                          const [moved] = newCols.splice(fromIdx, 1);
+                          newCols.splice(idx, 0, moved);
+                          newCols.forEach((c, i) => (c.order = i));
+                          setColumns(newCols);
+                        }
+                      }}
+                      onDragEnd={() => {
+                        setDraggedColIdx(null);
+                        setDragOverColIdx(null);
+                      }}
+                      className={`p-3 border-r border-slate-200 transition-all duration-150 cursor-grab active:cursor-grabbing select-none ${
+                        isDragOver
+                          ? "ring-2 ring-blue-500 border-blue-400 bg-blue-50/80 scale-[1.02] shadow-sm relative z-10"
+                          : isBeingDragged
+                            ? "opacity-40 scale-[0.98] border-dashed border-blue-400 bg-slate-100"
+                            : col.visible
+                              ? "bg-white text-slate-800"
+                              : "bg-slate-100/70 text-slate-400 line-through"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="font-bold flex items-center gap-1">
+                          ⋮⋮ {col.label}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => toggleColumnVisible(col.key)}
-                          className="p-1 hover:text-blue-600 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleColumnVisible(col.key);
+                          }}
+                          className="p-1 hover:text-blue-600 rounded transition-colors"
                           title={col.visible ? "點擊隱藏此欄位" : "點擊顯示此欄位"}
                         >
                           {col.visible ? <Eye className="h-3.5 w-3.5 text-blue-600" /> : <EyeOff className="h-3.5 w-3.5 text-slate-400" />}
                         </button>
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => moveColumn(idx, "up")}
-                          className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20"
-                          title="向左移動"
-                        >
-                          ◀
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === columns.length - 1}
-                          onClick={() => moveColumn(idx, "down")}
-                          className="p-0.5 text-slate-400 hover:text-slate-800 disabled:opacity-20"
-                          title="向右移動"
-                        >
-                          ▶
-                        </button>
                       </div>
-                    </div>
-                  </th>
-                ))}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               <tr className="hover:bg-slate-50 text-slate-600">
-                {columns.map((col) => {
+                {columns.map((col, idx) => {
+                  const isBeingDragged = draggedColIdx === idx;
+                  const isDragOver = dragOverColIdx === idx && draggedColIdx !== idx;
+                  const dragCellClass = isDragOver ? "bg-blue-50/30" : isBeingDragged ? "opacity-40" : "";
+
                   if (!col.visible) {
                     return (
-                      <td key={col.key} className="p-3 border-r text-center text-slate-300 italic bg-slate-50/50">
+                      <td key={col.key} className={`p-3 border-r text-center text-slate-300 italic bg-slate-50/50 ${dragCellClass}`}>
                         (已隱藏)
                       </td>
                     );
@@ -373,7 +430,7 @@ export default function AdminPage() {
                   switch (col.key) {
                     case "trafficLight":
                       return (
-                        <td key={col.key} className="p-3 border-r">
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
                           <span className="px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 text-[11px]">
                             ● 剩 5 天
                           </span>
@@ -381,26 +438,26 @@ export default function AdminPage() {
                       );
                     case "projectName":
                       return (
-                        <td key={col.key} className="p-3 border-r font-bold text-slate-900">
+                        <td key={col.key} className={`p-3 border-r font-bold text-slate-900 ${dragCellClass}`}>
                           樣品案場 A
                           <div className="text-[10px] text-slate-400 font-normal">台北市大安區新生南路</div>
                         </td>
                       );
                     case "customer":
                       return (
-                        <td key={col.key} className="p-3 border-r">
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
                           隆美興業 <span className="text-[10px] bg-blue-50 text-blue-700 px-1 rounded font-semibold">8.5折</span>
                         </td>
                       );
                     case "salesRep":
                       return (
-                        <td key={col.key} className="p-3 border-r">
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
                           林宏遠 / 張育菁
                         </td>
                       );
                     case "stageProgress":
                       return (
-                        <td key={col.key} className="p-3 border-r font-bold text-slate-700">
+                        <td key={col.key} className={`p-3 border-r font-bold text-slate-700 ${dragCellClass}`}>
                           設計提案/報價/簽約
                           <div className="mt-1 text-[10px] font-normal text-slate-500">報價單</div>
                         </td>
@@ -408,7 +465,7 @@ export default function AdminPage() {
                     case "quoteAndUnits":
                     case "amount":
                       return (
-                        <td key={col.key} className="p-3 border-r">
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
                           <div className="font-bold text-slate-900">$38.5 萬</div>
                           <div className="text-[10px] text-slate-400">2 戶</div>
                         </td>
@@ -417,18 +474,18 @@ export default function AdminPage() {
                       return null;
                     case "expectedDate":
                       return (
-                        <td key={col.key} className="p-3 border-r">
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
                           2026-11-30
                         </td>
                       );
                     case "actions":
                       return (
-                        <td key={col.key} className="p-3 border-r text-center">
+                        <td key={col.key} className={`p-3 border-r text-center ${dragCellClass}`}>
                           <span className="px-2 py-1 rounded bg-slate-100 font-bold text-slate-600">操作鈕</span>
                         </td>
                       );
                     default:
-                      return <td key={col.key} className="p-3 border-r">-</td>;
+                      return <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>-</td>;
                   }
                 })}
               </tr>
@@ -491,65 +548,195 @@ export default function AdminPage() {
           <h2 className="text-lg font-bold">帳號清單與權限設定</h2>
           <SectionHelpButton sectionId="admin-users" />
         </div>
-        <form onSubmit={saveAccount} className="grid gap-4 md:grid-cols-4">
-          <div>
-            <label htmlFor="account-name" className="mb-1.5 block text-sm font-medium">姓名</label>
-            <input id="account-name" required value={name} onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" />
-          </div>
-          <div>
-            <label htmlFor="account-email" className="mb-1.5 block text-sm font-medium">電子郵件（登入帳號）</label>
-            <input id="account-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" />
-          </div>
-          <div>
-            <label htmlFor="account-role" className="mb-1.5 block text-sm font-medium">帳號層級</label>
-            <select id="account-role" value={role} onChange={(event) => setRole(event.target.value as AppRole)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500">
-              {ROLE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end gap-2">
-            <button type="submit" disabled={savingAccount}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
-              {accountId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {savingAccount ? "儲存中..." : accountId ? "更新帳號" : "新增帳號"}
-            </button>
-            {accountId && <button type="button" onClick={resetAccountForm} aria-label="取消編輯"
-              className="rounded-lg border border-slate-300 p-2 text-slate-600 hover:bg-slate-100"><X className="h-4 w-4" /></button>}
-          </div>
-        </form>
 
-        <div className="mt-5 overflow-x-auto">
+        {/* 最上方只用來新增人員帳號 */}
+        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <Plus className="h-4 w-4 text-blue-600" />
+            新增人員帳號
+          </div>
+          <form onSubmit={handleCreateAccount} className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <label htmlFor="new-account-name" className="mb-1 block text-xs font-semibold text-slate-600">
+                姓名
+              </label>
+              <input
+                id="new-account-name"
+                required
+                placeholder="請輸入姓名"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-account-emp-id" className="mb-1 block text-xs font-semibold text-slate-600">
+                員工編號（登入帳號）
+              </label>
+              <input
+                id="new-account-emp-id"
+                type="text"
+                required
+                placeholder="英數字串，例：EMP001"
+                value={newEmployeeId}
+                onChange={(event) => {
+                  const sanitized = event.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                  setNewEmployeeId(sanitized);
+                }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-account-role" className="mb-1 block text-xs font-semibold text-slate-600">
+                帳號層級
+              </label>
+              <select
+                id="new-account-role"
+                value={newRole}
+                onChange={(event) => setNewRole(event.target.value as AppRole)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                {ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={savingNewAccount}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 shadow-xs"
+              >
+                <Plus className="h-4 w-4" />
+                {savingNewAccount ? "新增中..." : "新增帳號"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* 帳號列表與列內編輯 */}
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="border-b border-slate-200 text-xs text-slate-500">
               <tr>
                 <th className="px-3 py-2 font-semibold">姓名</th>
-                <th className="px-3 py-2 font-semibold">電子郵件</th>
+                <th className="px-3 py-2 font-semibold">員工編號</th>
                 <th className="px-3 py-2 font-semibold">層級</th>
                 <th className="px-3 py-2 text-right font-semibold">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-3 font-medium text-slate-800">{user.name}</td>
-                  <td className="px-3 py-3 text-slate-600">{user.email}</td>
-                  <td className="px-3 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{roleLabel(user.role)}</span></td>
-                  <td className="px-3 py-3 text-right flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPasswordModal({ open: true, user, newPass: "", confirmPass: "" })}
-                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100"
-                    >
-                      <KeyRound className="h-3.5 w-3.5" />改密碼
-                    </button>
-                    <button type="button" onClick={() => editAccount(user)} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50">
-                      <Pencil className="h-3.5 w-3.5" />編輯
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {users.map((user) => {
+                const isEditing = editingUserId === user.id;
+
+                if (isEditing) {
+                  return (
+                    <tr key={user.id} className="bg-blue-50/70 border-y border-blue-200">
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          required
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="姓名"
+                          className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void handleSaveInlineUser(user.id);
+                            if (e.key === "Escape") cancelEditInlineUser();
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          required
+                          value={editEmployeeId}
+                          onChange={(e) => {
+                            const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                            setEditEmployeeId(sanitized);
+                          }}
+                          placeholder="英數字串"
+                          className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void handleSaveInlineUser(user.id);
+                            if (e.key === "Escape") cancelEditInlineUser();
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <select
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value as AppRole)}
+                          className="rounded-md border border-blue-400 bg-white px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {ROLE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            disabled={savingInlineUserId === user.id}
+                            onClick={() => void handleSaveInlineUser(user.id)}
+                            className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                            title="儲存此列修改"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {savingInlineUserId === user.id ? "儲存中..." : "儲存"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingInlineUserId === user.id}
+                            onClick={cancelEditInlineUser}
+                            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                            title="取消編輯"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            取消
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-3 py-3 font-medium text-slate-800">{user.name}</td>
+                    <td className="px-3 py-3 text-slate-600 font-mono text-xs">{user.email}</td>
+                    <td className="px-3 py-3">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        {roleLabel(user.role)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPasswordModal({ open: true, user, newPass: "", confirmPass: "" })}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />改密碼
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEditInlineUser(user)}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />編輯
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
