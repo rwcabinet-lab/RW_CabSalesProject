@@ -90,6 +90,12 @@ export function handleApiError(
         { status: 409 }
       );
     }
+    if (code === "P2028") {
+      return NextResponse.json(
+        { error: customMessage || "資料庫交易處理逾時，請稍後重試" },
+        { status: 504 }
+      );
+    }
   }
 
   // 4. 未預期之例外

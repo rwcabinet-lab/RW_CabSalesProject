@@ -307,7 +307,15 @@ export const MilestoneService = {
           !["X-1", "X-2"].includes(m.stageCode) &&
           m.plannedDueDate
         ) {
-          const [my, mm, md] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const rawDueDate = m.plannedDueDate as unknown;
+          const mDueDateStr =
+            typeof rawDueDate === "string"
+              ? rawDueDate
+              : rawDueDate instanceof Date
+                ? rawDueDate.toISOString()
+                : null;
+          if (!mDueDateStr) continue;
+          const [my, mm, md] = mDueDateStr.slice(0, 10).split("-").map(Number);
           const nextPlanned = new Date(Date.UTC(my, mm - 1, md));
           nextPlanned.setUTCDate(nextPlanned.getUTCDate() + diffDays);
           const nextDateStr = nextPlanned.toISOString().slice(0, 10);
@@ -318,7 +326,8 @@ export const MilestoneService = {
       }
     }
 
-    const updatedRow = await prisma.$transaction(async (tx) => {
+    const updatedRow = await prisma.$transaction(
+      async (tx) => {
       const milestone = await tx.projectMilestone.update({
         where: { id: milestoneId, projectId },
         data: {
@@ -395,21 +404,33 @@ export const MilestoneService = {
 
       // 執行後續進度日期同步平移
       if (shiftedMilestoneUpdates.length > 0) {
+        // 先查出後續里程碑中確實存在待辦任務者，避免對不存在任務之里程碑逐一發送無效的 updateMany 查詢
+        const shiftedIds = shiftedMilestoneUpdates.map((s) => s.id);
+        const existingTasks = await tx.salesTask.findMany({
+          where: { milestoneId: { in: shiftedIds } },
+          select: { id: true, milestoneId: true },
+        });
+        const taskMilestoneMap = new Map(existingTasks.map((t) => [t.milestoneId!, t.id]));
+
         for (const shift of shiftedMilestoneUpdates) {
           const shiftDate = new Date(`${shift.newDateStr}T00:00:00.000Z`);
           await tx.projectMilestone.update({
             where: { id: shift.id },
             data: { plannedDueDate: shiftDate },
           });
-          await tx.salesTask.updateMany({
-            where: { milestoneId: shift.id },
-            data: { dueDatetime: shiftDate },
-          });
+          if (taskMilestoneMap.has(shift.id)) {
+            await tx.salesTask.update({
+              where: { id: taskMilestoneMap.get(shift.id)! },
+              data: { dueDatetime: shiftDate },
+            });
+          }
         }
       }
 
       return milestone;
-    });
+    },
+    { maxWait: 10000, timeout: 25000 }
+  );
 
     const shiftedDateMap = new Map(shiftedMilestoneUpdates.map((u) => [u.id, u.newDateStr]));
     const currentList = fullMilestones.map((m) => {

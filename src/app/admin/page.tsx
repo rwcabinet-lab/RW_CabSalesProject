@@ -10,7 +10,6 @@ import {
   UserRound,
   X,
   KeyRound,
-  Palette,
   Sliders,
   Calendar,
   ArrowUp,
@@ -49,10 +48,6 @@ export default function AdminPage() {
   });
   const [passwordNotice, setPasswordNotice] = useState("");
 
-  // 介面風格設定
-  const [themeColor, setThemeColor] = useState<"blue" | "dark" | "emerald" | "amber" | "slate">("blue");
-  const [themeDensity, setThemeDensity] = useState<"comfortable" | "compact">("comfortable");
-
   // 案件清單欄位設定
   const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
   const [savingColumns, setSavingColumns] = useState(false);
@@ -64,10 +59,6 @@ export default function AdminPage() {
   useEffect(() => {
     loadAdminData();
     loadConfigs();
-    const savedTheme = localStorage.getItem("app_theme_color") as typeof themeColor;
-    if (savedTheme) setThemeColor(savedTheme);
-    const savedDensity = localStorage.getItem("app_theme_density") as typeof themeDensity;
-    if (savedDensity) setThemeDensity(savedDensity);
   }, []);
 
   const loadAdminData = async () => {
@@ -178,32 +169,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleApplyTheme = (color: typeof themeColor, density: typeof themeDensity) => {
-    setThemeColor(color);
-    setThemeDensity(density);
-    localStorage.setItem("app_theme_color", color);
-    localStorage.setItem("app_theme_density", density);
-
-    // 即時動態套用至 document.documentElement 與 document.body
-    const themeClasses = ["theme-blue", "theme-emerald", "theme-amber", "theme-slate", "theme-dark"];
-    document.documentElement.classList.remove(...themeClasses);
-    document.body.classList.remove(...themeClasses);
-    if (color !== "blue") {
-      document.documentElement.classList.add(`theme-${color}`);
-      document.body.classList.add(`theme-${color}`);
-    }
-
-    if (density === "compact") {
-      document.documentElement.classList.add("density-compact");
-      document.body.classList.add("density-compact");
-    } else {
-      document.documentElement.classList.remove("density-compact");
-      document.body.classList.remove("density-compact");
-    }
-
-    setNotice(`已即時套用【${color === "blue" ? "經典藍" : color === "dark" ? "暗黑極簡" : color === "emerald" ? "森林綠" : color === "amber" ? "暖陽金" : "質樸灰"}】與【${density === "comfortable" ? "寬鬆版面" : "緊湊版面"}】風格！`);
-  };
-
   // 欄位開關與上移下移
   const toggleColumnVisible = (key: string) => {
     setColumns((cols) =>
@@ -303,7 +268,7 @@ export default function AdminPage() {
         <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><ShieldCheck className="h-6 w-6" /></div>
         <div>
           <h1 className="text-2xl font-black text-slate-900">管理者與系統設定</h1>
-          <p className="mt-1 text-sm text-slate-600">管理帳號密碼、全域案件清單欄位順序、各階段預設天數及介面風格風格。</p>
+          <p className="mt-1 text-sm text-slate-600">管理帳號密碼、全域案件清單欄位順序與各階段預設天數。</p>
         </div>
       </div>
 
@@ -519,65 +484,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* 3. 介面風格多樣化選擇 */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-3 flex items-center gap-2">
-          <Palette className="h-5 w-5 text-amber-600" />
-          <h2 className="text-lg font-bold">系統介面風格自訂</h2>
-          <SectionHelpButton sectionId="admin-theme" />
-        </div>
-        <p className="mb-4 text-xs text-slate-500">
-          切換主題色彩與畫面佈局密度，偏好設定將儲存於此瀏覽器。
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">主題色彩</label>
-            <div className="flex flex-wrap gap-3">
-              {[
-                { id: "blue", label: "經典藍 (預設)", bg: "bg-blue-600" },
-                { id: "emerald", label: "森林綠", bg: "bg-emerald-600" },
-                { id: "amber", label: "暖陽橘", bg: "bg-amber-600" },
-                { id: "slate", label: "質樸灰", bg: "bg-slate-700" },
-                { id: "dark", label: "極簡深色", bg: "bg-slate-900" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => handleApplyTheme(t.id as any, themeDensity)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${
-                    themeColor === t.id ? "ring-2 ring-blue-500 border-blue-500 bg-blue-50/50" : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className={`w-3.5 h-3.5 rounded-full ${t.bg}`} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">版面顯示密度</label>
-            <div className="flex gap-3">
-              {[
-                { id: "comfortable", label: "寬鬆舒適" },
-                { id: "compact", label: "緊湊精簡" },
-              ].map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => handleApplyTheme(themeColor, d.id as any)}
-                  className={`px-4 py-2 rounded-lg border text-xs font-semibold ${
-                    themeDensity === d.id ? "ring-2 ring-blue-500 border-blue-500 bg-blue-50/50" : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. 帳號管理與更改密碼 */}
+      {/* 3. 帳號清單與權限設定 */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-5 flex items-center gap-2">
           <UserRound className="h-5 w-5 text-blue-600" />
@@ -648,7 +555,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* 5. 各層級可瀏覽頁面 */}
+      {/* 4. 各層級可瀏覽頁面 */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-2 flex items-center gap-2">
           <Check className="h-5 w-5 text-emerald-600" />

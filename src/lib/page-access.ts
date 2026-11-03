@@ -6,7 +6,7 @@ export const PAGE_ACCESS_OPTIONS = [
   { key: "customers", label: "客戶主檔", href: "/customers" },
   { key: "projects", label: "案場、里程碑與報價", href: "/projects" },
   { key: "admin", label: "管理者設定", href: "/admin" },
-  { key: "milestone_reorder", label: "里程碑各進度項目拖曳變更順序與日期同步平移", href: "" },
+  { key: "milestone_reorder", label: "里程碑項目內容順序變更/日期平移", href: "" },
 ] as const;
 
 export const ROLE_OPTIONS = [

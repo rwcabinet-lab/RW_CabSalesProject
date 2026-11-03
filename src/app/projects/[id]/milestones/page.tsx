@@ -898,7 +898,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             ) : (
               <div
                 className="inline-flex items-center gap-1.5 text-slate-400 cursor-not-allowed select-none px-2 py-0.5"
-                title="需具備［里程碑各進度項目拖曳變更順序］權限"
+                title="需具備［里程碑項目內容順序變更/日期平移］權限"
               >
                 <input
                   type="checkbox"
