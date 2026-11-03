@@ -49,6 +49,9 @@ export default function SalesWorkbenchPage() {
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制 - 使用細粒度 Selector 避免多餘 Re-render)
   const {
     searchQuery,
+    dateMode,
+    startDate,
+    endDate,
     startMonth,
     endMonth,
     statusFilter,
@@ -60,6 +63,9 @@ export default function SalesWorkbenchPage() {
   } = useWorkbenchStore(
     useShallow((s) => ({
       searchQuery: s.searchQuery,
+      dateMode: s.dateMode,
+      startDate: s.startDate,
+      endDate: s.endDate,
       startMonth: s.startMonth,
       endMonth: s.endMonth,
       statusFilter: s.statusFilter,
@@ -72,6 +78,9 @@ export default function SalesWorkbenchPage() {
   );
 
   const setSearchQuery = useWorkbenchStore((s) => s.setSearchQuery);
+  const setDateMode = useWorkbenchStore((s) => s.setDateMode);
+  const setStartDate = useWorkbenchStore((s) => s.setStartDate);
+  const setEndDate = useWorkbenchStore((s) => s.setEndDate);
   const setStartMonth = useWorkbenchStore((s) => s.setStartMonth);
   const setEndMonth = useWorkbenchStore((s) => s.setEndMonth);
   const setStatusFilter = useWorkbenchStore((s) => s.setStatusFilter);
@@ -116,10 +125,18 @@ export default function SalesWorkbenchPage() {
       if (statusFilter && projectStatus !== statusFilter) match = false;
 
       const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
+      const projectDate = dateToCheck.slice(0, 10);
       const projectMonth = dateToCheck.slice(0, 7);
-      if (startMonth && projectMonth && projectMonth < startMonth) match = false;
-      if (endMonth && projectMonth && projectMonth > endMonth) match = false;
-      if ((startMonth || endMonth) && !projectMonth) match = false;
+
+      if (dateMode === "DATE") {
+        if (startDate && projectDate && projectDate < startDate) match = false;
+        if (endDate && projectDate && projectDate > endDate) match = false;
+        if ((startDate || endDate) && !projectDate) match = false;
+      } else {
+        if (startMonth && projectMonth && projectMonth < startMonth) match = false;
+        if (endMonth && projectMonth && projectMonth > endMonth) match = false;
+        if ((startMonth || endMonth) && !projectMonth) match = false;
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -135,7 +152,7 @@ export default function SalesWorkbenchPage() {
 
       return match;
     });
-  }, [projects, stageFilter, statusFilter, startMonth, endMonth, searchQuery]);
+  }, [projects, stageFilter, statusFilter, dateMode, startDate, endDate, startMonth, endMonth, searchQuery]);
 
   // 依完工日與狀態排序
   const sortedProjects = useMemo(() => {
@@ -344,7 +361,7 @@ export default function SalesWorkbenchPage() {
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-600" /> 案件清單
+            <Clock className="w-5 h-5 text-blue-600" /> 案場總覽
             <SectionHelpButton sectionId="workbench-projects" />
           </h2>
           <div className="flex items-center gap-3">
@@ -356,7 +373,7 @@ export default function SalesWorkbenchPage() {
                   : selectableUsers[0]?.id || "";
                 openAddProject(firstCust?.id || "", defaultRepId);
               }}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700"
+              className="inline-flex h-8 items-center gap-1.5 px-3 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition-colors"
             >
               <Plus className="w-4 h-4" /> 新增案場
             </button>
@@ -365,31 +382,81 @@ export default function SalesWorkbenchPage() {
 
         <div className="bg-white p-4 border-b flex flex-wrap items-center gap-4 bg-slate-50/50">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <span>月份：</span>
-            <input
-              type="month"
-              value={startMonth}
-              onChange={(e) => setStartMonth(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
-            />
-            <span className="text-slate-400">至</span>
-            <input
-              type="month"
-              value={endMonth}
-              onChange={(e) => setEndMonth(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
-            />
-            {(startMonth || endMonth) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStartMonth("");
-                  setEndMonth("");
-                }}
-                className="text-xs text-slate-400 hover:text-slate-600"
-              >
-                ✕ 清除
-              </button>
+            <span>時間區間：</span>
+            <select
+              value={dateMode}
+              onChange={(e) => {
+                setDateMode(e.target.value as "DATE" | "MONTH");
+                setStartDate("");
+                setEndDate("");
+                setStartMonth("");
+                setEndMonth("");
+              }}
+              className="h-7 border border-slate-300 rounded px-2 text-xs bg-white text-slate-700 font-medium"
+            >
+              <option value="DATE">日期</option>
+              <option value="MONTH">月份</option>
+            </select>
+            {dateMode === "DATE" ? (
+              <>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
+                  title="起始日期"
+                />
+                <span className="text-slate-400">至</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
+                  title="結束日期"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
+                  >
+                    ✕ 清除
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="month"
+                  value={startMonth}
+                  onChange={(e) => setStartMonth(e.target.value)}
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
+                  title="起始月份"
+                />
+                <span className="text-slate-400">至</span>
+                <input
+                  type="month"
+                  value={endMonth}
+                  onChange={(e) => setEndMonth(e.target.value)}
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
+                  title="結束月份"
+                />
+                {(startMonth || endMonth) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartMonth("");
+                      setEndMonth("");
+                    }}
+                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
+                  >
+                    ✕ 清除
+                  </button>
+                )}
+              </>
             )}
           </div>
           <label className="flex items-center gap-2 text-sm font-semibold">
@@ -397,7 +464,7 @@ export default function SalesWorkbenchPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
             >
               <option value="">全部狀態</option>
               <option value="RED">逾期</option>
@@ -412,7 +479,7 @@ export default function SalesWorkbenchPage() {
             <select
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
             >
               <option value="ACTIVE">進行中案件</option>
               <option value="">全部案件</option>
@@ -439,7 +506,7 @@ export default function SalesWorkbenchPage() {
               placeholder="搜尋案名/客戶/地址/業務..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+              className="h-7 pl-8 pr-7 border border-slate-300 rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
             />
             {searchQuery && (
               <button
@@ -599,28 +666,32 @@ export default function SalesWorkbenchPage() {
                           );
                         case "actions":
                           return (
-                            <td key={col.key} className="p-3 flex gap-2 justify-center">
-                              <button
-                                onClick={() => openEditProject(p)}
-                                className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-semibold"
-                              >
-                                編輯
-                              </button>
-                              <Link
-                                href={`/projects/${p.id}/milestones`}
-                                prefetch={true}
-                                className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs font-semibold hover:bg-blue-100 hover:text-blue-700"
-                              >
-                                案件細節
-                              </Link>
-                              {isAdmin && (
+                            <td key={col.key} className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
                                 <button
-                                  onClick={() => handleDeleteProject(p)}
-                                  className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-semibold"
+                                  type="button"
+                                  onClick={() => openEditProject(p)}
+                                  className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
                                 >
-                                  刪除
+                                  編輯
                                 </button>
-                              )}
+                                <Link
+                                  href={`/projects/${p.id}/milestones`}
+                                  prefetch={true}
+                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                >
+                                  案件細節
+                                </Link>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteProject(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                  >
+                                    刪除
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           );
                         default:

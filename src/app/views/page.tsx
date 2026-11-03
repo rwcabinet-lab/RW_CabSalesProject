@@ -228,13 +228,10 @@ export default function VisualViewsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
-              模組 D：多元可視化視圖
-            </span>
             <span className="text-xs text-slate-500 font-medium">甘特圖時程軸、行事曆排程</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-            全廠專案時程多維可視化檢視
+            全廠專案時程檢視
           </h1>
         </div>
 

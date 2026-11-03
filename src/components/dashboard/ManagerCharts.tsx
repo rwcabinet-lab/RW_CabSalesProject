@@ -18,13 +18,36 @@ export function SalesWorkloadChart({ data }: SalesWorkloadChartProps) {
     );
   }
 
+  // 自訂 X 軸標籤：上方姓名、下方職稱
+  const renderCustomTick = (props: any) => {
+    const { x, y, payload } = props;
+    const item = data[payload?.index];
+    const rawName = String(payload?.value || item?.salesRepName || "");
+    const match = rawName.match(/^(.+?)[（(](.+?)[）)]$/);
+    const displayName = match ? match[1] : rawName;
+    const displayRole = item?.roleLabel || (match ? match[2] : "");
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={0} y={0} dy={12} textAnchor="middle" fill="#334155" fontSize={11} fontWeight={600}>
+          {displayName}
+        </text>
+        {displayRole && (
+          <text x={0} y={0} dy={25} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+            {displayRole}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 26 }}>
         <XAxis
           xAxisId="total"
           dataKey="salesRepName"
-          tick={{ fontSize: 11, fill: "#64748b" }}
+          tick={renderCustomTick}
           axisLine={false}
           tickLine={false}
           interval={0}

@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
     for (const u of assignableUsers) {
       const roleLabel = formatRoleLabel(u.role);
       workloadMap[u.id] = {
-        name: `${u.name}（${roleLabel}）`,
+        name: u.name,
         role: u.role,
         roleLabel,
         projectIds: new Set<string>(),
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
           const roleLabel = formatRoleLabel(role);
           const name = u?.name || (uid === p.salesRepId ? p.salesRepName || "業務" : "同仁");
           workloadMap[uid] = {
-            name: `${name}（${roleLabel}）`,
+            name,
             role,
             roleLabel,
             projectIds: new Set<string>(),

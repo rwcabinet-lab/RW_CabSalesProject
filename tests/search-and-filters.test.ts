@@ -304,4 +304,32 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(workloadMap.get("u-eng")?.delayed).toBe(0);
     });
   });
+
+  describe("業務工作台比照主管監控室之時間區間（日期/月份）篩選機制", () => {
+    it("useWorkbenchStore 正確管理 dateMode、startDate、endDate 與 resetFilters", () => {
+      const store = useWorkbenchStore.getState();
+      expect(store.dateMode).toBe("DATE");
+      expect(store.startDate).toBe("");
+      expect(store.endDate).toBe("");
+
+      store.setDateMode("MONTH");
+      store.setStartMonth("2026-11");
+      store.setEndMonth("2026-12");
+      expect(useWorkbenchStore.getState().dateMode).toBe("MONTH");
+      expect(useWorkbenchStore.getState().startMonth).toBe("2026-11");
+
+      store.setDateMode("DATE");
+      store.setStartDate("2026-11-01");
+      store.setEndDate("2026-11-30");
+      expect(useWorkbenchStore.getState().startDate).toBe("2026-11-01");
+      expect(useWorkbenchStore.getState().endDate).toBe("2026-11-30");
+
+      store.resetFilters();
+      expect(useWorkbenchStore.getState().dateMode).toBe("DATE");
+      expect(useWorkbenchStore.getState().startDate).toBe("");
+      expect(useWorkbenchStore.getState().endDate).toBe("");
+      expect(useWorkbenchStore.getState().startMonth).toBe("");
+      expect(useWorkbenchStore.getState().endMonth).toBe("");
+    });
+  });
 });

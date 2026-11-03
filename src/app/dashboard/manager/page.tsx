@@ -496,7 +496,7 @@ export default function ManagerDashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h3 className="text-base font-bold flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-600" />
-                <span>人員案場負載與異常分佈</span>
+                <span>人員案場負載</span>
                 <SectionHelpButton sectionId="manager-workload" />
               </h3>
               <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
@@ -553,7 +553,7 @@ export default function ManagerDashboardPage() {
         <div className="bg-white p-6 rounded-2xl border shadow-sm">
           <h3 className="text-base font-bold flex items-center gap-2 mb-6">
             <TrendingUp className="w-5 h-5 text-emerald-600" />
-            <span>案件階段分佈與卡關瓶頸</span>
+            <span>案件階段分佈</span>
             <SectionHelpButton sectionId="manager-bottlenecks" />
           </h3>
           <div className="h-64">
@@ -566,7 +566,7 @@ export default function ManagerDashboardPage() {
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b flex flex-wrap items-center gap-3 text-sm font-semibold">
           <div className="flex items-center gap-2 mr-2">
-            <span className="font-bold text-slate-800">全案場總覽列表</span>
+            <span className="font-bold text-slate-800">案場總覽</span>
             <SectionHelpButton sectionId="manager-all-projects" />
           </div>
           <div className="flex items-center gap-1.5">
@@ -580,7 +580,7 @@ export default function ManagerDashboardPage() {
                 setStartMonth("");
                 setEndMonth("");
               }}
-              className="border rounded px-1.5 py-0.5 text-xs bg-white text-slate-700 font-medium"
+              className="h-7 border border-slate-300 rounded px-2 text-xs bg-white text-slate-700 font-medium"
             >
               <option value="DATE">日期</option>
               <option value="MONTH">月份</option>
@@ -591,7 +591,7 @@ export default function ManagerDashboardPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs"
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
                   title="起始日期"
                 />
                 <span className="text-slate-400">至</span>
@@ -599,14 +599,14 @@ export default function ManagerDashboardPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs"
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
                   title="結束日期"
                 />
                 {(startDate || endDate) && (
                   <button
                     type="button"
                     onClick={() => { setStartDate(""); setEndDate(""); }}
-                    className="text-xs text-slate-400 hover:text-slate-600"
+                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
                   >
                     ✕ 清除
                   </button>
@@ -618,7 +618,7 @@ export default function ManagerDashboardPage() {
                   type="month"
                   value={startMonth}
                   onChange={(e) => setStartMonth(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs"
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
                   title="起始月份"
                 />
                 <span className="text-slate-400">至</span>
@@ -626,14 +626,14 @@ export default function ManagerDashboardPage() {
                   type="month"
                   value={endMonth}
                   onChange={(e) => setEndMonth(e.target.value)}
-                  className="border rounded px-2 py-1 text-xs"
+                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
                   title="結束月份"
                 />
                 {(startMonth || endMonth) && (
                   <button
                     type="button"
                     onClick={() => { setStartMonth(""); setEndMonth(""); }}
-                    className="text-xs text-slate-400 hover:text-slate-600"
+                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
                   >
                     ✕ 清除
                   </button>
@@ -643,7 +643,7 @@ export default function ManagerDashboardPage() {
           </div>
           <label className="flex items-center gap-2">
             狀態：
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-7 border border-slate-300 rounded px-2 text-xs bg-white">
               <option value="">全部狀態</option>
               <option value="RED">逾期</option>
               <option value="YELLOW">即將到期</option>
@@ -654,14 +654,14 @@ export default function ManagerDashboardPage() {
           </label>
           <label className="flex items-center gap-2">
             業務：
-            <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+            <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="h-7 border border-slate-300 rounded px-2 text-xs bg-white">
               <option value="">全部業務</option>
               {businessOptions.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
           </label>
           <label className="flex items-center gap-2">
             階段：
-            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="border rounded px-2 py-1 text-xs">
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className="h-7 border border-slate-300 rounded px-2 text-xs bg-white">
               <option value="ACTIVE">進行中案件</option>
               <option value="">全部階段</option>
               <option value="DEVELOP">第一階段：案件開發</option>
@@ -687,7 +687,7 @@ export default function ManagerDashboardPage() {
               placeholder="搜尋案名/客戶/地址/業務..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 py-1 border rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+              className="h-7 pl-8 pr-7 border border-slate-300 rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
             />
             {searchQuery && (
               <button
@@ -832,7 +832,7 @@ export default function ManagerDashboardPage() {
                             <Link
                               href={`/projects/${p.id}/milestones`}
                               prefetch={true}
-                              className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700"
+                              className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
                             >
                               案件細節
                             </Link>
@@ -841,7 +841,7 @@ export default function ManagerDashboardPage() {
                                 type="button"
                                 onClick={() => void handleDeleteProject(p)}
                                 disabled={deletingProjectId !== null}
-                                className="ml-2 inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200"
+                                className="ml-2 inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />刪除
                               </button>
@@ -864,7 +864,7 @@ export default function ManagerDashboardPage() {
                         priority: "MEDIUM",
                         dueDate: todayDate(),
                       })}
-                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow hover:bg-blue-700"
+                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors"
                     >
                       指派任務
                     </button>
