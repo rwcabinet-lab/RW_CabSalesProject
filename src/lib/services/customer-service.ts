@@ -64,16 +64,35 @@ export const CustomerService = {
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
-    const users = await prisma.user.findMany({
-      where: { NOT: { email: { startsWith: "preview-" } } },
-      select: { id: true, name: true, role: true },
-      orderBy: { name: "asc" },
-    });
-    globalForDataService.loginUsersCache = {
-      data: users,
-      expiresAt: Date.now() + LOGIN_USERS_TTL_MS,
-    };
-    return users;
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const users = await prisma.user.findMany({
+          where: { NOT: { email: { startsWith: "preview-" } } },
+          select: { id: true, name: true, role: true },
+          orderBy: { name: "asc" },
+        });
+        globalForDataService.loginUsersCache = {
+          data: users,
+          expiresAt: Date.now() + LOGIN_USERS_TTL_MS,
+        };
+        return users;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+      }
+    }
+
+    // 若資料庫暫時延遲或連線瞬斷，但有舊快取則降級回傳快取資料
+    if (cached?.data && cached.data.length > 0) {
+      console.warn("getLoginUsers: 使用過期快取作為降級防護", lastError);
+      return cached.data;
+    }
+
+    throw lastError;
   },
 
   async addCustomer(data: CustomerCreateDTO): Promise<CustomerItem> {

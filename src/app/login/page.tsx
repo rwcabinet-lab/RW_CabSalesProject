@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { KeyRound, LogIn, Loader2 } from "lucide-react";
 import type { ApiResponse, UserDTO } from "@/types/dto";
 import { ROLE_OPTIONS } from "@/lib/page-access";
@@ -20,22 +20,32 @@ export default function LoginPage() {
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function loadUsers() {
-      try {
-        const response = await fetch("/api/auth/users");
-        const data = await response.json() as ApiResponse<LoginUser[]>;
-        if (!response.ok) throw new Error(data.error || "無法載入使用者");
-        setUsers(data);
-        if (data.length > 0) setUserId(data[0].id);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "無法載入使用者");
-      } finally {
-        setLoadingUsers(false);
+  const loadUsers = useCallback(async (retryCount = 0) => {
+    setLoadingUsers(true);
+    try {
+      const response = await fetch("/api/auth/users");
+      const data = (await response.json()) as ApiResponse<LoginUser[]>;
+      if (!response.ok) throw new Error(data.error || "無法載入使用者");
+      setUsers(data);
+      if (data.length > 0) setUserId(data[0].id);
+      setError("");
+    } catch (loadError) {
+      if (retryCount < 1) {
+        // 冷啟動或瞬時網路延遲自動重試一次
+        setTimeout(() => {
+          void loadUsers(retryCount + 1);
+        }, 1200);
+        return;
       }
+      setError(loadError instanceof Error ? loadError.message : "無法載入使用者");
+    } finally {
+      setLoadingUsers(false);
     }
-    loadUsers();
   }, []);
+
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -119,7 +129,23 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && (
+            <div role="alert" className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <span>{error}</span>
+              {users.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    void loadUsers(0);
+                  }}
+                  className="ml-3 shrink-0 rounded bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800 transition hover:bg-red-200"
+                >
+                  重新載入
+                </button>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"
