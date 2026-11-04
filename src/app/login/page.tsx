@@ -1,56 +1,25 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { KeyRound, LogIn, Loader2 } from "lucide-react";
-import type { ApiResponse, UserDTO } from "@/types/dto";
-import { ROLE_OPTIONS } from "@/lib/page-access";
-
-function roleLabel(role: string) {
-  return ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
-}
-
-type LoginUser = UserDTO;
+import { FormEvent, useState } from "react";
+import { KeyRound, LogIn, Loader2, User } from "lucide-react";
+import type { ApiResponse } from "@/types/dto";
 
 export default function LoginPage() {
-  const [users, setUsers] = useState<LoginUser[]>([]);
-  const [userId, setUserId] = useState("");
+  const [employeeNo, setEmployeeNo] = useState("");
   const [password, setPassword] = useState("");
-  const [loadingUsers, setLoadingUsers] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState("");
 
-  const loadUsers = useCallback(async (retryCount = 0) => {
-    setLoadingUsers(true);
-    try {
-      const response = await fetch("/api/auth/users");
-      const data = (await response.json()) as ApiResponse<LoginUser[]>;
-      if (!response.ok) throw new Error(data.error || "無法載入使用者");
-      setUsers(data);
-      if (data.length > 0) setUserId(data[0].id);
-      setError("");
-    } catch (loadError) {
-      if (retryCount < 1) {
-        // 冷啟動或瞬時網路延遲自動重試一次
-        setTimeout(() => {
-          void loadUsers(retryCount + 1);
-        }, 1200);
-        return;
-      }
-      setError(loadError instanceof Error ? loadError.message : "無法載入使用者");
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!userId) {
-      setError("請先選擇登入帳號");
+    const trimmedNo = employeeNo.trim();
+    if (!trimmedNo) {
+      setError("請輸入員工編號（五碼工號）");
+      return;
+    }
+    if (!password) {
+      setError("請輸入密碼");
       return;
     }
     setError("");
@@ -59,10 +28,10 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, password }),
+        body: JSON.stringify({ employeeNo: trimmedNo, password }),
       });
-      const data = await response.json() as ApiResponse<{ redirectTo?: string }>;
-      if (!response.ok) throw new Error(data.error || "登入失敗");
+      const data = (await response.json()) as ApiResponse<{ redirectTo?: string }>;
+      if (!response.ok) throw new Error(data.error || "登入失敗，請確認員工編號與密碼");
       setRedirecting(true);
       window.location.href = data.redirectTo || "/dashboard/workbench";
     } catch (loginError) {
@@ -85,37 +54,42 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5 p-8">
           <div>
-            <label htmlFor="login-user" className="mb-1.5 block text-sm font-semibold text-slate-700">使用者</label>
-            <select
-              id="login-user"
-              required
-              value={userId}
-              onChange={(event) => {
-                setUserId(event.target.value);
-                if (error) setError("");
-              }}
-              disabled={loadingUsers || users.length === 0 || submitting}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
-            >
-              {loadingUsers && <option value="">載入使用者中...</option>}
-              {!loadingUsers && users.length === 0 && <option value="">沒有可用使用者</option>}
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}（{roleLabel(user.role)}）
-                </option>
-              ))}
-            </select>
+            <label htmlFor="login-employee-no" className="mb-1.5 block text-sm font-semibold text-slate-700">
+              員工編號
+            </label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="login-employee-no"
+                type="text"
+                required
+                autoFocus
+                placeholder="請輸入大成或正道的五碼工號"
+                autoComplete="username"
+                value={employeeNo}
+                disabled={submitting}
+                onChange={(event) => {
+                  setEmployeeNo(event.target.value);
+                  if (error) setError("");
+                }}
+                className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              請輸入大成或正道的五碼工號，[員工編號][密碼]兩者均符合才可登入
+            </p>
           </div>
 
           <div>
-            <label htmlFor="login-password" className="mb-1.5 block text-sm font-semibold text-slate-700">密碼</label>
+            <label htmlFor="login-password" className="mb-1.5 block text-sm font-semibold text-slate-700">
+              密碼
+            </label>
             <div className="relative">
               <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 id="login-password"
                 type="password"
                 required
-                autoFocus
                 placeholder="請輸入密碼（預設：0000）"
                 autoComplete="current-password"
                 value={password}
@@ -130,26 +104,14 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div role="alert" className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               <span>{error}</span>
-              {users.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    void loadUsers(0);
-                  }}
-                  className="ml-3 shrink-0 rounded bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800 transition hover:bg-red-200"
-                >
-                  重新載入
-                </button>
-              )}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={submitting || loadingUsers || users.length === 0}
+            disabled={submitting}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
