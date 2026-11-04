@@ -43,8 +43,6 @@ export const milestoneInclude = {
   salesTask: { select: { id: true, subject: true, isCompleted: true } },
 } as const;
 
-export const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] =>
-  type === "CONTRACTOR" ? "PR" : type;
+export const customerTypeFromDatabase = (type: CustomerType): CustomerItem["customerType"] => type;
 
-export const customerTypeForDatabase = (type: CustomerTypeDTO): CustomerType =>
-  type === "PR" ? CustomerType.CONTRACTOR : (type as CustomerType);
+export const customerTypeForDatabase = (type: CustomerTypeDTO): CustomerType => type;

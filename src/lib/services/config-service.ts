@@ -27,7 +27,7 @@ export const ConfigService = {
     const stringValue = JSON.stringify(value);
     const updated = await prisma.appConfig.upsert({
       where: { key },
-      create: { key, value: stringValue },
+      create: { id: key, key, value: stringValue },
       update: { value: stringValue },
     });
     appConfigCache.set(key, { value, expiresAt: Date.now() + APP_CONFIG_TTL_MS });

@@ -3,6 +3,7 @@ import { getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import type { CustomerStatsDashboardDTO } from "@/types/dto";
 import { handleApiError } from "@/lib/errors";
+import { CUSTOMER_TYPE_LABELS } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -66,23 +67,6 @@ export async function GET(req: NextRequest) {
       return closedProjectIds.has(p.id) || p.currentStage === "CLOSED" || p.currentStage === "BILLED";
     };
 
-    const customerTypeLabels: Record<string, string> = {
-      LONGMEI_STORE: "隆美",
-      CABINET_FACTORY: "工廠",
-      DESIGN_COMPANY: "設計公司",
-      DEALER_COMPANY: "經銷公司",
-      CONSTRUCTION: "建設／營造",
-      LABOR_MATERIAL: "連工帶料",
-      INDIVIDUAL: "一般消費者",
-      DESIGNER: "設計師",
-      CONTRACTOR: "統包／營造",
-      PR: "公關客戶",
-      DEALER: "經銷商",
-      HOMEOWNER: "一般消費者",
-      DIRECT: "直接業主",
-      OTHER: "其他",
-    };
-
     const customerList = customers.map((c) => {
       const cProjects = c.projects;
       const totalProjects = cProjects.length;
@@ -105,8 +89,8 @@ export async function GET(req: NextRequest) {
       return {
         id: c.id,
         name: c.name,
-        customerType: c.customerType === "CONTRACTOR" ? "PR" : c.customerType,
-        customerTypeLabel: customerTypeLabels[c.customerType] || c.customerType,
+        customerType: c.customerType,
+        customerTypeLabel: CUSTOMER_TYPE_LABELS[c.customerType] || c.customerType,
         taxId: c.taxId || "",
         phone: c.phone || "",
         address: c.address || "",

@@ -100,7 +100,7 @@ export const CustomerService = {
       data: {
         ...data,
         paymentTerms: data.paymentTerms || "MONTHLY_30",
-        customerType: customerTypeForDatabase(data.customerType || "DESIGNER"),
+        customerType: customerTypeForDatabase(data.customerType || "DESIGN_COMPANY"),
       },
       relationLoadStrategy: "join",
       include: { salesRep: true },

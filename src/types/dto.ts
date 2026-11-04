@@ -8,7 +8,7 @@ import type {
   Role,
 } from "@prisma/client";
 
-export type CustomerTypeDTO = CustomerType | "PR";
+export type CustomerTypeDTO = CustomerType;
 export type PaymentTermsDTO = PaymentTerms;
 export type ProjectStageDTO = ProjectStage;
 export type MilestoneStatusDTO = MilestoneStatus;

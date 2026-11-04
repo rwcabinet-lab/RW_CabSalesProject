@@ -305,7 +305,10 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "customer_type_start_stages", value: customerTypeStages }),
       });
-      if (!res.ok) throw new Error("儲存各客戶類型起始進度失敗");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "儲存各客戶類型起始進度失敗");
+      }
       setNotice("各客戶類型預設起始進度已成功儲存至全域設定！");
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存各客戶類型起始進度失敗");

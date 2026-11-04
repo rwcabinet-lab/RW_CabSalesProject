@@ -87,7 +87,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     return { rows, finalStartCode, initialProjectStage };
   }
 
-  it("一般消費者 (INDIVIDUAL / HOMEOWNER) 建立案場時由 1-1 客源開發 開始", () => {
+  it("一般消費者 (INDIVIDUAL) 建立案場時由 1-1 客源開發 開始", () => {
     const { rows, finalStartCode, initialProjectStage } = generateMilestoneRows("INDIVIDUAL");
     expect(finalStartCode).toBe("1-1");
     expect(initialProjectStage).toBe("DEVELOP");
@@ -100,7 +100,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(rows.filter((r) => r.status === "COMPLETED")).toHaveLength(0);
   });
 
-  it("櫥櫃工廠 (CABINET_FACTORY) 建立案場時自動批次略過前置項目，直接推進至 4-4", () => {
+  it("工廠 (CABINET_FACTORY) 建立案場時自動批次略過前置項目，直接推進至 4-4", () => {
     const today = new Date("2026-11-04T00:00:00.000Z");
     const { rows, finalStartCode, initialProjectStage } = generateMilestoneRows("CABINET_FACTORY", undefined, today);
 

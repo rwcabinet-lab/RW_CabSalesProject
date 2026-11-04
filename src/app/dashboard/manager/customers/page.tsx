@@ -15,16 +15,9 @@ const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   CABINET_FACTORY: "工廠",
   DESIGN_COMPANY: "設計公司",
   DEALER_COMPANY: "經銷公司",
-  CONSTRUCTION: "建設／營造",
-  LABOR_MATERIAL: "連工帶料",
+  CONSTRUCTION: "建設/營造",
   INDIVIDUAL: "一般消費者",
-  DESIGNER: "設計師",
-  CONTRACTOR: "統包／營造",
-  PR: "公關客戶",
-  DEALER: "經銷商",
-  HOMEOWNER: "一般消費者",
-  DIRECT: "直接業主",
-  OTHER: "其他",
+  PR: "公關案",
 };
 
 export default function CustomerStatsPage() {

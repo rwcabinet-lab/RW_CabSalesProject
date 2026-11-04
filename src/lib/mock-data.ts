@@ -12,7 +12,7 @@ import type {
 export const INITIAL_CUSTOMERS: CustomerItem[] = [
   {
     id: "c1",
-    customerType: "DESIGNER",
+    customerType: "DESIGN_COMPANY",
     name: "品辰室內設計工程有限公司",
     taxId: "54892134",
     phone: "02-27891234",
@@ -36,7 +36,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   },
   {
     id: "c3",
-    customerType: "DEALER",
+    customerType: "DEALER_COMPANY",
     name: "欣居系統家具名店",
     taxId: "28475912",
     phone: "03-6578901",
@@ -48,7 +48,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   },
   {
     id: "c4",
-    customerType: "HOMEOWNER",
+    customerType: "INDIVIDUAL",
     name: "淡水李公館 (李國強先生)",
     phone: "0912-345-678",
     address: "新北市淡水區濱海路一段55號12樓",
@@ -59,7 +59,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   },
   {
     id: "c5",
-    customerType: "HOMEOWNER",
+    customerType: "INDIVIDUAL",
     name: "天母黃公館 (黃小姐)",
     phone: "0933-888-999",
     address: "台北市士林區忠誠路二段99號",
@@ -76,7 +76,7 @@ export const INITIAL_PROJECTS: ProjectDetail[] = [
     projectName: "淡水新市鎮-李公館全室系統櫃",
     customerId: "c4",
     customerName: "淡水李公館 (李國強先生)",
-    customerType: "HOMEOWNER",
+    customerType: "INDIVIDUAL",
     defaultDiscount: 1.00,
     siteAddress: "新北市淡水區濱海路一段55號12樓",
     siteCondition: "新成屋 (已完成地磚保護)",
@@ -94,7 +94,7 @@ export const INITIAL_PROJECTS: ProjectDetail[] = [
     projectName: "竹北遠百特案-品辰設計張總監宅",
     customerId: "c1",
     customerName: "品辰室內設計工程有限公司",
-    customerType: "DESIGNER",
+    customerType: "DESIGN_COMPANY",
     defaultDiscount: 0.85,
     siteAddress: "新竹縣竹北市光明六路東一段233號",
     siteCondition: "毛胚屋客變中",
