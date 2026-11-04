@@ -43,13 +43,43 @@ export async function POST(req: NextRequest) {
     const customPassword = passwords[user.id] || passwords[user.email];
     const expectedPassword = customPassword || DEFAULT_LOGIN_PASSWORD;
 
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+    const userAgent = req.headers.get("user-agent") || undefined;
+
     // 除非未初始化設定個人密碼，否則不得使用 0000 登入
     if (password !== expectedPassword) {
+      void DataService.recordLoginLog({
+        userId: user.id,
+        employeeNo: user.email,
+        userName: user.name,
+        role: user.role,
+        loginAt: new Date().toISOString(),
+        ipAddress,
+        userAgent,
+        status: "FAILED",
+        failureReason: "密碼不符",
+      });
+
       return NextResponse.json(
         { error: "員工編號或密碼不正確，兩者均符合才可登入" },
         { status: 401 }
       );
     }
+
+    // 記錄登入成功事件
+    void DataService.recordLoginLog({
+      userId: user.id,
+      employeeNo: user.email,
+      userName: user.name,
+      role: user.role,
+      loginAt: new Date().toISOString(),
+      ipAddress,
+      userAgent,
+      status: "SUCCESS",
+    });
 
     const profile = await loadUserAccessProfile(user.id);
     if (!profile || profile.email.startsWith("preview-")) {

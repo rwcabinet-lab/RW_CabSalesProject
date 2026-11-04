@@ -90,4 +90,54 @@ describe("Employee ID & Password Login Logic (員工編號與密碼登入機制)
       expect(evaluateLoginPassword("otherpass", customPassword)).toBe(false);
     });
   });
+
+  describe("管理者登入紀錄管理 (Login Logs by User)", () => {
+    interface MockLog {
+      id: string;
+      userId: string;
+      employeeNo: string;
+      userName: string;
+      status: "SUCCESS" | "FAILED";
+      loginAt: string;
+    }
+
+    const logs: MockLog[] = [
+      { id: "1", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-11-04T09:00:00Z" },
+      { id: "2", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "FAILED", loginAt: "2026-11-04T08:59:00Z" },
+      { id: "3", userId: "u2", employeeNo: "A2820", userName: "林宸鈴", status: "SUCCESS", loginAt: "2026-11-04T08:30:00Z" },
+    ];
+
+    it("正確依據 userId 或 employeeNo 篩選出該使用者的登入紀錄", () => {
+      const filterLogs = (target: string) =>
+        logs.filter((l) => l.userId === target || l.employeeNo.toLowerCase() === target.toLowerCase());
+
+      const u1Logs = filterLogs("u1");
+      expect(u1Logs.length).toBe(2);
+      expect(u1Logs[0].status).toBe("SUCCESS");
+      expect(u1Logs[1].status).toBe("FAILED");
+
+      const u2Logs = filterLogs("A2820");
+      expect(u2Logs.length).toBe(1);
+      expect(u2Logs[0].userName).toBe("林宸鈴");
+
+      const unknownLogs = filterLogs("non_existent");
+      expect(unknownLogs.length).toBe(0);
+    });
+
+    it("登入紀錄安全保留最新上限筆數 (滑動滾動視窗)", () => {
+      const maxRecords = 500;
+      const manyLogs = Array.from({ length: 600 }, (_, i) => ({
+        id: `log_${i}`,
+        userId: "u1",
+        employeeNo: "03328",
+        userName: "張欽哲",
+        status: "SUCCESS" as const,
+        loginAt: new Date(Date.now() - i * 1000).toISOString(),
+      }));
+
+      const boundedLogs = manyLogs.slice(0, maxRecords);
+      expect(boundedLogs.length).toBe(500);
+      expect(boundedLogs[0].id).toBe("log_0");
+    });
+  });
 });

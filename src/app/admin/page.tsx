@@ -15,6 +15,10 @@ import {
   FastForward,
   Eye,
   EyeOff,
+  History,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import {
@@ -27,13 +31,31 @@ import {
   STANDARD_MILESTONE_STAGE_CODES,
 } from "@/lib/constants";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
-import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO } from "@/types/dto";
+import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
 
 type ManagedUser = { id: string; name: string; email: string; role: AppRole };
 type RolePermission = { role: AppRole; label: string; pages: PageAccessKey[] };
 
 function roleLabel(role: string) {
   return ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
+}
+
+function parseUserAgent(ua?: string) {
+  if (!ua) return "未知裝置";
+  let os = "其他";
+  if (ua.includes("Windows")) os = "Windows";
+  else if (ua.includes("Mac OS")) os = "macOS";
+  else if (ua.includes("Android")) os = "Android";
+  else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+  else if (ua.includes("Linux")) os = "Linux";
+
+  let browser = "瀏覽器";
+  if (ua.includes("Edg/")) browser = "Edge";
+  else if (ua.includes("Chrome/") && !ua.includes("Edg/")) browser = "Chrome";
+  else if (ua.includes("Safari/") && !ua.includes("Chrome/")) browser = "Safari";
+  else if (ua.includes("Firefox/")) browser = "Firefox";
+
+  return `${os} · ${browser}`;
 }
 
 const CONFIGURABLE_CUSTOMER_TYPES = [
@@ -72,6 +94,47 @@ export default function AdminPage() {
     open: false, user: null, newPass: "", confirmPass: ""
   });
   const [passwordNotice, setPasswordNotice] = useState("");
+
+  // 登入紀錄彈窗
+  const [loginLogsModal, setLoginLogsModal] = useState<{
+    open: boolean;
+    user: ManagedUser | null;
+    loading: boolean;
+    logs: LoginRecordDTO[];
+    error: string;
+  }>({
+    open: false,
+    user: null,
+    loading: false,
+    logs: [],
+    error: "",
+  });
+
+  const openLoginRecords = async (user: ManagedUser) => {
+    setLoginLogsModal({
+      open: true,
+      user,
+      loading: true,
+      logs: [],
+      error: "",
+    });
+    try {
+      const res = await fetch(`/api/admin/login-logs?userId=${encodeURIComponent(user.id)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "無法載入登入紀錄");
+      setLoginLogsModal((prev) => ({
+        ...prev,
+        loading: false,
+        logs: Array.isArray(data) ? data : [],
+      }));
+    } catch (err) {
+      setLoginLogsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : "載入登入紀錄失敗",
+      }));
+    }
+  };
 
   // 案件清單欄位設定與拖曳預覽
   const [columns, setColumns] = useState<ColumnItemDTO[]>(DEFAULT_PROJECT_COLUMNS);
@@ -856,7 +919,15 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void openLoginRecords(user)}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                          title="查看該使用者登入紀錄"
+                        >
+                          <History className="h-3.5 w-3.5" />登入紀錄
+                        </button>
                         <button
                           type="button"
                           onClick={() => setPasswordModal({ open: true, user, newPass: "", confirmPass: "" })}
@@ -980,6 +1051,122 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 登入紀錄 Modal */}
+      {loginLogsModal.open && loginLogsModal.user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b pb-3 mb-4 shrink-0">
+              <h3 className="font-bold flex items-center gap-2 text-slate-900 text-base">
+                <History className="h-5 w-5 text-indigo-600" />
+                登入紀錄 — {loginLogsModal.user.name}
+                <span className="text-xs font-mono font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                  工號：{loginLogsModal.user.email}
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLoginLogsModal({ open: false, user: null, loading: false, logs: [], error: "" })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 pr-1">
+              {loginLogsModal.loading && (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                  <span className="text-sm">載入登入紀錄中...</span>
+                </div>
+              )}
+
+              {loginLogsModal.error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+                  {loginLogsModal.error}
+                </div>
+              )}
+
+              {!loginLogsModal.loading && !loginLogsModal.error && loginLogsModal.logs.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <History className="h-10 w-10 text-slate-300 mb-2 stroke-[1.5]" />
+                  <p className="text-sm font-medium">尚無登入紀錄</p>
+                  <p className="text-xs text-slate-400 mt-1">該同仁進行系統登入時將自動完整記錄</p>
+                </div>
+              )}
+
+              {!loginLogsModal.loading && !loginLogsModal.error && loginLogsModal.logs.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                      <tr>
+                        <th className="px-3 py-2.5">登入時間</th>
+                        <th className="px-3 py-2.5">結果狀態</th>
+                        <th className="px-3 py-2.5">來源 IP</th>
+                        <th className="px-3 py-2.5">裝置環境</th>
+                        <th className="px-3 py-2.5">說明</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loginLogsModal.logs.map((log) => {
+                        const isSuccess = log.status === "SUCCESS";
+                        return (
+                          <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-3 py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                              {new Date(log.loginAt).toLocaleString("zh-TW", {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                                hour12: false,
+                              })}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              {isSuccess ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  登入成功
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200">
+                                  <AlertCircle className="h-3 w-3" />
+                                  登入失敗
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 font-mono text-slate-600 whitespace-nowrap">
+                              {log.ipAddress || "-"}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-600 max-w-[160px] truncate" title={log.userAgent}>
+                              {parseUserAgent(log.userAgent)}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-500 text-[11px]">
+                              {log.failureReason || (isSuccess ? "正常驗證通過" : "-")}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between shrink-0 text-xs text-slate-500">
+              <span>共 {loginLogsModal.logs.length} 筆登入歷史紀錄</span>
+              <button
+                type="button"
+                onClick={() => setLoginLogsModal({ open: false, user: null, loading: false, logs: [], error: "" })}
+                className="rounded-lg bg-slate-100 hover:bg-slate-200 px-4 py-2 font-medium text-slate-700 transition"
+              >
+                關閉
+              </button>
+            </div>
           </div>
         </div>
       )}

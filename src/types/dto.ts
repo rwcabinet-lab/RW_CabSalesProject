@@ -360,6 +360,19 @@ export interface ManagedUserDTO {
   role: any;
 }
 
+export interface LoginRecordDTO {
+  id: string;
+  userId: string;
+  employeeNo: string;
+  userName: string;
+  role: string;
+  loginAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  status: "SUCCESS" | "FAILED";
+  failureReason?: string;
+}
+
 export interface RolePermissionDTO {
   role: any;
   label: string;
