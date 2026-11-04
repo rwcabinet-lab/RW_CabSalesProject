@@ -16,31 +16,33 @@ export type {
   TaskDTO as SalesTaskItem,
 } from "@/types/dto";
 
-/** 客戶類型中文對照表 */
+/** 客戶類型中文對照表 (完全對齊系統 7 大標準客戶類型) */
 export const CUSTOMER_TYPE_LABELS: Record<string, string> = {
-  LONGMEI_STORE: "隆美門市",
-  CABINET_FACTORY: "櫥櫃工廠",
+  LONGMEI_STORE: "隆美",
+  CABINET_FACTORY: "工廠",
   DESIGN_COMPANY: "設計公司",
   DEALER_COMPANY: "經銷公司",
-  CONSTRUCTION: "建設／營造",
-  LABOR_MATERIAL: "連工帶料",
+  CONSTRUCTION: "建設/營造",
   INDIVIDUAL: "一般消費者",
-  DESIGNER: "設計師",
-  CONTRACTOR: "統包／營造",
-  PR: "公關客戶",
-  DEALER: "經銷商",
+  PR: "公關案",
+  // 向下相容歷史資料
+  CONTRACTOR: "公關案",
+  DESIGNER: "設計公司",
+  DEALER: "經銷公司",
   HOMEOWNER: "一般消費者",
+  LABOR_MATERIAL: "連工帶料",
   DIRECT: "直接業主",
 };
 
-/** 各客戶類型建立案場時的預設起始進度 (方案一：自動批次略過前置進度) */
+/** 各客戶類型建立案場時的預設起始進度 */
 export const CUSTOMER_TYPE_START_STAGE_CODES: Partial<Record<string, MilestoneStageCode>> = {
-  CABINET_FACTORY: "4-4", // 櫥櫃工廠 ➔ 4-4 拆單並提交生產
-  LABOR_MATERIAL: "4-4",  // 連工帶料 ➔ 4-4 拆單並提交生產
-  DEALER_COMPANY: "3-2",  // 經銷公司 ➔ 3-2 報價單
-  DEALER: "3-2",          // 經銷商 ➔ 3-2 報價單
+  CABINET_FACTORY: "4-4", // 工廠 ➔ 4-4 拆單並提交生產
   DESIGN_COMPANY: "3-1",  // 設計公司 ➔ 3-1 設計圖
-  DESIGNER: "3-1",        // 設計師 ➔ 3-1 設計圖
+  DEALER_COMPANY: "3-2",  // 經銷公司 ➔ 3-2 報價單
+  // 向下相容別名
+  DESIGNER: "3-1",
+  DEALER: "3-2",
+  LABOR_MATERIAL: "4-4",
 };
 
 /** 判斷案件階段是否符合特定欄位/階段（含歷史向下相容） */

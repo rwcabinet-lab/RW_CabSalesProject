@@ -229,21 +229,26 @@ export const ProjectService = {
     const dynamicTypeStages = await ConfigService.getCustomerTypeStartStages();
     const allCodes = STANDARD_MILESTONE_STAGE_CODES;
 
+    const normalizedCustomerType = customerTypeFromDatabase(customer.customerType);
+
     // 依客戶類型或指定參數決定起始進度（方案一：自動批次略過前置進度）
     const targetStartCode =
       (data.startStageCode && allCodes.includes(data.startStageCode as MilestoneStageCode)
         ? (data.startStageCode as MilestoneStageCode)
         : undefined) ||
+      dynamicTypeStages[normalizedCustomerType] ||
       dynamicTypeStages[customer.customerType] ||
-      dynamicTypeStages[customerTypeFromDatabase(customer.customerType)] ||
+      CUSTOMER_TYPE_START_STAGE_CODES[normalizedCustomerType] ||
       CUSTOMER_TYPE_START_STAGE_CODES[customer.customerType] ||
-      CUSTOMER_TYPE_START_STAGE_CODES[customerTypeFromDatabase(customer.customerType)] ||
       "1-1";
 
     const targetIndex = allCodes.indexOf(targetStartCode);
     const validTargetIndex = targetIndex !== -1 ? targetIndex : 0;
     const finalStartCode = allCodes[validTargetIndex];
-    const customerTypeLabel = CUSTOMER_TYPE_LABELS[customer.customerType] || customer.customerType;
+    const customerTypeLabel =
+      CUSTOMER_TYPE_LABELS[normalizedCustomerType] ||
+      CUSTOMER_TYPE_LABELS[customer.customerType] ||
+      normalizedCustomerType;
 
     const today = new Date();
     let cursorDate = new Date(today);

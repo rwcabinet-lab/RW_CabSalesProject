@@ -37,17 +37,13 @@ function roleLabel(role: string) {
 }
 
 const CONFIGURABLE_CUSTOMER_TYPES = [
-  { key: "CABINET_FACTORY", label: "櫥櫃工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，建議預設【4-4 拆單並提交生產】或【5-1 生產】" },
-  { key: "LABOR_MATERIAL", label: "連工帶料", badge: "統包加工", desc: "統包工班加工訂單，建議預設【4-4 拆單】或【3-2 報價單】" },
-  { key: "DEALER_COMPANY", label: "經銷公司", badge: "經銷通路", desc: "簽約配合經銷商，自備需求直接報價，建議預設【3-2 報價單】" },
-  { key: "DEALER", label: "經銷商", badge: "經銷通路", desc: "常態經銷夥伴，建議預設【3-2 報價單】" },
-  { key: "DESIGN_COMPANY", label: "設計公司", badge: "長期設計", desc: "自備空間配置底圖，建議預設【3-1 設計圖】或【3-2 報價單】" },
-  { key: "DESIGNER", label: "設計師", badge: "長期設計", desc: "長期配合設計師，自備圖面規格，建議預設【3-1 設計圖】" },
-  { key: "CONSTRUCTION", label: "建設／營造", badge: "工程營造", desc: "建設建案或工程標案，依工程需求排定" },
-  { key: "CONTRACTOR", label: "統包／營造", badge: "統包工班", desc: "統包工程商，通常已有初步規劃" },
-  { key: "LONGMEI_STORE", label: "隆美門市", badge: "門市專案", desc: "門市專案轉單，依門市需求建立，建議由 1-1 開始" },
-  { key: "HOMEOWNER", label: "一般消費者 (業主)", badge: "終端住宅", desc: "終端個人住宅業主，建議完整執行【1-1 客源開發】" },
-  { key: "INDIVIDUAL", label: "一般消費者 (個人)", badge: "個人業主", desc: "終端散客業主，建議完整執行【1-1 客源開發】" },
+  { key: "CABINET_FACTORY", label: "工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，預設【4-4 拆單並提交生產】" },
+  { key: "DESIGN_COMPANY", label: "設計公司", badge: "設計提案", desc: "自備空間配置底圖，預設【3-1 設計圖】" },
+  { key: "DEALER_COMPANY", label: "經銷公司", badge: "經銷通路", desc: "常態簽約經銷夥伴，自備規格需求，預設【3-2 報價單】" },
+  { key: "CONSTRUCTION", label: "建設/營造", badge: "工程營造", desc: "建設建案或工程標案，預設由【1-1 客源開發】開始" },
+  { key: "PR", label: "公關案", badge: "公關專案", desc: "公關客戶或特殊樣品案場，預設由【1-1 客源開發】開始" },
+  { key: "LONGMEI_STORE", label: "隆美", badge: "門市專案", desc: "門市專案或轉單，預設由【1-1 客源開發】開始" },
+  { key: "INDIVIDUAL", label: "一般消費者", badge: "終端業主", desc: "一般個人與住宅散客業主，完整執行【1-1 客源開發】流程" },
 ];
 
 export default function AdminPage() {

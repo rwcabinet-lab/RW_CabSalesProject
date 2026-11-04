@@ -13,15 +13,14 @@ import { ConflictError } from "@/lib/errors";
 describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進度跳轉邏輯)", () => {
   it("各客戶類型對應之起始進度正確設定", () => {
     expect(CUSTOMER_TYPE_START_STAGE_CODES["CABINET_FACTORY"]).toBe("4-4");
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["LABOR_MATERIAL"]).toBe("4-4");
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["DEALER_COMPANY"]).toBe("3-2");
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["DEALER"]).toBe("3-2");
     expect(CUSTOMER_TYPE_START_STAGE_CODES["DESIGN_COMPANY"]).toBe("3-1");
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["DESIGNER"]).toBe("3-1");
+    expect(CUSTOMER_TYPE_START_STAGE_CODES["DEALER_COMPANY"]).toBe("3-2");
 
-    // 一般消費者未特別跳轉，預設不應存在自訂對照（後續邏輯會 fallback 回 1-1）
+    // 一般消費者與其他未設定跳轉類型，預設不應存在自訂對照（後續邏輯會 fallback 回 1-1）
     expect(CUSTOMER_TYPE_START_STAGE_CODES["INDIVIDUAL"]).toBeUndefined();
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["HOMEOWNER"]).toBeUndefined();
+    expect(CUSTOMER_TYPE_START_STAGE_CODES["CONSTRUCTION"]).toBeUndefined();
+    expect(CUSTOMER_TYPE_START_STAGE_CODES["LONGMEI_STORE"]).toBeUndefined();
+    expect(CUSTOMER_TYPE_START_STAGE_CODES["PR"]).toBeUndefined();
   });
 
   function generateMilestoneRows(
@@ -117,7 +116,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     for (const r of skippedRows) {
       expect(r.status).toBe("COMPLETED");
       expect(r.actualDueDate).toEqual(today);
-      expect(r.notes).toContain("【系統自動略過：依客戶類型（櫥櫃工廠）跳轉】");
+      expect(r.notes).toContain("【系統自動略過：依客戶類型（工廠）跳轉】");
     }
 
     // 目標項目 (4-4) 必須為 IN_PROGRESS
@@ -183,7 +182,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     const autoSkippedMilestone = {
       id: "m-skip",
       status: "COMPLETED",
-      notes: "【系統自動略過：依客戶類型（櫥櫃工廠）跳轉】",
+      notes: "【系統自動略過：依客戶類型（工廠）跳轉】",
     };
 
     expect(() => {
