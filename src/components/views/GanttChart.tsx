@@ -189,10 +189,37 @@ export function GanttChart({ projects, tasks }: GanttProps) {
             時程標記：
             <SectionHelpButton sectionId="views-gantt" />
           </span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />里程碑期限</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />待辦期限</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />已完成／實際日期</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />預計完工日</span>
+          <span className="flex items-center gap-1.5" title="進行中之標準里程碑子進度預定完成日">
+            <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+            現正進行
+          </span>
+          <span className="flex items-center gap-1.5" title="個別交辦之任務待辦到期日">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+            指派任務
+          </span>
+          <span className="flex items-center gap-1.5" title="大圓代表原排定完成期限（完成轉綠），小圓代表實際完成日期">
+            <span className="relative flex items-center justify-center mr-0.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="absolute -right-1 -bottom-0.5 h-1.5 w-1.5 rounded-full border border-white bg-emerald-500" />
+            </span>
+            預定完成／實際完成
+          </span>
+          <span className="flex items-center gap-1.5" title="已超過期限或今日到期未完成之項目">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+            逾期／已到期
+          </span>
+          <span className="flex items-center gap-1.5" title="尚未啟動排程之里程碑">
+            <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+            待開始
+          </span>
+          <span className="flex items-center gap-1.5" title="案場整體驗收預計完工日">
+            <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+            預計完工日
+          </span>
+          <span className="flex items-center gap-1.5" title="貫穿時間軸之今日日期垂直基準線">
+            <span className="h-3 w-0.5 rounded bg-sky-400" />
+            今日基準線
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -328,7 +355,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                                         ? "bg-red-100 text-red-700 font-bold"
                                         : "bg-amber-50 text-amber-700"
                                     }`}>
-                                      待辦
+                                      指派任務
                                     </span>
                                   )}
                                 </div>
@@ -352,7 +379,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                                     <span
                                       className={`absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${color}`}
                                       style={{ left: `${positionOf(row.dateKey)}%` }}
-                                      title={`期限：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
+                                      title={`預定完成：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
                                     />
                                   )}
 
