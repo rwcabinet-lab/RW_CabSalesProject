@@ -5,11 +5,23 @@ import { DataService } from "@/lib/data-service";
 import { SESSION_COOKIE_NAME, signSessionUserId } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import {
+  checkLoginRateLimit,
+  recordLoginAttempt,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/rate-limiter";
 
 const DEFAULT_LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
 
 export async function POST(req: NextRequest) {
   try {
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+    const userAgent = req.headers.get("user-agent") || undefined;
+
     const body = await req.json();
     const rawEmployeeNo = body.employeeNo ?? body.userId ?? body.account ?? "";
     const employeeNo = typeof rawEmployeeNo === "string" ? rawEmployeeNo.trim() : "";
@@ -22,7 +34,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 依據五碼員工編號（儲存於 email 欄位）或 ID 尋找使用者（支援英文字母不分大小寫比對）
+    // 1. 執行 IP 與工號雙維度防暴力破解限流檢查
+    const rateLimit = checkLoginRateLimit(ipAddress, employeeNo);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.error },
+        {
+          status: 429,
+          headers: rateLimit.retryAfterSeconds
+            ? { "Retry-After": String(rateLimit.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
+    recordLoginAttempt(ipAddress);
+
+    // 2. 依據五碼員工編號（儲存於 email 欄位）或 ID 尋找使用者（支援英文字母不分大小寫比對）
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -33,6 +60,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user || user.email.startsWith("preview-")) {
+      recordLoginFailure(employeeNo);
       return NextResponse.json(
         { error: "員工編號或密碼不正確，兩者均符合才可登入" },
         { status: 401 }
@@ -43,14 +71,10 @@ export async function POST(req: NextRequest) {
     const customPassword = passwords[user.id] || passwords[user.email];
     const expectedPassword = customPassword || DEFAULT_LOGIN_PASSWORD;
 
-    const ipAddress =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "127.0.0.1";
-    const userAgent = req.headers.get("user-agent") || undefined;
-
-    // 除非未初始化設定個人密碼，否則不得使用 0000 登入
+    // 3. 除非未初始化設定個人密碼，否則不得使用 0000 登入
     if (password !== expectedPassword) {
+      recordLoginFailure(employeeNo);
+
       void DataService.recordLoginLog({
         userId: user.id,
         employeeNo: user.email,
@@ -69,7 +93,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 記錄登入成功事件
+    // 4. 登入成功：清除該帳號累積之失敗計數並記錄日誌
+    recordLoginSuccess(employeeNo);
+
     void DataService.recordLoginLog({
       userId: user.id,
       employeeNo: user.email,
