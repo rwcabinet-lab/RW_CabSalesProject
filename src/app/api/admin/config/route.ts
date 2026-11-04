@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
       const stageDays = await DataService.getAppConfig("milestone_default_days", MILESTONE_DEFAULT_DAYS);
       return NextResponse.json({ stageDays });
     }
+    if (key === "customerTypeStages" || key === "customer_type_start_stages") {
+      const customerTypeStages = await DataService.getCustomerTypeStartStages();
+      return NextResponse.json({ customerTypeStages });
+    }
     return NextResponse.json({ error: "無效的 key 參數" }, { status: 400 });
   } catch (err) {
     return handleApiError(err, "讀取設定失敗");

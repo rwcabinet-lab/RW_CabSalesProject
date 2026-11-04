@@ -33,6 +33,16 @@ export const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   DIRECT: "直接業主",
 };
 
+/** 各客戶類型建立案場時的預設起始進度 (方案一：自動批次略過前置進度) */
+export const CUSTOMER_TYPE_START_STAGE_CODES: Partial<Record<string, MilestoneStageCode>> = {
+  CABINET_FACTORY: "4-4", // 櫥櫃工廠 ➔ 4-4 拆單並提交生產
+  LABOR_MATERIAL: "4-4",  // 連工帶料 ➔ 4-4 拆單並提交生產
+  DEALER_COMPANY: "3-2",  // 經銷公司 ➔ 3-2 報價單
+  DEALER: "3-2",          // 經銷商 ➔ 3-2 報價單
+  DESIGN_COMPANY: "3-1",  // 設計公司 ➔ 3-1 設計圖
+  DESIGNER: "3-1",        // 設計師 ➔ 3-1 設計圖
+};
+
 /** 判斷案件階段是否符合特定欄位/階段（含歷史向下相容） */
 export function matchesStage(projectStage: string, columnId: string): boolean {
   if (projectStage === columnId) return true;

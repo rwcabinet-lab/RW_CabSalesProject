@@ -718,6 +718,9 @@ export const MilestoneService = {
       throw new ConflictError("請由最後一個已完成的里程碑開始回退");
     }
     const target = milestones[targetIndex];
+    if (target.notes?.includes("系統自動略過")) {
+      throw new ConflictError("此進度為建立案場時依客戶類型自動略過之項目，無法回退");
+    }
     const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
     const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);

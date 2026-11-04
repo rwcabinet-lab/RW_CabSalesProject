@@ -7,6 +7,11 @@ import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { fromTenThousands } from "@/lib/currency";
 import { toast } from "@/stores/useToastStore";
 import { QUERY_KEYS } from "@/hooks/useQueries";
+import {
+  CUSTOMER_TYPE_LABELS,
+  CUSTOMER_TYPE_START_STAGE_CODES,
+  MILESTONE_STAGE_LABELS,
+} from "@/lib/constants";
 import type { CustomerDTO, UserDTO, WorkbenchDashboardDTO } from "@/types/dto";
 
 interface WorkbenchProjectFormsProps {
@@ -29,6 +34,8 @@ export function WorkbenchAddProjectPanel({
   const setNewProjectData = useWorkbenchStore((s) => s.setNewProjectData);
 
   const [saving, setSaving] = useState(false);
+  const selectedCust = customers.find((c) => c.id === newProjectData.customerId);
+  const autoStartCode = selectedCust ? CUSTOMER_TYPE_START_STAGE_CODES[selectedCust.customerType] : undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +78,11 @@ export function WorkbenchAddProjectPanel({
         </button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        {selectedCust && autoStartCode && (
+          <div className="col-span-full text-xs text-emerald-800 bg-emerald-100/70 border border-emerald-200 px-3 py-1.5 rounded flex items-center gap-1.5">
+            <span>💡 依客戶類型【{CUSTOMER_TYPE_LABELS[selectedCust.customerType] || selectedCust.customerType}】，建立案場時進度將自動略過前期階段，直接推進至【{autoStartCode} {MILESTONE_STAGE_LABELS[autoStartCode]}】</span>
+          </div>
+        )}
         <label>
           案場名稱 *
           <input

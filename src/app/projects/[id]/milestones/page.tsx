@@ -1248,7 +1248,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           )}
 
                           {/* [回退至此] 同 [進度完成] 位置，移至 [歷次紀錄] 左側 */}
-                          {canRollback && !isProjectLost && lastCompletedMilestone?.id === m.id && (
+                          {canRollback && !isProjectLost && lastCompletedMilestone?.id === m.id && !m.notes?.includes("系統自動略過") && (
                             <button
                               type="button"
                               onClick={() => handleRollback(m)}

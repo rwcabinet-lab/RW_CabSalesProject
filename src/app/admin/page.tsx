@@ -12,11 +12,20 @@ import {
   KeyRound,
   Sliders,
   Calendar,
+  FastForward,
   Eye,
   EyeOff,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
-import { DEFAULT_PROJECT_COLUMNS, MILESTONE_STAGE_LABELS, MILESTONE_DEFAULT_DAYS, PHASE_LABELS, normalizeProjectColumns } from "@/lib/constants";
+import {
+  DEFAULT_PROJECT_COLUMNS,
+  MILESTONE_STAGE_LABELS,
+  MILESTONE_DEFAULT_DAYS,
+  PHASE_LABELS,
+  normalizeProjectColumns,
+  CUSTOMER_TYPE_START_STAGE_CODES,
+  STANDARD_MILESTONE_STAGE_CODES,
+} from "@/lib/constants";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO } from "@/types/dto";
 
@@ -26,6 +35,20 @@ type RolePermission = { role: AppRole; label: string; pages: PageAccessKey[] };
 function roleLabel(role: string) {
   return ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
 }
+
+const CONFIGURABLE_CUSTOMER_TYPES = [
+  { key: "CABINET_FACTORY", label: "櫥櫃工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，建議預設【4-4 拆單並提交生產】或【5-1 生產】" },
+  { key: "LABOR_MATERIAL", label: "連工帶料", badge: "統包加工", desc: "統包工班加工訂單，建議預設【4-4 拆單】或【3-2 報價單】" },
+  { key: "DEALER_COMPANY", label: "經銷公司", badge: "經銷通路", desc: "簽約配合經銷商，自備需求直接報價，建議預設【3-2 報價單】" },
+  { key: "DEALER", label: "經銷商", badge: "經銷通路", desc: "常態經銷夥伴，建議預設【3-2 報價單】" },
+  { key: "DESIGN_COMPANY", label: "設計公司", badge: "長期設計", desc: "自備空間配置底圖，建議預設【3-1 設計圖】或【3-2 報價單】" },
+  { key: "DESIGNER", label: "設計師", badge: "長期設計", desc: "長期配合設計師，自備圖面規格，建議預設【3-1 設計圖】" },
+  { key: "CONSTRUCTION", label: "建設／營造", badge: "工程營造", desc: "建設建案或工程標案，依工程需求排定" },
+  { key: "CONTRACTOR", label: "統包／營造", badge: "統包工班", desc: "統包工程商，通常已有初步規劃" },
+  { key: "LONGMEI_STORE", label: "隆美門市", badge: "門市專案", desc: "門市專案轉單，依門市需求建立，建議由 1-1 開始" },
+  { key: "HOMEOWNER", label: "一般消費者 (業主)", badge: "終端住宅", desc: "終端個人住宅業主，建議完整執行【1-1 客源開發】" },
+  { key: "INDIVIDUAL", label: "一般消費者 (個人)", badge: "個人業主", desc: "終端散客業主，建議完整執行【1-1 客源開發】" },
+];
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -64,6 +87,12 @@ export default function AdminPage() {
   const [stageDays, setStageDays] = useState<Record<string, number>>(MILESTONE_DEFAULT_DAYS);
   const [savingDays, setSavingDays] = useState(false);
 
+  // 各客戶類型預設起始進度設定
+  const [customerTypeStages, setCustomerTypeStages] = useState<Record<string, string>>(
+    CUSTOMER_TYPE_START_STAGE_CODES as Record<string, string>
+  );
+  const [savingTypeStages, setSavingTypeStages] = useState(false);
+
   useEffect(() => {
     loadAdminData();
     loadConfigs();
@@ -91,14 +120,17 @@ export default function AdminPage() {
 
   const loadConfigs = async () => {
     try {
-      const [colRes, dayRes] = await Promise.all([
+      const [colRes, dayRes, typeRes] = await Promise.all([
         fetch("/api/admin/config?key=columns", { cache: "no-store" }),
         fetch("/api/admin/config?key=stageDays", { cache: "no-store" }),
+        fetch("/api/admin/config?key=customerTypeStages", { cache: "no-store" }),
       ]);
       const colData = await colRes.json();
       const dayData = await dayRes.json();
+      const typeData = await typeRes.json();
       setColumns(normalizeProjectColumns(colData.columns));
       if (dayData.stageDays) setStageDays(dayData.stageDays);
+      if (typeData.customerTypeStages) setCustomerTypeStages(typeData.customerTypeStages);
     } catch (err) {
       console.error("Failed to load configs", err);
     }
@@ -264,6 +296,25 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : "儲存預設天數失敗");
     } finally {
       setSavingDays(false);
+    }
+  };
+
+  const saveCustomerTypeStagesConfig = async () => {
+    setSavingTypeStages(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch("/api/admin/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "customer_type_start_stages", value: customerTypeStages }),
+      });
+      if (!res.ok) throw new Error("儲存各客戶類型起始進度失敗");
+      setNotice("各客戶類型預設起始進度已成功儲存至全域設定！");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "儲存各客戶類型起始進度失敗");
+    } finally {
+      setSavingTypeStages(false);
     }
   };
 
@@ -538,6 +589,95 @@ export default function AdminPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* 2.5 各客戶類型預設起始進度設定 */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FastForward className="h-5 w-5 text-emerald-600" />
+            <h2 className="text-lg font-bold">各客戶類型預設起始進度設定</h2>
+          </div>
+          <button
+            type="button"
+            onClick={saveCustomerTypeStagesConfig}
+            disabled={savingTypeStages}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {savingTypeStages ? "儲存中..." : "儲存起始進度"}
+          </button>
+        </div>
+        <p className="mb-4 text-xs text-slate-500">
+          設定各類型客戶建立新案場時的預設起始里程碑。系統將自動批次略過前置項目並標記完成，直接啟動所選進度，節省業務同仁手動推進步驟。
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {CONFIGURABLE_CUSTOMER_TYPES.map((item) => {
+            const currentStage = customerTypeStages[item.key] || "1-1";
+            const isCustomStart = currentStage !== "1-1";
+
+            return (
+              <div
+                key={item.key}
+                className={`p-4 rounded-xl border flex flex-col justify-between transition-colors ${
+                  isCustomStart
+                    ? "border-emerald-300 bg-emerald-50/40 shadow-xs"
+                    : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="font-bold text-sm text-slate-800">{item.label}</span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isCustomStart
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-600">起始進度：</label>
+                    {isCustomStart && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                        略過前期進度
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={currentStage}
+                    onChange={(e) =>
+                      setCustomerTypeStages({
+                        ...customerTypeStages,
+                        [item.key]: e.target.value,
+                      })
+                    }
+                    className={`w-full text-xs font-bold rounded-lg border px-2.5 py-1.5 outline-none transition ${
+                      isCustomStart
+                        ? "border-emerald-500 bg-white text-emerald-900 shadow-xs"
+                        : "border-slate-300 bg-white text-slate-700"
+                    }`}
+                  >
+                    {STANDARD_MILESTONE_STAGE_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        [{code}] {MILESTONE_STAGE_LABELS[code]}
+                        {code === "1-1" ? "（系統標準起點）" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

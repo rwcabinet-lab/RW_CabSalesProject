@@ -1,6 +1,10 @@
 import { prisma } from "../prisma";
 import { NotFoundError } from "../errors";
-import { MILESTONE_DEFAULT_DAYS } from "../constants";
+import {
+  CUSTOMER_TYPE_START_STAGE_CODES,
+  MILESTONE_DEFAULT_DAYS,
+  MilestoneStageCode,
+} from "../constants";
 import { appConfigCache, APP_CONFIG_TTL_MS } from "./shared";
 
 export const ConfigService = {
@@ -32,5 +36,12 @@ export const ConfigService = {
 
   async getMilestoneDefaultDays(): Promise<Record<string, number>> {
     return ConfigService.getAppConfig<Record<string, number>>("milestone_default_days", MILESTONE_DEFAULT_DAYS);
+  },
+
+  async getCustomerTypeStartStages(): Promise<Record<string, MilestoneStageCode>> {
+    return ConfigService.getAppConfig<Record<string, MilestoneStageCode>>(
+      "customer_type_start_stages",
+      CUSTOMER_TYPE_START_STAGE_CODES as Record<string, MilestoneStageCode>
+    );
   },
 };

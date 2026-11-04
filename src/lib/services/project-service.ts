@@ -8,12 +8,14 @@ import {
 } from "@prisma/client";
 import { BadRequestError } from "../errors";
 import {
+  CUSTOMER_TYPE_LABELS,
+  CUSTOMER_TYPE_START_STAGE_CODES,
   MILESTONE_DEFAULT_DAYS,
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   STANDARD_MILESTONE_STAGE_CODES,
 } from "../constants";
-import { ScheduleEngine } from "../schedule-engine";
+import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "../schedule-engine";
 import type {
   MilestonePhaseDTO,
   MilestoneStageCode,
@@ -203,10 +205,11 @@ export const ProjectService = {
     cost?: number;
     quoteAmount?: number;
     salesRepId?: string;
+    startStageCode?: string;
   }): Promise<ProjectDetail | undefined> {
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
-      select: { id: true, salesRepId: true },
+      select: { id: true, salesRepId: true, customerType: true },
     });
     if (!customer) return undefined;
 
@@ -223,22 +226,69 @@ export const ProjectService = {
     const assignedSalesRepId = data.salesRepId || customer.salesRepId;
 
     const defaultDays = await ConfigService.getMilestoneDefaultDays();
+    const dynamicTypeStages = await ConfigService.getCustomerTypeStartStages();
     const allCodes = STANDARD_MILESTONE_STAGE_CODES;
-    let cursorDate = new Date();
+
+    // 依客戶類型或指定參數決定起始進度（方案一：自動批次略過前置進度）
+    const targetStartCode =
+      (data.startStageCode && allCodes.includes(data.startStageCode as MilestoneStageCode)
+        ? (data.startStageCode as MilestoneStageCode)
+        : undefined) ||
+      dynamicTypeStages[customer.customerType] ||
+      dynamicTypeStages[customerTypeFromDatabase(customer.customerType)] ||
+      CUSTOMER_TYPE_START_STAGE_CODES[customer.customerType] ||
+      CUSTOMER_TYPE_START_STAGE_CODES[customerTypeFromDatabase(customer.customerType)] ||
+      "1-1";
+
+    const targetIndex = allCodes.indexOf(targetStartCode);
+    const validTargetIndex = targetIndex !== -1 ? targetIndex : 0;
+    const finalStartCode = allCodes[validTargetIndex];
+    const customerTypeLabel = CUSTOMER_TYPE_LABELS[customer.customerType] || customer.customerType;
+
+    const today = new Date();
+    let cursorDate = new Date(today);
+
     const milestoneRows = allCodes.map((code, index) => {
-      const planned = new Date(cursorDate);
-      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
-      planned.setDate(planned.getDate() + days);
-      cursorDate = planned;
+      const isSkipped = index < validTargetIndex;
+      const isActive = index === validTargetIndex;
+
+      let plannedDueDate: Date;
+      let actualDueDate: Date | null = null;
+      let status: MilestoneStatus;
+      let notes: string | null = null;
+
+      if (isSkipped) {
+        status = MilestoneStatus.COMPLETED;
+        plannedDueDate = new Date(today);
+        actualDueDate = new Date(today);
+        notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
+      } else if (isActive) {
+        status = MilestoneStatus.IN_PROGRESS;
+        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+        plannedDueDate = new Date(today);
+        plannedDueDate.setDate(plannedDueDate.getDate() + days);
+        cursorDate = new Date(plannedDueDate);
+      } else {
+        status = MilestoneStatus.PENDING;
+        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+        plannedDueDate = new Date(cursorDate);
+        plannedDueDate.setDate(plannedDueDate.getDate() + days);
+        cursorDate = new Date(plannedDueDate);
+      }
+
       return {
         stageCode: code,
         phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP",
         stageOrder: index + 1,
-        plannedDueDate: planned,
-        status: index === 0 ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING,
+        plannedDueDate,
+        actualDueDate,
+        status,
+        notes,
         assignedToId: assignedSalesRepId,
       };
     });
+
+    const initialProjectStage = (STAGE_CODE_TO_PROJECT_STAGE[finalStartCode] || ProjectStage.DEVELOP) as ProjectStage;
 
     return await prisma.$transaction(async (tx) => {
       const p = await tx.project.create({
@@ -248,7 +298,7 @@ export const ProjectService = {
           siteAddress: data.siteAddress,
           siteCondition: data.siteCondition,
           salesRepId: assignedSalesRepId,
-          currentStage: ProjectStage.DEVELOP,
+          currentStage: initialProjectStage,
           expectedDate: data.expectedDate ? new Date(data.expectedDate) : undefined,
           unitCount: data.unitCount,
           cost: data.cost,
@@ -264,18 +314,24 @@ export const ProjectService = {
         include: projectInclude,
       });
 
-      const firstMilestone = await tx.projectMilestone.findFirst({
-        where: { projectId: p.id, stageCode: "1-1" },
+      const activeMilestone = await tx.projectMilestone.findFirst({
+        where: { projectId: p.id, stageCode: finalStartCode },
       });
-      if (firstMilestone) {
+      if (activeMilestone) {
+        const isDrawing =
+          activeMilestone.phase === "PROPOSAL" ||
+          activeMilestone.phase === "PRE_PROD" ||
+          finalStartCode.startsWith("3-") ||
+          finalStartCode.startsWith("4-");
+
         await tx.salesTask.create({
           data: {
             projectId: p.id,
-            milestoneId: firstMilestone.id,
+            milestoneId: activeMilestone.id,
             assignedToId: assignedSalesRepId,
-            taskType: TaskType.SITE_VISIT,
-            subject: MILESTONE_STAGE_LABELS["1-1"] || "客源開發",
-            dueDatetime: firstMilestone.plannedDueDate || new Date(),
+            taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+            subject: MILESTONE_STAGE_LABELS[finalStartCode as MilestoneStageCode] || "里程碑任務",
+            dueDatetime: activeMilestone.plannedDueDate || new Date(),
             priority: TaskPriority.MEDIUM,
             isCompleted: false,
           },
