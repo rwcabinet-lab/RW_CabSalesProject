@@ -5,10 +5,12 @@ import { canRoleAccessPath } from "@/lib/page-access";
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // 1. 靜態資源、圖片與 Next.js 內部資源直接放行，杜絕不必要的驗證負擔
+  // 1. 靜態資源、圖片與公開驗證路由直接放行，杜絕不必要的驗證負擔
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api/auth/") ||
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/auth/session" ||
     pathname === "/favicon.ico" ||
     /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$/i.test(pathname)
   ) {

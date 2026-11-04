@@ -48,6 +48,12 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(canRoleAccessPath("SITE_ENGINEER", "/api/admin/users")).toBe(false);
     });
 
+    it("已登入同仁可存取 /api/auth/users 作為指派選單資料來源", () => {
+      expect(canRoleAccessPath("SALES", "/api/auth/users")).toBe(true);
+      expect(canRoleAccessPath("ASSISTANT", "/api/auth/users")).toBe(true);
+      expect(canRoleAccessPath("ADMIN", "/api/auth/users")).toBe(true);
+    });
+
     it("公開路徑一律放行 (/login, /forbidden, /settings)", () => {
       expect(canRoleAccessPath("SALES", "/login")).toBe(true);
       expect(canRoleAccessPath("SITE_ENGINEER", "/forbidden")).toBe(true);
