@@ -742,6 +742,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const pausedMilestone = sortedAllMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
   const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
   const lastCompletedMilestone = [...sortedAllMilestones].reverse().find((m) => m.status === "COMPLETED");
+  const currentActionableMilestone =
+    project?.currentStage === "WRAP_UP"
+      ? sortedAllMilestones.find((m) => m.stageCode === "X-1" && m.status !== "COMPLETED")
+      : sortedAllMilestones.find((item) => item.status === "IN_PROGRESS" || item.status === "OVERDUE") ||
+        sortedAllMilestones.find((item) => item.status !== "COMPLETED");
 
   // 依大階段分組
   const phaseGroups: Record<MilestonePhaseDTO, MilestoneWithLight[]> = {
@@ -1032,7 +1037,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isAuditSubmitted = m.auditSubmitted === true;
               const isDueToday = !isProjectLost && !isSubsequent && m.trafficLight?.label === "已到期";
               const isOverdue = !isProjectLost && !isSubsequent && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾期"));
-              const isActive = (m.status === "IN_PROGRESS" || isOverdue || isDueToday) && !isSubsequent;
+              const isCurrentActionable = currentActionableMilestone?.id === m.id;
+              const isActive = isCurrentActionable && m.status !== "COMPLETED" && !isSubsequent;
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
@@ -1075,7 +1081,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             ? "border-red-200 bg-red-50/30"
                             : isPaused
                               ? "border-slate-300 bg-slate-50/50"
-                              : m.status === "IN_PROGRESS"
+                              : isActive || m.status === "IN_PROGRESS"
                                 ? "border-blue-200 bg-blue-50/20 shadow-xs"
                                 : m.status === "COMPLETED"
                                   ? "border-emerald-100 bg-emerald-50/10"
