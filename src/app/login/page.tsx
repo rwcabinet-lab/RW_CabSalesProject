@@ -75,9 +75,6 @@ export default function LoginPage() {
                 className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               />
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">
-              請輸入大成或正道的五碼工號，[員工編號][密碼]兩者均符合才可登入
-            </p>
           </div>
 
           <div>
