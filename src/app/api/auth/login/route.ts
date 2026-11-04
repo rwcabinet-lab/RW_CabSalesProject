@@ -40,10 +40,11 @@ export async function POST(req: NextRequest) {
     }
 
     const passwords = await DataService.getAppConfig<Record<string, string>>("user_passwords", {});
-    const expectedPassword = passwords[user.id] || passwords[user.email] || DEFAULT_LOGIN_PASSWORD;
+    const customPassword = passwords[user.id] || passwords[user.email];
+    const expectedPassword = customPassword || DEFAULT_LOGIN_PASSWORD;
 
-    // 嚴格比對：[員工編號][密碼]兩者均符合才可登入，支援使用者自訂密碼並相容系統預設密碼 0000
-    if (password !== expectedPassword && password !== DEFAULT_LOGIN_PASSWORD) {
+    // 除非未初始化設定個人密碼，否則不得使用 0000 登入
+    if (password !== expectedPassword) {
       return NextResponse.json(
         { error: "員工編號或密碼不正確，兩者均符合才可登入" },
         { status: 401 }

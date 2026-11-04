@@ -87,7 +87,7 @@ export default function LoginPage() {
                 id="login-password"
                 type="password"
                 required
-                placeholder="請輸入密碼（預設：0000）"
+                placeholder="請輸入密碼"
                 autoComplete="current-password"
                 value={password}
                 disabled={submitting}

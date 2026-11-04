@@ -55,4 +55,39 @@ describe("Employee ID & Password Login Logic (員工編號與密碼登入機制)
       error: "員工編號或密碼不正確，兩者均符合才可登入",
     });
   });
+
+  describe("密碼初始化規則：除非未初始化設定個人密碼，否則不得使用 0000 登入", () => {
+    const DEFAULT_INIT_PASSWORD = "0000";
+
+    const evaluateLoginPassword = (
+      inputPassword: string,
+      customPassword?: string
+    ): boolean => {
+      const expectedPassword = customPassword || DEFAULT_INIT_PASSWORD;
+      return inputPassword === expectedPassword;
+    };
+
+    it("已初始化設定個人密碼之同仁，輸入個人密碼放行，輸入 0000 必須直接被拒絕", () => {
+      const customPassword = "mySecretPassword2026";
+
+      // 輸入正確個人密碼 -> 放行
+      expect(evaluateLoginPassword("mySecretPassword2026", customPassword)).toBe(true);
+
+      // 輸入 0000 -> 拒絕（不得使用 0000 登入）
+      expect(evaluateLoginPassword("0000", customPassword)).toBe(false);
+
+      // 輸入錯誤密碼 -> 拒絕
+      expect(evaluateLoginPassword("wrongpass", customPassword)).toBe(false);
+    });
+
+    it("尚未初始化設定個人密碼之同仁，僅允許使用 0000 進行初始登入", () => {
+      const customPassword = undefined; // 未初始化設定
+
+      // 輸入 0000 -> 放行
+      expect(evaluateLoginPassword("0000", customPassword)).toBe(true);
+
+      // 輸入其他密碼 -> 拒絕
+      expect(evaluateLoginPassword("otherpass", customPassword)).toBe(false);
+    });
+  });
 });

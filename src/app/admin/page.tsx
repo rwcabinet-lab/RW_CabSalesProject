@@ -937,14 +937,14 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSavePassword} className="space-y-3 text-sm">
               <p className="text-xs text-slate-500 bg-amber-50 p-2.5 rounded border border-amber-200">
-                目前系統共用登入密碼為 <b>0000</b>，在此可設定使用者專屬密碼。
+                在此可為該同仁設定專屬個人密碼（至少 4 碼以上）。
               </p>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">新密碼</label>
                 <input
                   type="password"
                   required
-                  placeholder="請輸入新密碼 (預設: 0000)"
+                  placeholder="請輸入新密碼（至少 4 碼）"
                   value={passwordModal.newPass}
                   onChange={(e) => setPasswordModal({ ...passwordModal, newPass: e.target.value })}
                   className="w-full rounded border border-slate-300 p-2 text-sm outline-none focus:border-amber-500"

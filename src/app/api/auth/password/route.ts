@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // 個人修改自己密碼：必須驗證舊密碼
     const currentPassword = passwords[sessionUserId] || process.env.LOGIN_PASSWORD || "0000";
     if (!oldPassword || oldPassword !== currentPassword) {
-      return NextResponse.json({ error: "目前密碼不正確（系統預設密碼為 0000）" }, { status: 400 });
+      return NextResponse.json({ error: "目前密碼不正確" }, { status: 400 });
     }
 
     passwords[sessionUserId] = newPassword;

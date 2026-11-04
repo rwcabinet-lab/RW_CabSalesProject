@@ -246,7 +246,7 @@ export default function SettingsPage() {
                 <input
                   type="password"
                   required
-                  placeholder="請輸入目前密碼（預設 0000）"
+                  placeholder="請輸入目前密碼"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   className="w-full border rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
