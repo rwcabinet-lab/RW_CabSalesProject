@@ -61,7 +61,7 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(canRoleAccessPath("SALES", "/api/auth/login")).toBe(true);
     });
 
-    it("SALES 具備業務工作台與多元可視化存取權", () => {
+    it("SALES 具備案場筆記與視覺時程存取權", () => {
       expect(canRoleAccessPath("SALES", "/dashboard/workbench")).toBe(true);
       expect(canRoleAccessPath("SALES", "/views")).toBe(true);
       expect(canRoleAccessPath("SALES", "/customers")).toBe(true);

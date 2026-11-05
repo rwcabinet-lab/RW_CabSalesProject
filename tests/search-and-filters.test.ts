@@ -16,7 +16,7 @@ describe("搜尋與篩選條件功能測試", () => {
     });
   });
 
-  describe("業務工作台案件清單關鍵字搜尋過濾邏輯", () => {
+  describe("案場筆記案件清單關鍵字搜尋過濾邏輯", () => {
     const mockProjects: WorkbenchProjectDTO[] = [
       {
         id: "p1",
@@ -123,7 +123,7 @@ describe("搜尋與篩選條件功能測試", () => {
     });
   });
 
-  describe("主管監控室案件清單與業務選單過濾邏輯", () => {
+  describe("全場總控案件清單與業務選單過濾邏輯", () => {
     const mockOverview: ManagerProjectOverviewDTO[] = [
       {
         id: "p1",
@@ -221,7 +221,7 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(businessOptions).not.toContain("未指派");
     });
 
-    it("主管監控室關鍵字搜尋能正確比對案名、地址、客戶與業務", () => {
+    it("全場總控關鍵字搜尋能正確比對案名、地址、客戶與業務", () => {
       const filterOverview = (projects: ManagerProjectOverviewDTO[], keyword: string) => {
         const q = keyword.trim().toLowerCase();
         if (!q) return projects;
@@ -305,7 +305,7 @@ describe("搜尋與篩選條件功能測試", () => {
     });
   });
 
-  describe("業務工作台比照主管監控室之時間區間（日期/月份）篩選機制", () => {
+  describe("案場筆記比照全場總控之時間區間（日期/月份）篩選機制", () => {
     it("useWorkbenchStore 正確管理 dateMode、startDate、endDate 與 resetFilters", () => {
       const store = useWorkbenchStore.getState();
       expect(store.dateMode).toBe("DATE");

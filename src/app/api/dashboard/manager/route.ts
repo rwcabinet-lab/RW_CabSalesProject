@@ -374,7 +374,7 @@ export async function GET(req: NextRequest) {
       assignedTasks: assignedTasksWithStatus,
     });
   } catch (error) {
-    return handleApiError(error, "無法取得主管監控室資料");
+    return handleApiError(error, "無法取得全場總控資料");
   }
 }
 

@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import {
@@ -33,7 +34,7 @@ import {
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
 
-type ManagedUser = { id: string; name: string; email: string; role: AppRole };
+type ManagedUser = { id: string; name: string; email: string; role: AppRole; lastLoginAt?: string | null };
 type RolePermission = { role: AppRole; label: string; pages: PageAccessKey[] };
 
 function roleLabel(role: string) {
@@ -71,6 +72,7 @@ const CONFIGURABLE_CUSTOMER_TYPES = [
 export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [permissions, setPermissions] = useState<RolePermission[]>([]);
+  const [configTab, setConfigTab] = useState<"columns" | "stageDays" | "customerTypes">("columns");
   const [loading, setLoading] = useState(true);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [error, setError] = useState("");
@@ -413,12 +415,21 @@ export default function AdminPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">載入管理設定資料中...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-16">
       <div className="flex items-start gap-3">
         <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><ShieldCheck className="h-6 w-6" /></div>
         <div>
-          <h1 className="text-2xl font-black text-slate-900">管理者與系統設定</h1>
+          <h1 className="text-2xl font-black text-slate-900">管理設定</h1>
           <p className="mt-1 text-sm text-slate-600">管理帳號密碼、全域案件清單欄位順序與各階段預設天數。</p>
         </div>
       </div>
@@ -426,27 +437,72 @@ export default function AdminPage() {
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
 
-      {/* 1. 案件清單全域欄位設定 (主管監控室即時表格樣式，支援拖曳與顯隱) */}
+      {/* 1. 全域案件與時程設定（分頁切換：欄位順序 / 預設天數 / 起始進度） */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sliders className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-bold">案件清單欄位項目與順序（全域表格視圖調整）</h2>
-            <SectionHelpButton sectionId="admin-columns" />
+        {/* 分頁切換按鈕組 */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setConfigTab("columns")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                configTab === "columns"
+                  ? "bg-white text-blue-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Sliders className="h-4 w-4" />
+              案件清單欄位項目與順序
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfigTab("stageDays")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                configTab === "stageDays"
+                  ? "bg-white text-indigo-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Calendar className="h-4 w-4" />
+              各階段進度預設天數設定
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfigTab("customerTypes")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                configTab === "customerTypes"
+                  ? "bg-white text-emerald-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FastForward className="h-4 w-4" />
+              各客戶類型預設起始進度設定
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={saveColumnsConfig}
-            disabled={savingColumns}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {savingColumns ? "儲存中..." : "儲存欄位設定"}
-          </button>
         </div>
-        <p className="mb-4 text-xs text-slate-500">
-          以主管監控室表格樣式預覽。您可以點擊表頭的 <b>👁️ 圖示</b> 開關欄位顯示，或<b>直接按住並拖曳表頭</b>即時預覽調整欄位左右順序。儲存後工作台與主管監控室將同步套用。
-        </p>
+
+        {/* 分頁 1. 案件清單欄位項目與順序 */}
+        {configTab === "columns" && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sliders className="h-5 w-5 text-blue-600" />
+                <h2 className="text-lg font-bold">案件清單欄位項目與順序（全域表格視圖調整）</h2>
+                <SectionHelpButton sectionId="admin-columns" />
+              </div>
+              <button
+                type="button"
+                onClick={saveColumnsConfig}
+                disabled={savingColumns}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {savingColumns ? "儲存中..." : "儲存欄位設定"}
+              </button>
+            </div>
+            <p className="mb-4 text-xs text-slate-500">
+              以全場總控表格樣式預覽。您可以點擊表頭的 <b>👁️ 圖示</b> 開關欄位顯示，或<b>直接按住並拖曳表頭</b>即時預覽調整欄位左右順序。儲存後案場筆記與全場總控將同步套用。
+            </p>
 
         {/* 模擬即時預覽表格 */}
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/50">
@@ -605,142 +661,148 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </div>
+    )}
 
-      {/* 2. 各階段預設天數設定 */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-indigo-600" />
-            <h2 className="text-lg font-bold">各階段進度預設天數設定</h2>
-            <SectionHelpButton sectionId="admin-stage-days" />
-          </div>
-          <button
-            type="button"
-            onClick={saveStageDaysConfig}
-            disabled={savingDays}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {savingDays ? "儲存中..." : "儲存預設天數"}
-          </button>
-        </div>
-        <p className="mb-4 text-xs text-slate-500">
-          設定新建立案場時自動計算預定完成日的標準作業天數，各案場細節內仍可自行手動覆蓋修改。
-        </p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {Object.entries(MILESTONE_STAGE_LABELS)
-            .filter(([code]) => code !== "X-2")
-            .map(([code, label]) => (
-            <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
-              <span className="text-xs font-bold text-slate-700 truncate" title={label}>
-                [{code}] {label}
-              </span>
-              <div className="mt-2 flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min="1"
-                  value={stageDays[code] ?? 3}
-                  onChange={(e) =>
-                    setStageDays({ ...stageDays, [code]: Number(e.target.value) || 1 })
-                  }
-                  className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
-                />
-                <span className="text-xs text-slate-500">天</span>
-              </div>
+      {/* 分頁 2. 各階段進度預設天數設定 */}
+      {configTab === "stageDays" && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-indigo-600" />
+              <h2 className="text-lg font-bold">各階段進度預設天數設定</h2>
+              <SectionHelpButton sectionId="admin-stage-days" />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 2.5 各客戶類型預設起始進度設定 */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FastForward className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-lg font-bold">各客戶類型預設起始進度設定</h2>
+            <button
+              type="button"
+              onClick={saveStageDaysConfig}
+              disabled={savingDays}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {savingDays ? "儲存中..." : "儲存預設天數"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={saveCustomerTypeStagesConfig}
-            disabled={savingTypeStages}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {savingTypeStages ? "儲存中..." : "儲存起始進度"}
-          </button>
+          <p className="mb-4 text-xs text-slate-500">
+            設定新建立案場時自動計算預定完成日的標準作業天數，各案場細節內仍可自行手動覆蓋修改。
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.entries(MILESTONE_STAGE_LABELS)
+              .filter(([code]) => code !== "X-2")
+              .map(([code, label]) => (
+              <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
+                <span className="text-xs font-bold text-slate-700 truncate" title={label}>
+                  [{code}] {label}
+                </span>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    value={stageDays[code] ?? 3}
+                    onChange={(e) =>
+                      setStageDays({ ...stageDays, [code]: Number(e.target.value) || 1 })
+                    }
+                    className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
+                  />
+                  <span className="text-xs text-slate-500">天</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="mb-4 text-xs text-slate-500">
-          設定各類型客戶建立新案場時的預設起始里程碑。系統將自動批次略過前置項目並標記完成，直接啟動所選進度，節省業務同仁手動推進步驟。
-        </p>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {CONFIGURABLE_CUSTOMER_TYPES.map((item) => {
-            const currentStage = customerTypeStages[item.key] || "1-1";
-            const isCustomStart = currentStage !== "1-1";
+      {/* 分頁 3. 各客戶類型預設起始進度設定 */}
+      {configTab === "customerTypes" && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FastForward className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-lg font-bold">各客戶類型預設起始進度設定</h2>
+            </div>
+            <button
+              type="button"
+              onClick={saveCustomerTypeStagesConfig}
+              disabled={savingTypeStages}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {savingTypeStages ? "儲存中..." : "儲存起始進度"}
+            </button>
+          </div>
+          <p className="mb-4 text-xs text-slate-500">
+            設定各類型客戶建立新案場時的預設起始里程碑。系統將自動批次略過前置項目並標記完成，直接啟動所選進度，節省業務同仁手動推進步驟。
+          </p>
 
-            return (
-              <div
-                key={item.key}
-                className={`p-4 rounded-xl border flex flex-col justify-between transition-colors ${
-                  isCustomStart
-                    ? "border-emerald-300 bg-emerald-50/40 shadow-xs"
-                    : "border-slate-200 bg-slate-50 hover:border-slate-300"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="font-bold text-sm text-slate-800">{item.label}</span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {CONFIGURABLE_CUSTOMER_TYPES.map((item) => {
+              const currentStage = customerTypeStages[item.key] || "1-1";
+              const isCustomStart = currentStage !== "1-1";
+
+              return (
+                <div
+                  key={item.key}
+                  className={`p-4 rounded-xl border flex flex-col justify-between transition-colors ${
+                    isCustomStart
+                      ? "border-emerald-300 bg-emerald-50/40 shadow-xs"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="font-bold text-sm text-slate-800">{item.label}</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isCustomStart
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-600">起始進度：</label>
+                      {isCustomStart && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          略過前期進度
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      value={currentStage}
+                      onChange={(e) =>
+                        setCustomerTypeStages({
+                          ...customerTypeStages,
+                          [item.key]: e.target.value,
+                        })
+                      }
+                      className={`w-full text-xs font-bold rounded-lg border px-2.5 py-1.5 outline-none transition ${
                         isCustomStart
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : "bg-slate-200 text-slate-700"
+                          ? "border-emerald-500 bg-white text-emerald-900 shadow-xs"
+                          : "border-slate-300 bg-white text-slate-700"
                       }`}
                     >
-                      {item.badge}
-                    </span>
+                      {STANDARD_MILESTONE_STAGE_CODES.map((code) => (
+                        <option key={code} value={code}>
+                          [{code}] {MILESTONE_STAGE_LABELS[code]}
+                          {code === "1-1" ? "（系統標準起點）" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                    {item.desc}
-                  </p>
                 </div>
-                <div className="pt-2 border-t border-slate-200">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-600">起始進度：</label>
-                    {isCustomStart && (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                        略過前期進度
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    value={currentStage}
-                    onChange={(e) =>
-                      setCustomerTypeStages({
-                        ...customerTypeStages,
-                        [item.key]: e.target.value,
-                      })
-                    }
-                    className={`w-full text-xs font-bold rounded-lg border px-2.5 py-1.5 outline-none transition ${
-                      isCustomStart
-                        ? "border-emerald-500 bg-white text-emerald-900 shadow-xs"
-                        : "border-slate-300 bg-white text-slate-700"
-                    }`}
-                  >
-                    {STANDARD_MILESTONE_STAGE_CODES.map((code) => (
-                      <option key={code} value={code}>
-                        [{code}] {MILESTONE_STAGE_LABELS[code]}
-                        {code === "1-1" ? "（系統標準起點）" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+      )}
       </section>
 
       {/* 3. 帳號清單與權限設定 */}
@@ -820,12 +882,13 @@ export default function AdminPage() {
 
         {/* 帳號列表與列內編輯 */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="border-b border-slate-200 text-xs text-slate-500">
               <tr>
                 <th className="px-3 py-2 font-semibold">姓名</th>
                 <th className="px-3 py-2 font-semibold">員工編號</th>
                 <th className="px-3 py-2 font-semibold">層級</th>
+                <th className="px-3 py-2 font-semibold">最後上線時間</th>
                 <th className="px-3 py-2 text-right font-semibold">操作</th>
               </tr>
             </thead>
@@ -881,6 +944,9 @@ export default function AdminPage() {
                           ))}
                         </select>
                       </td>
+                      <td className="px-3 py-2.5 text-xs text-slate-400 font-mono">
+                        {user.lastLoginAt ? user.lastLoginAt.slice(0, 16).replace("T", " ") : "尚未上線"}
+                      </td>
                       <td className="px-3 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -917,6 +983,13 @@ export default function AdminPage() {
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                         {roleLabel(user.role)}
                       </span>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
+                      {user.lastLoginAt ? (
+                        <span>{user.lastLoginAt.slice(0, 16).replace("T", " ")}</span>
+                      ) : (
+                        <span className="text-slate-400 font-sans">尚未上線</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -959,7 +1032,7 @@ export default function AdminPage() {
           <h2 className="text-lg font-bold">各層級可瀏覽頁面</h2>
           <SectionHelpButton sectionId="admin-permissions" />
         </div>
-        <p className="mb-5 text-sm text-slate-600">權限同時套用於頁面和相關資料 API；管理者設定僅限管理員，且管理員至少保留一個。</p>
+        <p className="mb-5 text-sm text-slate-600">權限同時套用於頁面和相關資料 API；管理設定僅限管理員，且管理員至少保留一個。</p>
         <div className="space-y-5">
           {permissions.map((item) => (
             <div key={item.role} className="overflow-x-auto rounded-lg border border-slate-200">
@@ -1079,7 +1152,7 @@ export default function AdminPage() {
             <div className="overflow-y-auto flex-1 pr-1">
               {loginLogsModal.loading && (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                  <RefreshCw className="h-6 w-6 animate-spin text-emerald-600" />
                   <span className="text-sm">載入登入紀錄中...</span>
                 </div>
               )}

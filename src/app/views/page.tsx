@@ -12,6 +12,7 @@ import {
   Building2,
   CalendarDays,
   ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { GanttChart } from "@/components/views/GanttChart";
 import { CalendarView } from "@/components/views/CalendarView";
@@ -201,9 +202,9 @@ export default function VisualViewsPage() {
 
   if (loading) {
     return (
-      <div className="p-16 text-center space-y-3">
-        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto" />
-        <p className="text-slate-500 font-medium text-sm">正在載入多元可視化視圖數據...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-slate-500 font-medium text-sm">正在載入視覺時程數據...</p>
       </div>
     );
   }

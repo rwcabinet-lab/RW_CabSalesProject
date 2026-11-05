@@ -192,7 +192,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     }).toThrow(ConflictError);
   });
 
-  it("管理者設定動態覆寫：優先採用動態設定之客戶類型起始進度", () => {
+  it("管理設定動態覆寫：優先採用動態設定之客戶類型起始進度", () => {
     // 假設管理者在後台將「建設／營造 (CONSTRUCTION)」自訂設定為從「2-3 圖面索取」開始
     const dynamicConfig: Record<string, string> = {
       CONSTRUCTION: "2-3",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles } from "lucide-react";
+import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles, RefreshCw } from "lucide-react";
 import type { UserDTO } from "@/types/dto";
 import { useSessionQuery } from "@/hooks/useQueries";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
@@ -197,7 +197,12 @@ export default function SettingsPage() {
       : "業務專員";
 
   if (loading) {
-    return <div className="p-16 text-center text-slate-400">載入個人設定中...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">載入個人設定中...</p>
+      </div>
+    );
   }
 
   return (

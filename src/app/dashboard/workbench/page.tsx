@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   X,
   Search,
+  RefreshCw,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -231,13 +232,20 @@ export default function SalesWorkbenchPage() {
     return [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
   }, [columns]);
 
-  if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">正在載入業務工作台...</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">正在載入案場筆記...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-16">
       <div className="flex justify-between border-b pb-4">
         <div>
-          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">業務工作台</span>
+          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">案場筆記</span>
           <h1 className="text-2xl font-black mt-1">案件列表</h1>
         </div>
       </div>

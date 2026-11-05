@@ -136,6 +136,6 @@ export async function GET(req: NextRequest) {
       tasks: tasksWithPausedStatus,
     });
   } catch (error) {
-    return handleApiError(error, "無法取得業務工作台資料");
+    return handleApiError(error, "無法取得案場筆記資料");
   }
 }

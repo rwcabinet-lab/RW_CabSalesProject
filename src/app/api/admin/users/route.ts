@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest, invalidateUserAccessProfile } from "@/lib/access-control";
 import { invalidateLoginUsersCache } from "@/lib/data-service";
+import { ConfigService } from "@/lib/services";
 import { ROLE_OPTIONS } from "@/lib/page-access";
 import { handleApiError } from "@/lib/errors";
 
@@ -34,12 +35,39 @@ export async function GET(request: NextRequest) {
   if (auth.response) return auth.response;
 
   try {
-    const users = await prisma.user.findMany({
-      where: { NOT: { email: { startsWith: "preview-" } } },
-      select: { id: true, name: true, email: true, role: true },
-      orderBy: [{ role: "asc" }, { name: "asc" }],
-    });
-    return NextResponse.json(users, { headers: { "Cache-Control": "no-store" } });
+    const [users, records] = await Promise.all([
+      prisma.user.findMany({
+        where: { NOT: { email: { startsWith: "preview-" } } },
+        select: { id: true, name: true, email: true, role: true },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      }),
+      ConfigService.getAppConfig<Array<{
+        userId?: string;
+        employeeNo?: string;
+        loginAt: string;
+        status?: string;
+      }>>("login_records", []).catch(() => []),
+    ]);
+
+    const lastLoginMap = new Map<string, string>();
+    for (const r of records) {
+      if (r.status === "FAILED") continue;
+      const keyId = r.userId;
+      const keyEmp = r.employeeNo?.toLowerCase();
+      if (keyId && !lastLoginMap.has(keyId)) {
+        lastLoginMap.set(keyId, r.loginAt);
+      }
+      if (keyEmp && !lastLoginMap.has(keyEmp)) {
+        lastLoginMap.set(keyEmp, r.loginAt);
+      }
+    }
+
+    const usersWithLastLogin = users.map((u) => ({
+      ...u,
+      lastLoginAt: lastLoginMap.get(u.id) || (u.email ? lastLoginMap.get(u.email.toLowerCase()) : null) || null,
+    }));
+
+    return NextResponse.json(usersWithLastLogin, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return handleApiError(error, "無法載入帳號清單");
   }

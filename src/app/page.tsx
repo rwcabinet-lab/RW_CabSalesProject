@@ -82,7 +82,7 @@ export default async function HomePage() {
             </span>
           </div>
           <h3 className="text-lg font-bold text-slate-900 group-hover:text-emerald-600 transition">
-            客戶主檔管理 (B2B / B2C)
+            客戶資料管理 (B2B / B2C)
           </h3>
           <p className="text-xs text-slate-600 mt-2 line-clamp-3">
             支援隆美、設計公司、經銷公司、工廠、建設/營造、一般消費者與公關案，並設定預設折率、付款條件與統一編號。
@@ -125,7 +125,7 @@ export default async function HomePage() {
           <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
             <span>共有 {activeProjects.length} 個進行中案場</span>
             <Link href="/dashboard/workbench" className="text-blue-600 font-semibold hover:underline">
-              開啟業務工作台
+              開啟案場筆記
             </Link>
           </div>
         </div>

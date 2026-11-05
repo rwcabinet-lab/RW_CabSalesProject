@@ -62,10 +62,10 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: "角色或頁面權限資料無效" }, { status: 400 });
       }
       if (item.role === "ADMIN" && !item.pages.includes("admin")) {
-        return NextResponse.json({ error: "管理員必須保留管理者設定頁面的權限" }, { status: 400 });
+        return NextResponse.json({ error: "管理員必須保留管理設定頁面的權限" }, { status: 400 });
       }
       if (item.role !== "ADMIN" && item.pages.includes("admin")) {
-        return NextResponse.json({ error: "管理者設定頁面僅能授予管理員" }, { status: 400 });
+        return NextResponse.json({ error: "管理設定頁面僅能授予管理員" }, { status: 400 });
       }
       submittedRoles.add(item.role);
     }

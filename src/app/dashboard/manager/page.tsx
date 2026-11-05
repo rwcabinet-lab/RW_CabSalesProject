@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X } from "lucide-react";
+import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
@@ -348,7 +348,14 @@ export default function ManagerDashboardPage() {
     return [...columns].sort((a, b) => a.order - b.order).filter((c) => c.visible);
   }, [columns]);
 
-  if (loading && !data) return <div className="p-16 text-center text-slate-500 font-semibold">載入主管監控室數據中...</div>;
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">載入全場總控數據中...</p>
+      </div>
+    );
+  }
   if (loadError && !data) return <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>;
   if (!data) return null;
 
@@ -356,7 +363,7 @@ export default function ManagerDashboardPage() {
     <div className="space-y-8 pb-16">
       <div className="flex flex-wrap justify-between items-center border-b pb-4 gap-4">
         <div>
-          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">主管監控室</span>
+          <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">全場總控</span>
           <h1 className="text-2xl font-black mt-1">
             {activeTab === "overview" ? "營運總覽分析" : "案件現況統計"}
           </h1>

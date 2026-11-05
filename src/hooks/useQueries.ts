@@ -112,7 +112,7 @@ export function useColumnConfigQuery() {
 }
 
 /**
- * 業務工作台儀表板資料（快取 30 秒）
+ * 案場筆記儀表板資料（快取 30 秒）
  */
 export function useWorkbenchQuery() {
   return useQuery({
@@ -121,7 +121,7 @@ export function useWorkbenchQuery() {
       const res = await fetch("/api/dashboard/workbench");
       const json = (await res.json()) as ApiResponse<WorkbenchDashboardDTO>;
       if (!res.ok || !json.currentUser) {
-        throw new Error(json.error || "無法取得業務工作台資料");
+        throw new Error(json.error || "無法取得案場筆記資料");
       }
       return json;
     },
@@ -130,7 +130,7 @@ export function useWorkbenchQuery() {
 }
 
 /**
- * 主管監控室營運儀表板資料（依月份區間篩選，快取 30 秒）
+ * 全場總控營運儀表板資料（依月份區間篩選，快取 30 秒）
  */
 export function useManagerDashboardQuery(
   startMonth?: string,
@@ -159,7 +159,7 @@ export function useManagerDashboardQuery(
 }
 
 /**
- * 主管監控室客戶統計資料（快取 30 秒）
+ * 全場總控客戶統計資料（快取 30 秒）
  */
 export function useManagerCustomerStatsQuery() {
   return useQuery({
@@ -177,7 +177,7 @@ export function useManagerCustomerStatsQuery() {
 }
 
 /**
- * 主管監控室案件現況統計（經營會議報告：已簽約/已報價/估價中）
+ * 全場總控案件現況統計（經營會議報告：已簽約/已報價/估價中）
  */
 export function useManagerProjectStatusQuery(year?: string | number, month?: string | number) {
   return useQuery({
@@ -198,7 +198,7 @@ export function useManagerProjectStatusQuery(year?: string | number, month?: str
 }
 
 /**
- * 多元可視化資料（快取 30 秒）
+ * 視覺時程資料（快取 30 秒）
  */
 export function useViewsDataQuery() {
   return useQuery({
@@ -207,7 +207,7 @@ export function useViewsDataQuery() {
       const res = await fetch("/api/views/data", { cache: "no-store" });
       const json = (await res.json()) as ApiResponse<ViewsDataDTO>;
       if (!res.ok) {
-        throw new Error(json.error || "無法取得多元可視化資料");
+        throw new Error(json.error || "無法取得視覺時程資料");
       }
       return json;
     },

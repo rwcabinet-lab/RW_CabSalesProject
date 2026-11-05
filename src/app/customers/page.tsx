@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse, CustomerDTO } from "@/types/dto";
 import { isAssignableRole } from "@/lib/page-access";
@@ -200,7 +200,7 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
             <Users className="w-7 h-7 text-blue-600" />
-            <span>客戶主檔管理 (Customer Management)</span>
+            <span>客戶資料管理</span>
             <SectionHelpButton sectionId="customers-management" />
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -218,7 +218,10 @@ export default function CustomersPage() {
       {/* 客戶列表 Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500">載入客戶資料中...</div>
+          <div className="flex flex-col items-center justify-center min-h-[300px] p-12">
+            <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+            <p className="text-sm text-slate-500 font-medium">載入客戶資料中...</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             {loadError && <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>}

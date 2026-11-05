@@ -358,6 +358,7 @@ export interface ManagedUserDTO {
   name: string;
   email: string;
   role: any;
+  lastLoginAt?: string | null;
 }
 
 export interface LoginRecordDTO {

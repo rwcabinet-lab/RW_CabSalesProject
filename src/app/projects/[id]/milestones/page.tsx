@@ -26,6 +26,7 @@ import {
   GripVertical,
   Sparkles,
   RotateCcw,
+  RefreshCw,
 } from "lucide-react";
 import {
   MILESTONE_STAGE_LABELS,
@@ -731,7 +732,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     }
   };
 
-  if (loading) return <div className="p-16 text-center text-slate-500 font-semibold">載入詳細資料中...</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">載入案場時程資料中...</p>
+      </div>
+    );
+  }
 
   const isProjectLost = project?.currentStage === "LOST";
   const canReviewAudit =

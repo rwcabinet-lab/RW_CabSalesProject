@@ -1047,7 +1047,7 @@ export const MilestoneService = {
         });
         firstIncomplete.status = MilestoneStatus.IN_PROGRESS;
 
-        // 連動復原該里程碑的待辦任務，使其重新出現在業務工作台
+        // 連動復原該里程碑的待辦任務，使其重新出現在案場筆記
         await tx.salesTask.updateMany({
           where: { milestoneId: firstIncomplete.id, resultNotes: "流標" },
           data: { isCompleted: false, completedAt: null, resultNotes: null },

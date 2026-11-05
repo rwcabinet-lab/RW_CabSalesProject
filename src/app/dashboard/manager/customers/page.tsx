@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2 } from "lucide-react";
+import { Users, Building2, TrendingUp, Search, Filter, ArrowUpDown, CheckCircle2, RefreshCw } from "lucide-react";
 import { CustomerTypeDistributionChart } from "@/components/dashboard/ManagerCharts";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
@@ -86,8 +86,9 @@ export default function CustomerStatsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-slate-400">
-        載入客戶統計資料中...
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">載入客戶資料統計中...</p>
       </div>
     );
   }
@@ -107,7 +108,7 @@ export default function CustomerStatsPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
-              主管監控室
+              全場總控
             </span>
           </div>
           <h1 className="text-2xl font-black mt-1">客戶資料統計與分析</h1>
