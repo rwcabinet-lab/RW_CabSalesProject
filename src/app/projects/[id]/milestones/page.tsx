@@ -877,7 +877,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">客戶類型：</span><span className="font-semibold text-slate-700">{CUSTOMER_TYPE_LABELS[project.customerType] || project.customerType}</span></div>
             <div><span className="text-slate-400">客戶折數：</span><span className="font-semibold text-slate-700">{project.defaultDiscount === 1 ? "牌價" : `${(project.defaultDiscount * 10).toFixed(1)} 折`}</span></div>
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
-            <div><span className="text-slate-400">預計完工日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
+            <div><span className="text-slate-400">預定進場日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
             <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatTenThousands(project.quoteAmount) : project.totalAmount != null ? formatTenThousands(project.totalAmount) : "未填"}</span></div>
             <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatTenThousands(project.cost) : "未填"}</span></div>
@@ -1040,7 +1040,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 m.isSubsequentToPaused ??
                 (pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED")
               );
-              const isPaused = !isProjectLost && m.status !== "COMPLETED" && (!m.plannedDueDate || m.trafficLight?.label === "暫緩") && !isSubsequent;
+              const isPaused = !isProjectLost && m.status !== "COMPLETED" && (!m.plannedDueDate || m.trafficLight?.label === "需追蹤") && !isSubsequent;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
               const isDueToday = !isProjectLost && !isSubsequent && m.trafficLight?.label === "已到期";
@@ -1205,7 +1205,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   {isProjectLost
                                     ? m.status === "COMPLETED" ? "已完成" : "未進行"
                                     : isPaused
-                                      ? "暫緩"
+                                      ? "需追蹤"
                                       : STATUS_MAP[m.status].label}
                                 </span>
                               )}
@@ -1221,14 +1221,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                 <span className="text-[10px] text-amber-600 font-bold">● {m.trafficLight.label}</span>
                               )}
                               {!isProjectLost && !isSubsequent && isPaused && (
-                                <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full font-bold">● 暫緩</span>
+                                <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full font-bold">● 需追蹤</span>
                               )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
                               <span>負責人：<b className="text-slate-700">{m.assignedToName || "未指派"}</b></span>
                               {!isSubsequent && (
-                                <span>預定完成：<b>{m.plannedDueDate || (isPaused ? "暫緩" : "未設定")}</b></span>
+                                <span>預定完成：<b>{m.plannedDueDate || (isPaused ? "需追蹤" : "未設定")}</b></span>
                               )}
                               {m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>}
                               {m.notes && <span className="italic text-slate-400">({m.notes})</span>}
@@ -1238,13 +1238,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
                         {/* 按鈕組 */}
                         <div className="flex items-center gap-2 shrink-0">
-                          {isActive && !isProjectLost && isAuditStage && !isAuditSubmitted && currentUserId === m.assignedToId && (
+                          {isActive && !isProjectLost && isAuditStage && !isAuditSubmitted && (currentUserId === m.assignedToId || canReviewAudit) && (
                             <button
                               type="button"
-                              onClick={() => setSubmitAuditModal({ milestone: m, notes: "" })}
+                              onClick={() => setSubmitAuditModal({
+                                milestone: m,
+                                notes: currentUserId !== m.assignedToId ? `[主管/主責代送審] ` : "",
+                              })}
                               className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition"
                             >
-                              <Send className="w-3 h-3" /> 提交審核
+                              <Send className="w-3 h-3" /> {currentUserId === m.assignedToId ? "提交審核" : "代送審核"}
                             </button>
                           )}
 
@@ -1494,7 +1497,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       </p>
                       {status.isPaused && !status.isCompleted && (
                         <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          暫緩
+                          需追蹤
                         </span>
                       )}
                       {status.isOverdue && (
@@ -1515,7 +1518,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </p>
                   </div>
                   <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : "text-slate-500"}>
-                    到期：{status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
+                    到期：{status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
                   </span>
                   <span className={`font-semibold ${task.priority === "HIGH" ? "text-red-600" : task.priority === "MEDIUM" ? "text-amber-600" : "text-slate-500"}`}>
                     優先度：{task.priority === "HIGH" ? "高" : task.priority === "MEDIUM" ? "中" : "低"}
@@ -1592,7 +1595,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             </div>
             <form onSubmit={handleSubmitAudit} className="space-y-3 text-xs">
               <p className="text-slate-600 bg-purple-50 p-2.5 rounded-lg border border-purple-100">
-                提交後，系統會自動在審核人員（主責業務/主管）的待辦清單中建立待辦事項，僅審核人員具備完成權限。
+                {currentUserId !== submitAuditModal.milestone.assignedToId
+                  ? `您正以主管／主責業務身分代【${submitAuditModal.milestone.assignedToName || "原負責人"}】提交審核。提交後系統會於審核人待辦清單建立待辦任務。`
+                  : "提交後，系統會自動在審核人員（主責業務/主管）的待辦清單中建立待辦事項，僅審核人員具備完成權限。"}
               </p>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">提交審核備註</label>
@@ -1721,7 +1726,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">預計完工日</label>
+                  <label className="block font-semibold text-slate-700 mb-1">預定進場日</label>
                   <input
                     type="date"
                     value={projectEditForm.expectedDate}

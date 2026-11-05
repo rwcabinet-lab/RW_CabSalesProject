@@ -213,15 +213,20 @@ export async function PUT(
       if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
         return NextResponse.json({ error: "此里程碑不需要審核" }, { status: 400 });
       }
-      if (milestone.assignedToId !== user.id) {
-        return NextResponse.json({ error: "僅此進度的負責人員可提交審核" }, { status: 403 });
+      const canSubmitAudit =
+        milestone.assignedToId === user.id ||
+        isManager ||
+        user.id === project.salesRepId;
+      if (!canSubmitAudit) {
+        return NextResponse.json({ error: "僅此進度的負責人員、主責業務或主管可提交審核" }, { status: 403 });
       }
 
+      const reviewerId = project.salesRepId || project.customerSalesRepId || user.id;
       await DataService.submitMilestoneForReview(
         projectId,
         milestoneId,
         user.id,
-        project.salesRepId,
+        reviewerId,
         notes,
         initialMilestones,
       );

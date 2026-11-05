@@ -162,4 +162,43 @@ describe("Milestone Assignee & Task Lifecycle Logic (方案 A + 方案 B 待辦�
       expect(engineerPendingTasks).toHaveLength(0);
     });
   });
+
+  describe("方向一: 里程碑提交審核權限判定 (Submit Audit Permission Logic)", () => {
+    const project = {
+      id: "proj-101",
+      salesRepId: "user-sales",
+    };
+
+    const auditMilestone = {
+      id: "m-audit",
+      stageCode: "3-1", // 設計圖（需審核節點）
+      assignedToId: "user-engineer", // 指定工務/繪圖人員負責
+      status: "IN_PROGRESS",
+    };
+
+    function checkCanSubmitAudit(user: { id: string; role: string }) {
+      const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+      return auditMilestone.assignedToId === user.id || isManager || user.id === project.salesRepId;
+    }
+
+    it("負責人本人具備提交審核權限", () => {
+      expect(checkCanSubmitAudit({ id: "user-engineer", role: "SITE_ENGINEER" })).toBe(true);
+    });
+
+    it("主管階級 (ADMIN / LEVEL_MANAGER / SALES_MANAGER) 具備代行提交審核權限", () => {
+      expect(checkCanSubmitAudit({ id: "admin-user", role: "ADMIN" })).toBe(true);
+      expect(checkCanSubmitAudit({ id: "level-mgr", role: "LEVEL_MANAGER" })).toBe(true);
+      expect(checkCanSubmitAudit({ id: "sales-mgr", role: "SALES_MANAGER" })).toBe(true);
+    });
+
+    it("專案主責業務具備代行提交審核權限", () => {
+      expect(checkCanSubmitAudit({ id: "user-sales", role: "SALES" })).toBe(true);
+    });
+
+    it("非本進度負責人、非主責業務且非主管之一般同仁，禁止提交審核", () => {
+      expect(checkCanSubmitAudit({ id: "other-sales", role: "SALES" })).toBe(false);
+      expect(checkCanSubmitAudit({ id: "other-asst", role: "ASSISTANT" })).toBe(false);
+      expect(checkCanSubmitAudit({ id: "other-eng", role: "SITE_ENGINEER" })).toBe(false);
+    });
+  });
 });

@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
 
     const tasksWithPausedStatus = tasks.map((task) => {
       const projectLabel = projectTrafficLightMap.get(task.projectId);
-      const isProjectPaused = projectLabel === "暫緩";
+      const isProjectPaused = projectLabel === "需追蹤";
       return {
         ...task,
         isPaused: Boolean(task.isPaused || isProjectPaused),

@@ -29,10 +29,10 @@ export interface TaskScheduleStatus {
   isPaused: boolean;
   isCompleted: boolean;
   dueDateStr: string;
-  badgeLabel: "已逾期" | "已到期" | "暫緩" | "已完成" | null;
+  badgeLabel: "已逾期" | "已到期" | "需追蹤" | "已完成" | null;
 }
 
-/** 評估待辦事項時程狀態（逾期/當天到期/暫緩/完成） */
+/** 評估待辦事項時程狀態（逾期/當天到期/需追蹤/完成） */
 export function getTaskScheduleStatus(
   task: {
     dueDatetime?: string | null;
@@ -64,7 +64,7 @@ export function getTaskScheduleStatus(
       isPaused: true,
       isCompleted: false,
       dueDateStr,
-      badgeLabel: "暫緩",
+      badgeLabel: "需追蹤",
     };
   }
 
@@ -134,7 +134,7 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
 export const ScheduleEngine = {
   /**
    * 計算特定里程碑的時程燈號
-   * 🔴 逾期卡關  🟡 3天內到期  🟢 正常進行中  ⚪ 已完成/未啟動/暫緩/未排定
+   * 🔴 逾期卡關  🟡 3天內到期  🟢 正常進行中  ⚪ 已完成/未啟動/需追蹤/未排定
    */
   getTrafficLight(
     milestone: ProjectMilestoneItem,
@@ -154,7 +154,7 @@ export const ScheduleEngine = {
     }
 
     if (!milestone.plannedDueDate) {
-      return { color: "GRAY", label: "暫緩", daysDiff: 999 };
+      return { color: "GRAY", label: "需追蹤", daysDiff: 999 };
     }
 
     const [dy, dm, dd] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -213,7 +213,7 @@ export const ScheduleEngine = {
   },
 
   /**
-   * 重新評估整份里程碑清單，標記逾期項目與暫緩後續項目
+   * 重新評估整份里程碑清單，標記逾期項目與需追蹤後續項目
    */
   evaluateMilestones(
     milestones: ProjectMilestoneItem[],
@@ -236,7 +236,7 @@ export const ScheduleEngine = {
       return { milestones: sanitized, isDelayed: false };
     }
 
-    // 尋找第一個未完成且未設定/已清空預定完成日之暫緩進度項目
+    // 尋找第一個未完成且未設定/已清空預定完成日之需追蹤進度項目
     const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
     const pausedMilestone = sorted.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
     const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
@@ -253,7 +253,7 @@ export const ScheduleEngine = {
         return { ...m, isSubsequentToPaused: false };
       }
 
-      // 若為暫緩進度的後續項目：不計算逾期，並標記 isSubsequentToPaused = true
+      // 若為需追蹤進度的後續項目：不計算逾期，並標記 isSubsequentToPaused = true
       if (isSubsequentToPaused) {
         if (m.status === "OVERDUE") {
           return { ...m, status: "IN_PROGRESS" as const, isSubsequentToPaused: true };

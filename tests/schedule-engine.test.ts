@@ -74,7 +74,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(status.badgeLabel).toBe("已逾期");
     });
 
-    it("暫緩中之案件待辦事項即使逾期或到期亦應維持暫緩標記", () => {
+    it("需追蹤中之案件待辦事項即使逾期或到期亦應維持需追蹤標記", () => {
       const task = {
         dueDatetime: "2026-11-01T00:00:00Z",
         isCompleted: false,
@@ -84,7 +84,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(status.isDueToday).toBe(false);
       expect(status.isOverdue).toBe(false);
       expect(status.isPaused).toBe(true);
-      expect(status.badgeLabel).toBe("暫緩");
+      expect(status.badgeLabel).toBe("需追蹤");
     });
 
     it("已完成之待辦事項應標記為已完成且不觸發逾期或當天到期", () => {
@@ -193,11 +193,11 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(light.label).toBe("流標");
     });
 
-    it("進行中但無預定到期日應標示為暫緩", () => {
+    it("進行中但無預定到期日應標示為需追蹤", () => {
       const milestone = createMockMilestone("m-8", "2-1", 1, "IN_PROGRESS", null);
       const light = ScheduleEngine.getTrafficLight(milestone, fixedCurrentDate);
       expect(light.color).toBe("GRAY");
-      expect(light.label).toBe("暫緩");
+      expect(light.label).toBe("需追蹤");
     });
   });
 
@@ -302,11 +302,11 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(result.milestones[0].status).toBe("IN_PROGRESS");
     });
 
-    it("當進度項目移除預定完成變為暫緩時，後續未完成進度標記 isSubsequentToPaused 且不觸發逾期", () => {
+    it("當進度項目移除預定完成變為需追蹤時，後續未完成進度標記 isSubsequentToPaused 且不觸發逾期", () => {
       const milestones = [
         createMockMilestone("m-1", "1-1", 1, "COMPLETED", "2026-10-10"),
-        createMockMilestone("m-2", "1-2", 2, "IN_PROGRESS", null), // 暫緩：移除預定完成日
-        createMockMilestone("m-3", "2-1", 3, "PENDING", "2026-10-15"), // 過去日期，但因前項暫緩而不應判定為 OVERDUE
+        createMockMilestone("m-2", "1-2", 2, "IN_PROGRESS", null), // 需追蹤：移除預定完成日
+        createMockMilestone("m-3", "2-1", 3, "PENDING", "2026-10-15"), // 過去日期，但因前項需追蹤而不應判定為 OVERDUE
         createMockMilestone("m-4", "2-2", 4, "PENDING", "2026-11-20"),
       ];
 
@@ -320,12 +320,12 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
 
       // 檢查燈號
       const tlPaused = ScheduleEngine.getTrafficLight(result.milestones[1], fixedDate);
-      expect(tlPaused.label).toBe("暫緩");
+      expect(tlPaused.label).toBe("需追蹤");
       const tlSubsequent = ScheduleEngine.getTrafficLight(result.milestones[2], fixedDate);
       expect(tlSubsequent.label).toBe("未排定時程");
     });
 
-    it("當暫緩進度項目重新設定預定完成日後，後續進度即自動恢復正常顯示與評估", () => {
+    it("當需追蹤進度項目重新設定預定完成日後，後續進度即自動恢復正常顯示與評估", () => {
       const milestonesWithDate = [
         createMockMilestone("m-1", "1-1", 1, "COMPLETED", "2026-10-10"),
         createMockMilestone("m-2", "1-2", 2, "IN_PROGRESS", "2026-11-05"), // 重新設定預定完成日
@@ -337,7 +337,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(result.milestones[2].isSubsequentToPaused).toBe(false);
 
       const tlRestored = ScheduleEngine.getTrafficLight(result.milestones[1], fixedDate);
-      expect(tlRestored.label).not.toBe("暫緩");
+      expect(tlRestored.label).not.toBe("需追蹤");
     });
   });
 

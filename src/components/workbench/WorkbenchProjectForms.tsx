@@ -176,7 +176,7 @@ export function WorkbenchAddProjectPanel({
           />
         </label>
         <label>
-          預計完工日
+          預定進場日
           <input
             type="date"
             value={newProjectData.expectedDate}
@@ -403,7 +403,7 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              預計完工日
+              預定進場日
               <input
                 type="date"
                 value={newProjectData.expectedDate}

@@ -193,7 +193,7 @@ export const DEFAULT_PROJECT_COLUMNS = [
   { key: "salesRep", label: "業務 / 業助", visible: true, order: 3 },
   { key: "stageProgress", label: "階段 / 進度", visible: true, order: 4 },
   { key: "quoteAndUnits", label: "報價 / 戶數", visible: true, order: 5 },
-  { key: "expectedDate", label: "預定完工日", visible: true, order: 6 },
+  { key: "expectedDate", label: "預定進場日", visible: true, order: 6 },
   { key: "actions", label: "操作", visible: true, order: 7 },
 ];
 

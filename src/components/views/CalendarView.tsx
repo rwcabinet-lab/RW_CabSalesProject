@@ -410,7 +410,7 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                       {activeEvent.task.isCompleted
                         ? "已完成"
                         : activeEvent.task.isPaused
-                        ? "暫緩"
+                        ? "需追蹤"
                         : toDateKey(activeEvent.task.dueDatetime)! < todayKey
                         ? "已逾期"
                         : toDateKey(activeEvent.task.dueDatetime) === todayKey

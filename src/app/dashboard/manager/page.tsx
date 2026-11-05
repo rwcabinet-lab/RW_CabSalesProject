@@ -194,7 +194,7 @@ export default function ManagerDashboardPage() {
     void invalidateManager();
   };
 
-  // 預定完工日排序
+  // 預定進場日排序
   // 案場總覽過濾：預設排除已流標/請款
   const allProjectsOverview = data?.allProjectsOverview ?? EMPTY_OVERVIEW;
 
@@ -229,7 +229,7 @@ export default function ManagerDashboardPage() {
     });
   }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, searchQuery]);
 
-  // 依完工日與狀態排序
+  // 依進場日與狀態排序
   const sortedOverview = useMemo(() => {
     return [...filteredOverview].sort((a, b) => {
       if (statusSort !== "NONE") {
@@ -426,7 +426,7 @@ export default function ManagerDashboardPage() {
                       )}
                       {status.isPaused && !status.isCompleted && (
                         <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          暫緩
+                          需追蹤
                         </span>
                       )}
                       {status.isOverdue && (
@@ -446,7 +446,7 @@ export default function ManagerDashboardPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500">
                     <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : ""}>
-                      預定完成：{status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
+                      預定完成：{status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
                     </span>
                     <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
                     <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
@@ -565,7 +565,7 @@ export default function ManagerDashboardPage() {
               <option value="RED">逾期</option>
               <option value="YELLOW">即將到期</option>
               <option value="GREEN">正常</option>
-              <option value="GRAY">暫緩/未排定/已完成</option>
+              <option value="GRAY">需追蹤/未排定/已完成</option>
               <option value="LOST">流標</option>
             </select>
           </label>

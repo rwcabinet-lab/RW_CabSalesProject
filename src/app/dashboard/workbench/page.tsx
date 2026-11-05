@@ -95,7 +95,7 @@ export default function SalesWorkbenchPage() {
     }
   };
 
-  // 預定完工日與狀態排序
+  // 預定進場日與狀態排序
   // 過濾邏輯：預設排除已流標/請款 (stageFilter === "ACTIVE")
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
@@ -126,7 +126,7 @@ export default function SalesWorkbenchPage() {
     });
   }, [projects, stageFilter, statusFilter, searchQuery]);
 
-  // 依完工日與狀態排序
+  // 依進場日與狀態排序
   const sortedProjects = useMemo(() => {
     return [...filteredProjects].sort((a, b) => {
       if (statusSort !== "NONE") {
@@ -248,7 +248,7 @@ export default function SalesWorkbenchPage() {
               <tbody className="divide-y">
                 {visibleTasks.map((task) => {
                   const projectForTask = projects.find((p) => p.id === task.projectId);
-                  const isProjectPaused = projectForTask?.trafficLight?.label === "暫緩";
+                  const isProjectPaused = projectForTask?.trafficLight?.label === "需追蹤";
                   const isPaused = Boolean(task.isPaused || isProjectPaused);
                   const status = getTaskScheduleStatus({ ...task, isPaused });
                   const isAlert = status.isOverdue || status.isDueToday;
@@ -276,7 +276,7 @@ export default function SalesWorkbenchPage() {
                           )}
                           {status.isPaused && !status.isCompleted && (
                             <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                              暫緩
+                              需追蹤
                             </span>
                           )}
                           {status.isOverdue && (
@@ -297,7 +297,7 @@ export default function SalesWorkbenchPage() {
                         )}
                       </td>
                       <td className={`p-3 font-medium ${isAlert ? "text-red-600 font-bold" : status.isPaused ? "text-slate-400 italic font-medium" : ""}`}>
-                        {status.isPaused ? "暫緩" : status.dueDateStr || "未設定"}
+                        {status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
                       </td>
                       <td className="p-3">{task.priority}</td>
                       <td className="p-3 text-center">
@@ -391,7 +391,7 @@ export default function SalesWorkbenchPage() {
               <option value="RED">逾期</option>
               <option value="YELLOW">即將到期</option>
               <option value="GREEN">正常</option>
-              <option value="GRAY">暫緩/未排定/已完成</option>
+              <option value="GRAY">需追蹤/未排定/已完成</option>
               <option value="LOST">流標</option>
             </select>
           </label>
