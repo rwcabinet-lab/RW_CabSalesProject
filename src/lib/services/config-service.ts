@@ -108,10 +108,12 @@ export const ConfigService = {
     const targetId = targetUser?.id || targetUserId;
     const targetEmployeeNo = targetUser?.email;
 
-    return records.filter((r) => {
-      if (r.userId === targetId) return true;
-      if (targetEmployeeNo && r.employeeNo?.toLowerCase() === targetEmployeeNo.toLowerCase()) return true;
-      return false;
-    });
+    return records
+      .filter((r) => {
+        if (r.userId === targetId) return true;
+        if (targetEmployeeNo && r.employeeNo?.toLowerCase() === targetEmployeeNo.toLowerCase()) return true;
+        return false;
+      })
+      .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
   },
 };

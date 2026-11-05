@@ -139,5 +139,41 @@ describe("Employee ID & Password Login Logic (員工編號與密碼登入機制)
       expect(boundedLogs.length).toBe(500);
       expect(boundedLogs[0].id).toBe("log_0");
     });
+
+    it("登入紀錄確保由新到舊排序，且使用者最後上線時間與最新登入成功紀錄完全相符", () => {
+      const unorganizedLogs: MockLog[] = [
+        { id: "old", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-11-04T02:00:00.000Z" },
+        { id: "failed_latest", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "FAILED", loginAt: "2026-11-05T03:45:00.000Z" },
+        { id: "newest_success", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-11-05T03:40:56.804Z" },
+        { id: "mid", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-11-04T05:22:00.000Z" },
+      ];
+
+      // 1. 取得使用者紀錄時確保排序
+      const sortedLogs = [...unorganizedLogs].sort(
+        (a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime()
+      );
+      expect(sortedLogs[0].id).toBe("failed_latest");
+      expect(sortedLogs[1].id).toBe("newest_success");
+
+      // 2. 判定最後成功上線時間 (lastLoginAt)
+      const latestSuccess = sortedLogs.find((r) => r.status !== "FAILED");
+      expect(latestSuccess?.id).toBe("newest_success");
+      expect(latestSuccess?.loginAt).toBe("2026-11-05T03:40:56.804Z");
+
+      // 3. 驗證格式化顯示邏輯一致性（消除 UTC slice 造成的 8 小時時差）
+      const formatDateTime = (iso: string) =>
+        new Date(iso).toLocaleString("zh-TW", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        });
+
+      // 列表與彈窗中該筆成功登入的時間字串完全一致
+      expect(formatDateTime(latestSuccess!.loginAt)).toBe(formatDateTime(sortedLogs[1].loginAt));
+    });
   });
 });

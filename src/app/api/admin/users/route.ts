@@ -49,23 +49,23 @@ export async function GET(request: NextRequest) {
       }>>("login_records", []).catch(() => []),
     ]);
 
-    const lastLoginMap = new Map<string, string>();
-    for (const r of records) {
-      if (r.status === "FAILED") continue;
-      const keyId = r.userId;
-      const keyEmp = r.employeeNo?.toLowerCase();
-      if (keyId && !lastLoginMap.has(keyId)) {
-        lastLoginMap.set(keyId, r.loginAt);
-      }
-      if (keyEmp && !lastLoginMap.has(keyEmp)) {
-        lastLoginMap.set(keyEmp, r.loginAt);
-      }
-    }
+    // 依照登入時間由新到舊排序所有紀錄
+    const sortedRecords = [...records].sort(
+      (a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime()
+    );
 
-    const usersWithLastLogin = users.map((u) => ({
-      ...u,
-      lastLoginAt: lastLoginMap.get(u.id) || (u.email ? lastLoginMap.get(u.email.toLowerCase()) : null) || null,
-    }));
+    const usersWithLastLogin = users.map((u) => {
+      const uEmailLower = u.email?.toLowerCase();
+      const latestSuccess = sortedRecords.find(
+        (r) =>
+          r.status !== "FAILED" &&
+          (r.userId === u.id || (uEmailLower && r.employeeNo?.toLowerCase() === uEmailLower))
+      );
+      return {
+        ...u,
+        lastLoginAt: latestSuccess?.loginAt || null,
+      };
+    });
 
     return NextResponse.json(usersWithLastLogin, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

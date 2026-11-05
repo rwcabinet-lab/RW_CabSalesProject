@@ -41,6 +41,21 @@ function roleLabel(role: string) {
   return ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
 }
 
+function formatLoginDateTime(isoStr?: string | null): string {
+  if (!isoStr) return "尚未上線";
+  const date = new Date(isoStr);
+  if (Number.isNaN(date.getTime())) return "尚未上線";
+  return date.toLocaleString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
 function parseUserAgent(ua?: string) {
   if (!ua) return "未知裝置";
   let os = "其他";
@@ -73,6 +88,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [permissions, setPermissions] = useState<RolePermission[]>([]);
   const [configTab, setConfigTab] = useState<"columns" | "stageDays" | "customerTypes">("columns");
+  const [accountTab, setAccountTab] = useState<"users" | "permissions">("users");
   const [loading, setLoading] = useState(true);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [error, setError] = useState("");
@@ -805,261 +821,295 @@ export default function AdminPage() {
       )}
       </section>
 
-      {/* 3. 帳號清單與權限設定 */}
+      {/* 2. 帳號與權限管理（分頁切換：帳號清單與權限設定 / 各層級可瀏覽頁面） */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <UserRound className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-bold">帳號清單與權限設定</h2>
-          <SectionHelpButton sectionId="admin-users" />
+        {/* 分頁切換按鈕組 */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setAccountTab("users")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                accountTab === "users"
+                  ? "bg-white text-blue-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <UserRound className="h-4 w-4" />
+              帳號清單與權限設定
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountTab("permissions")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                accountTab === "permissions"
+                  ? "bg-white text-emerald-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Check className="h-4 w-4" />
+              各層級可瀏覽頁面
+            </button>
+          </div>
+          <SectionHelpButton sectionId={accountTab === "users" ? "admin-users" : "admin-permissions"} />
         </div>
 
-        {/* 最上方只用來新增人員帳號 */}
-        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-          <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <Plus className="h-4 w-4 text-blue-600" />
-            新增人員帳號
+        {/* 分頁 1. 帳號清單與權限設定 */}
+        {accountTab === "users" && (
+          <div>
+            <div className="mb-5 flex items-center gap-2">
+              <UserRound className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-bold">帳號清單與權限設定</h2>
+              <SectionHelpButton sectionId="admin-users" />
+            </div>
+
+            {/* 最上方只用來新增人員帳號 */}
+            <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+              <div className="mb-3 flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <Plus className="h-4 w-4 text-blue-600" />
+                新增人員帳號
+              </div>
+              <form onSubmit={handleCreateAccount} className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                <div>
+                  <label htmlFor="new-account-name" className="mb-1 block text-xs font-semibold text-slate-600">
+                    姓名
+                  </label>
+                  <input
+                    id="new-account-name"
+                    required
+                    placeholder="請輸入姓名"
+                    value={newName}
+                    onChange={(event) => setNewName(event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-account-emp-id" className="mb-1 block text-xs font-semibold text-slate-600">
+                    員工編號（登入帳號）
+                  </label>
+                  <input
+                    id="new-account-emp-id"
+                    type="text"
+                    required
+                    placeholder="英數字串，例：EMP001"
+                    value={newEmployeeId}
+                    onChange={(event) => {
+                      const sanitized = event.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                      setNewEmployeeId(sanitized);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-account-role" className="mb-1 block text-xs font-semibold text-slate-600">
+                    帳號層級
+                  </label>
+                  <select
+                    id="new-account-role"
+                    value={newRole}
+                    onChange={(event) => setNewRole(event.target.value as AppRole)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={savingNewAccount}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 shadow-xs"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {savingNewAccount ? "新增中..." : "新增帳號"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* 帳號列表與列內編輯 */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="border-b border-slate-200 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">姓名</th>
+                    <th className="px-3 py-2 font-semibold">員工編號</th>
+                    <th className="px-3 py-2 font-semibold">層級</th>
+                    <th className="px-3 py-2 font-semibold">最後上線時間</th>
+                    <th className="px-3 py-2 text-right font-semibold">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((user) => {
+                    const isEditing = editingUserId === user.id;
+
+                    if (isEditing) {
+                      return (
+                        <tr key={user.id} className="bg-blue-50/70 border-y border-blue-200">
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="text"
+                              required
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="姓名"
+                              className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void handleSaveInlineUser(user.id);
+                                if (e.key === "Escape") cancelEditInlineUser();
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="text"
+                              required
+                              value={editEmployeeId}
+                              onChange={(e) => {
+                                const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                                setEditEmployeeId(sanitized);
+                              }}
+                              placeholder="英數字串"
+                              className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void handleSaveInlineUser(user.id);
+                                if (e.key === "Escape") cancelEditInlineUser();
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <select
+                              value={editRole}
+                              onChange={(e) => setEditRole(e.target.value as AppRole)}
+                              className="rounded-md border border-blue-400 bg-white px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              {ROLE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-slate-500 font-mono">
+                            {formatLoginDateTime(user.lastLoginAt)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={savingInlineUserId === user.id}
+                                onClick={() => void handleSaveInlineUser(user.id)}
+                                className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                                title="儲存此列修改"
+                              >
+                                <Save className="h-3.5 w-3.5" />
+                                {savingInlineUserId === user.id ? "儲存中..." : "儲存"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingInlineUserId === user.id}
+                                onClick={cancelEditInlineUser}
+                                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                                title="取消編輯"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                取消
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return (
+                      <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-3 font-medium text-slate-800">{user.name}</td>
+                        <td className="px-3 py-3 text-slate-600 font-mono text-xs">{user.email}</td>
+                        <td className="px-3 py-3">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            {roleLabel(user.role)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
+                          {formatLoginDateTime(user.lastLoginAt)}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void openLoginRecords(user)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                              title="查看該使用者登入紀錄"
+                            >
+                              <History className="h-3.5 w-3.5" />登入紀錄
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPasswordModal({ open: true, user, newPass: "", confirmPass: "" })}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100"
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />改密碼
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => startEditInlineUser(user)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />編輯
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <form onSubmit={handleCreateAccount} className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-            <div>
-              <label htmlFor="new-account-name" className="mb-1 block text-xs font-semibold text-slate-600">
-                姓名
-              </label>
-              <input
-                id="new-account-name"
-                required
-                placeholder="請輸入姓名"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-              />
+        )}
+
+        {/* 分頁 2. 各層級可瀏覽頁面 */}
+        {accountTab === "permissions" && (
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Check className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-lg font-bold">各層級可瀏覽頁面</h2>
+              <SectionHelpButton sectionId="admin-permissions" />
             </div>
-            <div>
-              <label htmlFor="new-account-emp-id" className="mb-1 block text-xs font-semibold text-slate-600">
-                員工編號（登入帳號）
-              </label>
-              <input
-                id="new-account-emp-id"
-                type="text"
-                required
-                placeholder="英數字串，例：EMP001"
-                value={newEmployeeId}
-                onChange={(event) => {
-                  const sanitized = event.target.value.replace(/[^a-zA-Z0-9]/g, "");
-                  setNewEmployeeId(sanitized);
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono outline-none focus:border-blue-500"
-              />
+            <p className="mb-5 text-sm text-slate-600">權限同時套用於頁面和相關資料 API；管理設定僅限管理員，且管理員至少保留一個。</p>
+            <div className="space-y-5">
+              {permissions.map((item) => (
+                <div key={item.role} className="overflow-x-auto rounded-lg border border-slate-200">
+                  <h3 className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold">{item.label}</h3>
+                  <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {PAGE_ACCESS_OPTIONS.map((page) => {
+                      const checked = item.pages.includes(page.key);
+                      const adminPage = page.key === "admin";
+                      return (
+                        <label key={page.key} className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm ${checked ? "text-slate-800" : "text-slate-500"} ${adminPage && item.role !== "ADMIN" ? "opacity-50" : ""}`}>
+                          <input type="checkbox" checked={checked} disabled={adminPage}
+                            onChange={() => togglePermission(item.role, page.key)}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          <span>{page.label}{adminPage && <span className="ml-1 text-xs text-slate-400">（限管理員）</span>}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <label htmlFor="new-account-role" className="mb-1 block text-xs font-semibold text-slate-600">
-                帳號層級
-              </label>
-              <select
-                id="new-account-role"
-                value={newRole}
-                onChange={(event) => setNewRole(event.target.value as AppRole)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-              >
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={savingNewAccount}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 shadow-xs"
-              >
-                <Plus className="h-4 w-4" />
-                {savingNewAccount ? "新增中..." : "新增帳號"}
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={savePermissions} disabled={savingPermissions || loading || permissions.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
+                <Save className="h-4 w-4" />{savingPermissions ? "儲存中..." : "儲存頁面權限"}
               </button>
             </div>
-          </form>
-        </div>
-
-        {/* 帳號列表與列內編輯 */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs text-slate-500">
-              <tr>
-                <th className="px-3 py-2 font-semibold">姓名</th>
-                <th className="px-3 py-2 font-semibold">員工編號</th>
-                <th className="px-3 py-2 font-semibold">層級</th>
-                <th className="px-3 py-2 font-semibold">最後上線時間</th>
-                <th className="px-3 py-2 text-right font-semibold">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((user) => {
-                const isEditing = editingUserId === user.id;
-
-                if (isEditing) {
-                  return (
-                    <tr key={user.id} className="bg-blue-50/70 border-y border-blue-200">
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          required
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="姓名"
-                          className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") void handleSaveInlineUser(user.id);
-                            if (e.key === "Escape") cancelEditInlineUser();
-                          }}
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          required
-                          value={editEmployeeId}
-                          onChange={(e) => {
-                            const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
-                            setEditEmployeeId(sanitized);
-                          }}
-                          placeholder="英數字串"
-                          className="w-full rounded-md border border-blue-400 bg-white px-2.5 py-1 text-sm font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") void handleSaveInlineUser(user.id);
-                            if (e.key === "Escape") cancelEditInlineUser();
-                          }}
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <select
-                          value={editRole}
-                          onChange={(e) => setEditRole(e.target.value as AppRole)}
-                          className="rounded-md border border-blue-400 bg-white px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          {ROLE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-400 font-mono">
-                        {user.lastLoginAt ? user.lastLoginAt.slice(0, 16).replace("T", " ") : "尚未上線"}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            disabled={savingInlineUserId === user.id}
-                            onClick={() => void handleSaveInlineUser(user.id)}
-                            className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
-                            title="儲存此列修改"
-                          >
-                            <Save className="h-3.5 w-3.5" />
-                            {savingInlineUserId === user.id ? "儲存中..." : "儲存"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={savingInlineUserId === user.id}
-                            onClick={cancelEditInlineUser}
-                            className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                            title="取消編輯"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                            取消
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }
-
-                return (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-3 py-3 font-medium text-slate-800">{user.name}</td>
-                    <td className="px-3 py-3 text-slate-600 font-mono text-xs">{user.email}</td>
-                    <td className="px-3 py-3">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                        {roleLabel(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
-                      {user.lastLoginAt ? (
-                        <span>{user.lastLoginAt.slice(0, 16).replace("T", " ")}</span>
-                      ) : (
-                        <span className="text-slate-400 font-sans">尚未上線</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => void openLoginRecords(user)}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-                          title="查看該使用者登入紀錄"
-                        >
-                          <History className="h-3.5 w-3.5" />登入紀錄
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPasswordModal({ open: true, user, newPass: "", confirmPass: "" })}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100"
-                        >
-                          <KeyRound className="h-3.5 w-3.5" />改密碼
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startEditInlineUser(user)}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />編輯
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* 4. 各層級可瀏覽頁面 */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-2 flex items-center gap-2">
-          <Check className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-lg font-bold">各層級可瀏覽頁面</h2>
-          <SectionHelpButton sectionId="admin-permissions" />
-        </div>
-        <p className="mb-5 text-sm text-slate-600">權限同時套用於頁面和相關資料 API；管理設定僅限管理員，且管理員至少保留一個。</p>
-        <div className="space-y-5">
-          {permissions.map((item) => (
-            <div key={item.role} className="overflow-x-auto rounded-lg border border-slate-200">
-              <h3 className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold">{item.label}</h3>
-              <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                {PAGE_ACCESS_OPTIONS.map((page) => {
-                  const checked = item.pages.includes(page.key);
-                  const adminPage = page.key === "admin";
-                  return (
-                    <label key={page.key} className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm ${checked ? "text-slate-800" : "text-slate-500"} ${adminPage && item.role !== "ADMIN" ? "opacity-50" : ""}`}>
-                      <input type="checkbox" checked={checked} disabled={adminPage}
-                        onChange={() => togglePermission(item.role, page.key)}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                      <span>{page.label}{adminPage && <span className="ml-1 text-xs text-slate-400">（限管理員）</span>}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-5 flex justify-end">
-          <button type="button" onClick={savePermissions} disabled={savingPermissions || loading || permissions.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
-            <Save className="h-4 w-4" />{savingPermissions ? "儲存中..." : "儲存頁面權限"}
-          </button>
-        </div>
+          </div>
+        )}
       </section>
 
       {/* 更改密碼 Modal */}
@@ -1189,15 +1239,7 @@ export default function AdminPage() {
                         return (
                           <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
                             <td className="px-3 py-2.5 font-mono text-slate-700 whitespace-nowrap">
-                              {new Date(log.loginAt).toLocaleString("zh-TW", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                second: "2-digit",
-                                hour12: false,
-                              })}
+                              {formatLoginDateTime(log.loginAt)}
                             </td>
                             <td className="px-3 py-2.5 whitespace-nowrap">
                               {isSuccess ? (
