@@ -345,10 +345,15 @@ export const MilestoneService = {
         },
       });
 
+      const effectiveStatus = (targetStatus ?? currentMilestone.status) as MilestoneStatus;
+      const isActiveStatus =
+        effectiveStatus === MilestoneStatus.IN_PROGRESS ||
+        effectiveStatus === MilestoneStatus.OVERDUE;
+
       if (updates.assignedToId !== undefined) {
         if (!updates.assignedToId) {
           await tx.salesTask.deleteMany({ where: { milestoneId } });
-        } else {
+        } else if (isActiveStatus) {
           const auditSubmissionPending = Boolean(
             existingMilestones &&
             "auditSubmitted" in currentMilestone &&
@@ -388,6 +393,11 @@ export const MilestoneService = {
               },
             });
           }
+        } else {
+          // 里程碑尚未進入進行中階段（例如 PENDING 待開始），僅記錄進度負責人，不建立/保留未完成待辦（避免幽靈待辦與409衝突）
+          await tx.salesTask.deleteMany({
+            where: { milestoneId, isCompleted: false },
+          });
         }
       } else if (updates.plannedDueDate !== undefined) {
         const nextDue = updates.plannedDueDate ? new Date(updates.plannedDueDate) : new Date();

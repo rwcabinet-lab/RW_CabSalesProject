@@ -90,7 +90,15 @@ export const TaskService = {
       orderBy: { dueDatetime: "asc" },
     });
 
-    return tasks.map((t) => {
+    return tasks
+      .filter((t) => {
+        // 排除關聯於尚未進行（PENDING）之里程碑的未完成待辦（確保未來排程不污染待辦清單，杜絕無效待辦與409衝突）
+        if (t.milestoneId && t.milestone && t.milestone.status === "PENDING" && !t.isCompleted) {
+          return false;
+        }
+        return true;
+      })
+      .map((t) => {
       const isPaused = Boolean(
         t.milestone &&
         !t.milestone.plannedDueDate &&
