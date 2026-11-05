@@ -123,7 +123,7 @@ describe("搜尋與篩選條件功能測試", () => {
     });
   });
 
-  describe("全場總控案件清單與業務選單過濾邏輯", () => {
+  describe("主管總控案件清單與業務選單過濾邏輯", () => {
     const mockOverview: ManagerProjectOverviewDTO[] = [
       {
         id: "p1",
@@ -221,7 +221,7 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(businessOptions).not.toContain("未指派");
     });
 
-    it("全場總控關鍵字搜尋能正確比對案名、地址、客戶與業務", () => {
+    it("主管總控關鍵字搜尋能正確比對案名、地址、客戶與業務", () => {
       const filterOverview = (projects: ManagerProjectOverviewDTO[], keyword: string) => {
         const q = keyword.trim().toLowerCase();
         if (!q) return projects;
@@ -305,31 +305,30 @@ describe("搜尋與篩選條件功能測試", () => {
     });
   });
 
-  describe("案場筆記比照全場總控之時間區間（日期/月份）篩選機制", () => {
-    it("useWorkbenchStore 正確管理 dateMode、startDate、endDate 與 resetFilters", () => {
+  describe("案場筆記與主管總控之篩選與排序管理機制", () => {
+    it("useWorkbenchStore 正確管理 statusFilter、stageFilter、searchQuery 與 resetFilters", () => {
       const store = useWorkbenchStore.getState();
-      expect(store.dateMode).toBe("DATE");
-      expect(store.startDate).toBe("");
-      expect(store.endDate).toBe("");
+      expect(store.searchQuery).toBe("");
+      expect(store.statusFilter).toBe("");
+      expect(store.stageFilter).toBe("ACTIVE");
+      expect(store.dateSort).toBe("NONE");
+      expect(store.statusSort).toBe("NONE");
 
-      store.setDateMode("MONTH");
-      store.setStartMonth("2026-11");
-      store.setEndMonth("2026-12");
-      expect(useWorkbenchStore.getState().dateMode).toBe("MONTH");
-      expect(useWorkbenchStore.getState().startMonth).toBe("2026-11");
-
-      store.setDateMode("DATE");
-      store.setStartDate("2026-11-01");
-      store.setEndDate("2026-11-30");
-      expect(useWorkbenchStore.getState().startDate).toBe("2026-11-01");
-      expect(useWorkbenchStore.getState().endDate).toBe("2026-11-30");
+      store.setSearchQuery("遠雄");
+      store.setStatusFilter("RED");
+      store.setStageFilter("PROPOSAL");
+      store.toggleDateSort();
+      expect(useWorkbenchStore.getState().searchQuery).toBe("遠雄");
+      expect(useWorkbenchStore.getState().statusFilter).toBe("RED");
+      expect(useWorkbenchStore.getState().stageFilter).toBe("PROPOSAL");
+      expect(useWorkbenchStore.getState().dateSort).toBe("ASC");
 
       store.resetFilters();
-      expect(useWorkbenchStore.getState().dateMode).toBe("DATE");
-      expect(useWorkbenchStore.getState().startDate).toBe("");
-      expect(useWorkbenchStore.getState().endDate).toBe("");
-      expect(useWorkbenchStore.getState().startMonth).toBe("");
-      expect(useWorkbenchStore.getState().endMonth).toBe("");
+      expect(useWorkbenchStore.getState().searchQuery).toBe("");
+      expect(useWorkbenchStore.getState().statusFilter).toBe("");
+      expect(useWorkbenchStore.getState().stageFilter).toBe("ACTIVE");
+      expect(useWorkbenchStore.getState().dateSort).toBe("NONE");
+      expect(useWorkbenchStore.getState().statusSort).toBe("NONE");
     });
   });
 });

@@ -29,13 +29,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "僅主管層級可查閱營運總覽資料" }, { status: 403 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const monthFilter = searchParams.get("month");
-    const startMonth = searchParams.get("startMonth");
-    const endMonth = searchParams.get("endMonth");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-
     const [projects, allTasks, milestonesByProject, allUsers] = await Promise.all([
       DataService.getProjects(),
       DataService.getTasks(),
@@ -233,31 +226,7 @@ export async function GET(req: NextRequest) {
       PRODUCTION:  "生產施工期",
     };
 
-    // 依時間區間過濾（支援日期區間與月份區間，使用 expectedDate 或當前進行中里程碑的 plannedDueDate）
-    const filteredProjects = (startDate || endDate || startMonth || endMonth || monthFilter)
-      ? projects.filter((p) => {
-          const milestones = milestonesByProject[p.id] || [];
-          const activeMilestone = p.currentStage === "LOST"
-            ? null
-            : milestones.find((m) => m.status === "IN_PROGRESS") ||
-              milestones.find((m) => m.status === "OVERDUE");
-          const dateToCheck = activeMilestone?.plannedDueDate || p.expectedDate || "";
-          const targetDate = dateToCheck ? dateToCheck.slice(0, 10) : "";
-          const targetMonth = dateToCheck ? dateToCheck.slice(0, 7) : "";
-
-          if (startDate && targetDate && targetDate < startDate) return false;
-          if (endDate && targetDate && targetDate > endDate) return false;
-          if ((startDate || endDate) && !targetDate) return false;
-
-          if (startMonth && targetMonth && targetMonth < startMonth) return false;
-          if (endMonth && targetMonth && targetMonth > endMonth) return false;
-          if ((startMonth || endMonth) && !targetMonth) return false;
-          if (monthFilter && !targetMonth.startsWith(monthFilter)) return false;
-          return true;
-        })
-      : projects;
-
-    const allProjectsOverview = filteredProjects.map((p) => {
+    const allProjectsOverview = projects.map((p) => {
       const milestones = milestonesByProject[p.id] || [];
       const lastCompletedMilestone = milestones
         .filter((milestone) => milestone.status === "COMPLETED")
@@ -374,7 +343,7 @@ export async function GET(req: NextRequest) {
       assignedTasks: assignedTasksWithStatus,
     });
   } catch (error) {
-    return handleApiError(error, "無法取得全場總控資料");
+    return handleApiError(error, "無法取得主管總控資料");
   }
 }
 

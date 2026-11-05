@@ -8,7 +8,7 @@ import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "案場筆記", icon: LayoutDashboard },
-  { key: "manager", href: "/dashboard/manager", label: "全場總控", icon: BarChart3 },
+  { key: "manager", href: "/dashboard/manager", label: "主管總控", icon: BarChart3 },
   { key: "views", href: "/views", label: "視覺時程", icon: HardHat },
   { key: "customers", href: "/customers", label: "客戶主檔", icon: Users },
   { key: "admin", href: "/admin", label: "管理設定", icon: Settings },

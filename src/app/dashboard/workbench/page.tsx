@@ -50,11 +50,6 @@ export default function SalesWorkbenchPage() {
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制 - 使用細粒度 Selector 避免多餘 Re-render)
   const {
     searchQuery,
-    dateMode,
-    startDate,
-    endDate,
-    startMonth,
-    endMonth,
     statusFilter,
     stageFilter,
     dateSort,
@@ -64,11 +59,6 @@ export default function SalesWorkbenchPage() {
   } = useWorkbenchStore(
     useShallow((s) => ({
       searchQuery: s.searchQuery,
-      dateMode: s.dateMode,
-      startDate: s.startDate,
-      endDate: s.endDate,
-      startMonth: s.startMonth,
-      endMonth: s.endMonth,
       statusFilter: s.statusFilter,
       stageFilter: s.stageFilter,
       dateSort: s.dateSort,
@@ -79,11 +69,6 @@ export default function SalesWorkbenchPage() {
   );
 
   const setSearchQuery = useWorkbenchStore((s) => s.setSearchQuery);
-  const setDateMode = useWorkbenchStore((s) => s.setDateMode);
-  const setStartDate = useWorkbenchStore((s) => s.setStartDate);
-  const setEndDate = useWorkbenchStore((s) => s.setEndDate);
-  const setStartMonth = useWorkbenchStore((s) => s.setStartMonth);
-  const setEndMonth = useWorkbenchStore((s) => s.setEndMonth);
   const setStatusFilter = useWorkbenchStore((s) => s.setStatusFilter);
   const setStageFilter = useWorkbenchStore((s) => s.setStageFilter);
   const toggleDateSort = useWorkbenchStore((s) => s.toggleDateSort);
@@ -125,20 +110,6 @@ export default function SalesWorkbenchPage() {
       const projectStatus = p.currentStage === "LOST" ? "LOST" : p.trafficLight.color;
       if (statusFilter && projectStatus !== statusFilter) match = false;
 
-      const dateToCheck = p.activeMilestone?.plannedDueDate || p.expectedDate || "";
-      const projectDate = dateToCheck.slice(0, 10);
-      const projectMonth = dateToCheck.slice(0, 7);
-
-      if (dateMode === "DATE") {
-        if (startDate && projectDate && projectDate < startDate) match = false;
-        if (endDate && projectDate && projectDate > endDate) match = false;
-        if ((startDate || endDate) && !projectDate) match = false;
-      } else {
-        if (startMonth && projectMonth && projectMonth < startMonth) match = false;
-        if (endMonth && projectMonth && projectMonth > endMonth) match = false;
-        if ((startMonth || endMonth) && !projectMonth) match = false;
-      }
-
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const mProject = p.projectName?.toLowerCase().includes(q);
@@ -153,7 +124,7 @@ export default function SalesWorkbenchPage() {
 
       return match;
     });
-  }, [projects, stageFilter, statusFilter, dateMode, startDate, endDate, startMonth, endMonth, searchQuery]);
+  }, [projects, stageFilter, statusFilter, searchQuery]);
 
   // 依完工日與狀態排序
   const sortedProjects = useMemo(() => {
@@ -389,84 +360,6 @@ export default function SalesWorkbenchPage() {
         </div>
 
         <div className="bg-white p-4 border-b flex flex-wrap items-center gap-4 bg-slate-50/50">
-          <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <span>時間區間：</span>
-            <select
-              value={dateMode}
-              onChange={(e) => {
-                setDateMode(e.target.value as "DATE" | "MONTH");
-                setStartDate("");
-                setEndDate("");
-                setStartMonth("");
-                setEndMonth("");
-              }}
-              className="h-7 border border-slate-300 rounded px-2 text-xs bg-white text-slate-700 font-medium"
-            >
-              <option value="DATE">日期</option>
-              <option value="MONTH">月份</option>
-            </select>
-            {dateMode === "DATE" ? (
-              <>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
-                  title="起始日期"
-                />
-                <span className="text-slate-400">至</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
-                  title="結束日期"
-                />
-                {(startDate || endDate) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartDate("");
-                      setEndDate("");
-                    }}
-                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
-                  >
-                    ✕ 清除
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <input
-                  type="month"
-                  value={startMonth}
-                  onChange={(e) => setStartMonth(e.target.value)}
-                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
-                  title="起始月份"
-                />
-                <span className="text-slate-400">至</span>
-                <input
-                  type="month"
-                  value={endMonth}
-                  onChange={(e) => setEndMonth(e.target.value)}
-                  className="h-7 border border-slate-300 rounded px-2 text-xs bg-white"
-                  title="結束月份"
-                />
-                {(startMonth || endMonth) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartMonth("");
-                      setEndMonth("");
-                    }}
-                    className="h-7 px-2 inline-flex items-center text-xs text-slate-500 hover:text-slate-700 rounded hover:bg-slate-200/50"
-                  >
-                    ✕ 清除
-                  </button>
-                )}
-              </>
-            )}
-          </div>
           <label className="flex items-center gap-2 text-sm font-semibold">
             狀態：
             <select

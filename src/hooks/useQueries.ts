@@ -35,8 +35,7 @@ export const QUERY_KEYS = {
     ["projects", projectId, "tasks", isCompleted ? "completed" : "active"] as const,
   columnConfig: ["projects", "columns-config"] as const,
   workbench: ["dashboard", "workbench"] as const,
-  managerDashboard: (startMonth?: string, endMonth?: string, startDate?: string, endDate?: string) =>
-    ["dashboard", "manager", startMonth || "all", endMonth || "all", startDate || "all", endDate || "all"] as const,
+  managerDashboard: () => ["dashboard", "manager"] as const,
   managerCustomerStats: ["dashboard", "manager", "customers"] as const,
   managerProjectStatus: (year?: string | number, month?: string | number) =>
     ["dashboard", "manager", "status-report", String(year || "2026"), String(month || "10")] as const,
@@ -130,27 +129,16 @@ export function useWorkbenchQuery() {
 }
 
 /**
- * 全場總控營運儀表板資料（依月份區間篩選，快取 30 秒）
+ * 主管總控營運儀表板資料（快取 30 秒）
  */
-export function useManagerDashboardQuery(
-  startMonth?: string,
-  endMonth?: string,
-  startDate?: string,
-  endDate?: string,
-) {
+export function useManagerDashboardQuery() {
   return useQuery({
-    queryKey: QUERY_KEYS.managerDashboard(startMonth, endMonth, startDate, endDate),
+    queryKey: QUERY_KEYS.managerDashboard(),
     queryFn: async (): Promise<ManagerDashboardDTO> => {
-      const params = new URLSearchParams();
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      if (startMonth) params.set("startMonth", startMonth);
-      if (endMonth) params.set("endMonth", endMonth);
-      const queryStr = params.toString();
-      const res = await fetch(`/api/dashboard/manager${queryStr ? `?${queryStr}` : ""}`);
+      const res = await fetch("/api/dashboard/manager");
       const json = (await res.json()) as ApiResponse<ManagerDashboardDTO>;
       if (!res.ok || !json.kpi || !Array.isArray(json.allProjectsOverview) || !Array.isArray(json.assignedTasks)) {
-        throw new Error(json.error || "無法取得主管看板資料");
+        throw new Error(json.error || "無法取得主管總控資料");
       }
       return json;
     },
@@ -159,7 +147,7 @@ export function useManagerDashboardQuery(
 }
 
 /**
- * 全場總控客戶統計資料（快取 30 秒）
+ * 主管總控客戶統計資料（快取 30 秒）
  */
 export function useManagerCustomerStatsQuery() {
   return useQuery({
@@ -177,7 +165,7 @@ export function useManagerCustomerStatsQuery() {
 }
 
 /**
- * 全場總控案件現況統計（經營會議報告：已簽約/已報價/估價中）
+ * 主管總控案件現況統計（經營會議報告：已簽約/已報價/估價中）
  */
 export function useManagerProjectStatusQuery(year?: string | number, month?: string | number) {
   return useQuery({

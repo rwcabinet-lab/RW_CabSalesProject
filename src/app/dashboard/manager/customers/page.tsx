@@ -108,7 +108,7 @@ export default function CustomerStatsPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-800">
-              全場總控
+              主管總控
             </span>
           </div>
           <h1 className="text-2xl font-black mt-1">客戶資料統計與分析</h1>
