@@ -538,6 +538,26 @@ export default function ManagerDashboardPage() {
             <span className="font-bold text-slate-800">案場總覽</span>
             <SectionHelpButton sectionId="manager-all-projects" />
           </div>
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜尋案名/客戶/地址/業務..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-8 pr-7 border border-slate-300 rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="清除搜尋"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <label className="flex items-center gap-2">
             狀態：
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-7 border border-slate-300 rounded px-2 text-xs bg-white">
@@ -575,28 +595,8 @@ export default function ManagerDashboardPage() {
           </label>
         </div>
 
-        {/* 篩選結果摘要與關鍵字搜尋 */}
+        {/* 篩選結果摘要 */}
         <div className="px-6 py-2.5 bg-blue-50/50 border-b flex flex-wrap items-center gap-4 text-xs text-blue-900 font-semibold">
-          <div className="relative flex items-center">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="搜尋案名/客戶/地址/業務..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 pl-8 pr-7 border border-slate-300 rounded text-xs bg-white font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 sm:w-56"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                title="清除搜尋"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
           <div>
             篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedOverview.length}</span> 案，報價總額{" "}
             <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
