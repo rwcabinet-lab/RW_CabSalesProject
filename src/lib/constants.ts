@@ -66,12 +66,13 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "2-3": "圖面索取",
   "2-4": "丈量",
   "2-5": "場勘",
-  // ③ 設計提案/報價/簽約 (不拆分製作與審核，依審核機制控管)
+  // ③ 設計提案/報價/簽約
   "3-1": "設計圖",
   "3-2": "報價單",
-  "3-3": "提案簡報",
-  "3-4": "合約擬定",
-  "3-5": "送約/簽約",
+  "3-3": "提案簡報製作",
+  "3-4": "提案簡報",
+  "3-5": "合約擬定",
+  "3-6": "送約/簽約",
   // ④ 生產前確認/拆單
   "4-1": "復丈",
   "4-2": "二次場勘",
@@ -97,12 +98,11 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "X-2": "流標",
 };
 
-/** 需要審核的子進度清單 (繪圖/報價/提案/合約/施工圖) */
+/** 需要審核的子進度清單 (繪圖/報價/合約/施工圖) */
 export const AUDIT_STAGE_CODES = new Set<string>([
   "3-1", // 設計圖
   "3-2", // 報價單
-  "3-3", // 提案簡報
-  "3-4", // 合約擬定
+  "3-5", // 合約擬定
   "4-3", // 施工圖
 ]);
 
@@ -117,7 +117,7 @@ export const QUOTE_STAGE_CODES = new Set<string>([
 export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
   "1-1": 5, "1-2": 2,
   "2-1": 3, "2-2": 3, "2-3": 2, "2-4": 2, "2-5": 2,
-  "3-1": 5, "3-2": 5, "3-3": 5, "3-4": 5, "3-5": 2,
+  "3-1": 5, "3-2": 5, "3-3": 3, "3-4": 2, "3-5": 5, "3-6": 2,
   "4-1": 2, "4-2": 2, "4-3": 5, "4-4": 3,
   "5-1": 12, "5-2": 1, "5-3": 2,
   "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 5,
@@ -167,7 +167,7 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
 export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
   "1-1": "DEVELOP", "1-2": "DEVELOP",
   "2-1": "REQUIREMENT", "2-2": "REQUIREMENT", "2-3": "REQUIREMENT", "2-4": "REQUIREMENT", "2-5": "REQUIREMENT",
-  "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL",
+  "3-1": "PROPOSAL", "3-2": "PROPOSAL", "3-3": "PROPOSAL", "3-4": "PROPOSAL", "3-5": "PROPOSAL", "3-6": "PROPOSAL",
   "4-1": "PRE_PROD", "4-2": "PRE_PROD", "4-3": "PRE_PROD", "4-4": "PRE_PROD",
   "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
@@ -178,7 +178,7 @@ export const STAGE_CODE_TO_PHASE: Record<MilestoneStageCode, MilestonePhase> = {
 export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
   "1-1", "1-2",
   "2-1", "2-2", "2-3", "2-4", "2-5",
-  "3-1", "3-2", "3-3", "3-4", "3-5",
+  "3-1", "3-2", "3-3", "3-4", "3-5", "3-6",
   "4-1", "4-2", "4-3", "4-4",
   "5-1", "5-2", "5-3",
   "6-1", "6-2", "6-3", "6-4", "6-5",

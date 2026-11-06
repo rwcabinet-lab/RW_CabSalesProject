@@ -196,7 +196,8 @@ export async function GET(req: NextRequest) {
     for (const p of projects) {
       if (p.currentStage === "LOST") continue;
 
-      const m35 = p.milestones.find((m) => m.stageCode === "3-5");
+      const mSigned = p.milestones.find((m) => m.stageCode === "3-6") ||
+        p.milestones.find((m) => m.stageCode === "3-5" && !p.milestones.some((x) => x.stageCode === "3-6"));
       const m32 = p.milestones.find((m) => m.stageCode === "3-2");
       const isPastContract = [
         "PRE_PROD",
@@ -209,7 +210,7 @@ export async function GET(req: NextRequest) {
       ].includes(p.currentStage);
 
       // 自動判定邏輯
-      const autoSigned = m35?.status === "COMPLETED" || isPastContract;
+      const autoSigned = mSigned?.status === "COMPLETED" || isPastContract;
       const amt = Number(p.quoteAmount) || Number(p.estimatedBudget) || 0;
       const autoQuoted =
         !autoSigned &&
@@ -224,8 +225,8 @@ export async function GET(req: NextRequest) {
       let year = "未排定";
       if (p.expectedDate) {
         year = new Date(p.expectedDate).getFullYear().toString();
-      } else if (m35?.plannedDueDate) {
-        year = new Date(m35.plannedDueDate).getFullYear().toString();
+      } else if (mSigned?.plannedDueDate) {
+        year = new Date(mSigned.plannedDueDate).getFullYear().toString();
       }
 
       const region = extractRegion(p.siteAddress);

@@ -56,8 +56,9 @@ export async function GET(req: NextRequest) {
       const ms = milestonesByProject[p.id] || [];
       return ms.some(
         (m) =>
-          (m.stageCode === "3-5" || (m.stageCode as string) === "1-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "") === "送約/簽約") &&
-          m.status === "COMPLETED"
+          (m.stageCode === "3-6" || m.stageCode === "3-5" || (m.stageCode as string) === "1-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "") === "送約/簽約") &&
+          m.status === "COMPLETED" &&
+          (m.stageCode !== "3-5" || (MILESTONE_STAGE_LABELS[m.stageCode as keyof typeof MILESTONE_STAGE_LABELS] || "") === "送約/簽約" || !ms.some((x) => x.stageCode === "3-6"))
       );
     };
 

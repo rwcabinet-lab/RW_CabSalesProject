@@ -5,12 +5,34 @@ import {
   STANDARD_MILESTONE_STAGE_CODES,
   STAGE_CODE_TO_PHASE,
   MILESTONE_DEFAULT_DAYS,
+  MILESTONE_STAGE_LABELS,
+  AUDIT_STAGE_CODES,
   MilestoneStageCode,
 } from "@/lib/constants";
 import { STAGE_CODE_TO_PROJECT_STAGE, ScheduleEngine } from "@/lib/schedule-engine";
 import { ConflictError } from "@/lib/errors";
 
 describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進度跳轉邏輯)", () => {
+  it("標準 28 項里程碑與第三階段工序及審核設定正確", () => {
+    expect(STANDARD_MILESTONE_STAGE_CODES).toHaveLength(28);
+    expect(MILESTONE_STAGE_LABELS["3-2"]).toBe("報價單");
+    expect(MILESTONE_STAGE_LABELS["3-3"]).toBe("提案簡報製作");
+    expect(MILESTONE_STAGE_LABELS["3-4"]).toBe("提案簡報");
+    expect(MILESTONE_STAGE_LABELS["3-5"]).toBe("合約擬定");
+    expect(MILESTONE_STAGE_LABELS["3-6"]).toBe("送約/簽約");
+
+    // 提案簡報與提案簡報製作取消/不需審核
+    expect(AUDIT_STAGE_CODES.has("3-3")).toBe(false);
+    expect(AUDIT_STAGE_CODES.has("3-4")).toBe(false);
+
+    // 4 大需審核節點
+    expect(AUDIT_STAGE_CODES.has("3-1")).toBe(true); // 設計圖
+    expect(AUDIT_STAGE_CODES.has("3-2")).toBe(true); // 報價單
+    expect(AUDIT_STAGE_CODES.has("3-5")).toBe(true); // 合約擬定
+    expect(AUDIT_STAGE_CODES.has("4-3")).toBe(true); // 施工圖
+    expect(AUDIT_STAGE_CODES.size).toBe(4);
+  });
+
   it("各客戶類型對應之起始進度正確設定", () => {
     expect(CUSTOMER_TYPE_START_STAGE_CODES["CABINET_FACTORY"]).toBe("4-4");
     expect(CUSTOMER_TYPE_START_STAGE_CODES["DESIGN_COMPANY"]).toBe("3-1");
