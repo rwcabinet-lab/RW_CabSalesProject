@@ -24,6 +24,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(MILESTONE_STAGE_LABELS["4-3"]).toBe("派工");
     expect(MILESTONE_STAGE_LABELS["4-4"]).toBe("施工圖");
     expect(MILESTONE_STAGE_LABELS["4-5"]).toBe("拆單並提交生產");
+    expect(MILESTONE_STAGE_LABELS["6-1"]).toBe("進場安裝");
     expect(MILESTONE_STAGE_HINTS["4-3"]).toBe("請指定進場安裝日期");
 
     // 提案簡報與提案簡報製作取消/不需審核

@@ -84,7 +84,7 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "5-2": "出貨",
   "5-3": "派工", // 歷史向下相容
   // ⑥ 安裝及驗收
-  "6-1": "安裝",
+  "6-1": "進場安裝",
   "6-2": "監工及現場處置",
   "6-3": "工程驗收",
   "6-4": "提交成果驗收",

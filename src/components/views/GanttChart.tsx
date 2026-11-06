@@ -25,6 +25,7 @@ type TimelineRow = {
   id: string;
   label: string;
   kind: "MILESTONE" | "TASK" | "PROJECT";
+  stageCode?: string;
   dateKey: string | null;
   actualDateKey?: string | null;
   status?: string;
@@ -108,6 +109,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
           id: `milestone-${milestone.id}`,
           label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,
           kind: "MILESTONE",
+          stageCode: milestone.stageCode,
           dateKey: isSubsequent ? null : getDateKey(milestone.plannedDueDate),
           actualDateKey: getDateKey(milestone.actualDueDate),
           status: isSubsequent ? undefined : milestone.status,
@@ -379,7 +381,7 @@ export function GanttChart({ projects, tasks }: GanttProps) {
                                     <span
                                       className={`absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${color}`}
                                       style={{ left: `${positionOf(row.dateKey)}%` }}
-                                      title={`預定完成：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
+                                      title={`${row.stageCode === "6-1" ? "進場日期" : "預定完成"}：${row.dateKey}${row.status ? `｜${row.status}` : ""}`}
                                     />
                                   )}
 

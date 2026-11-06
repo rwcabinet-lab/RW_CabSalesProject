@@ -349,7 +349,9 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                 </div>
                 <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
                   <div>
-                    <span className="block font-semibold text-slate-400">預定期限</span>
+                    <span className="block font-semibold text-slate-400">
+                      {activeEvent.milestone.stageCode === "6-1" ? "進場日期" : "預定期限"}
+                    </span>
                     <span className="font-medium text-slate-800">
                       {activeEvent.milestone.plannedDueDate ? formatDate(activeEvent.milestone.plannedDueDate) : "未排定"}
                     </span>

@@ -1116,7 +1116,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                         <div>
-                          <label className="block text-slate-600 mb-1 font-semibold">預定完成日</label>
+                          <label className="block text-slate-600 mb-1 font-semibold">
+                            {m.stageCode === "6-1" ? "進場日期" : "預定完成日"}
+                          </label>
                           <input
                             type="date"
                             value={editForm.plannedDueDate}
@@ -1243,7 +1245,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
                               <span>負責人：<b className="text-slate-700">{m.assignedToName || "未指派"}</b></span>
                               {!isSubsequent && (
-                                <span>預定完成：<b>{m.plannedDueDate || (isPaused ? "需追蹤" : "未設定")}</b></span>
+                                <span>{m.stageCode === "6-1" ? "進場日期" : "預定完成"}：<b>{m.plannedDueDate || (isPaused ? "需追蹤" : "未設定")}</b></span>
                               )}
                               {m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>}
                               {m.notes && <span className="italic text-slate-400">({m.notes})</span>}
@@ -1349,7 +1351,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                 <div className="flex items-center gap-3">
                                   <span className="font-bold text-slate-500">#{rIdx + 1}</span>
                                   {r.assignedToName && <span className="font-semibold text-blue-700">👤 {r.assignedToName}</span>}
-                                  {r.plannedDueDate && <span>預定：{r.plannedDueDate}</span>}
+                                  {r.plannedDueDate && <span>{m.stageCode === "6-1" ? "進場：" : "預定："}{r.plannedDueDate}</span>}
                                   {r.actualDueDate ? (
                                     <span className="text-emerald-700 font-semibold">實際：{r.actualDueDate}</span>
                                   ) : (
@@ -1396,7 +1398,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="block text-slate-600 mb-0.5">預定完成日</label>
+                                  <label className="block text-slate-600 mb-0.5">
+                                    {m.stageCode === "6-1" ? "進場日期" : "預定完成日"}
+                                  </label>
                                   <input
                                     type="date"
                                     value={newRecordForm.plannedDueDate}
