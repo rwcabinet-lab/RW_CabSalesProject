@@ -6,6 +6,7 @@ import {
   STAGE_CODE_TO_PHASE,
   MILESTONE_DEFAULT_DAYS,
   MILESTONE_STAGE_LABELS,
+  MILESTONE_STAGE_HINTS,
   AUDIT_STAGE_CODES,
   MilestoneStageCode,
 } from "@/lib/constants";
@@ -20,6 +21,10 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(MILESTONE_STAGE_LABELS["3-4"]).toBe("提案簡報");
     expect(MILESTONE_STAGE_LABELS["3-5"]).toBe("合約擬定");
     expect(MILESTONE_STAGE_LABELS["3-6"]).toBe("送約/簽約");
+    expect(MILESTONE_STAGE_LABELS["4-3"]).toBe("派工");
+    expect(MILESTONE_STAGE_LABELS["4-4"]).toBe("施工圖");
+    expect(MILESTONE_STAGE_LABELS["4-5"]).toBe("拆單並提交生產");
+    expect(MILESTONE_STAGE_HINTS["4-3"]).toBe("請指定進場安裝日期");
 
     // 提案簡報與提案簡報製作取消/不需審核
     expect(AUDIT_STAGE_CODES.has("3-3")).toBe(false);
@@ -29,12 +34,12 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(AUDIT_STAGE_CODES.has("3-1")).toBe(true); // 設計圖
     expect(AUDIT_STAGE_CODES.has("3-2")).toBe(true); // 報價單
     expect(AUDIT_STAGE_CODES.has("3-5")).toBe(true); // 合約擬定
-    expect(AUDIT_STAGE_CODES.has("4-3")).toBe(true); // 施工圖
+    expect(AUDIT_STAGE_CODES.has("4-4")).toBe(true); // 施工圖
     expect(AUDIT_STAGE_CODES.size).toBe(4);
   });
 
   it("各客戶類型對應之起始進度正確設定", () => {
-    expect(CUSTOMER_TYPE_START_STAGE_CODES["CABINET_FACTORY"]).toBe("4-4");
+    expect(CUSTOMER_TYPE_START_STAGE_CODES["CABINET_FACTORY"]).toBe("4-5");
     expect(CUSTOMER_TYPE_START_STAGE_CODES["DESIGN_COMPANY"]).toBe("3-1");
     expect(CUSTOMER_TYPE_START_STAGE_CODES["DEALER_COMPANY"]).toBe("3-2");
 
@@ -122,17 +127,17 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(rows.filter((r) => r.status === "COMPLETED")).toHaveLength(0);
   });
 
-  it("工廠 (CABINET_FACTORY) 建立案場時自動批次略過前置項目，直接推進至 4-4", () => {
+  it("工廠 (CABINET_FACTORY) 建立案場時自動批次略過前置項目，直接推進至 4-5", () => {
     const today = new Date("2026-11-04T00:00:00.000Z");
     const { rows, finalStartCode, initialProjectStage } = generateMilestoneRows("CABINET_FACTORY", undefined, today);
 
-    expect(finalStartCode).toBe("4-4");
+    expect(finalStartCode).toBe("4-5");
     expect(initialProjectStage).toBe("PRE_PROD");
 
-    const targetIndex = rows.findIndex((r) => r.stageCode === "4-4");
+    const targetIndex = rows.findIndex((r) => r.stageCode === "4-5");
     expect(targetIndex).toBeGreaterThan(0);
 
-    // 前置項目 (1-1 至 4-3) 必須皆為 COMPLETED 且帶有自動略過備註
+    // 前置項目 (1-1 至 4-4) 必須皆為 COMPLETED 且帶有自動略過備註
     const skippedRows = rows.slice(0, targetIndex);
     expect(skippedRows.length).toBe(targetIndex);
     for (const r of skippedRows) {
@@ -141,15 +146,15 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
       expect(r.notes).toContain("【系統自動略過：依客戶類型（工廠）跳轉】");
     }
 
-    // 目標項目 (4-4) 必須為 IN_PROGRESS
+    // 目標項目 (4-5) 必須為 IN_PROGRESS
     const targetRow = rows[targetIndex];
     expect(targetRow.status).toBe("IN_PROGRESS");
-    // 預設 4-4 天數為 3 天，所以 plannedDueDate 應為 today + 3 天
+    // 預設 4-5 天數為 3 天，所以 plannedDueDate 應為 today + 3 天
     const expectedTargetDue = new Date(today);
     expectedTargetDue.setDate(expectedTargetDue.getDate() + 3);
     expect(targetRow.plannedDueDate).toEqual(expectedTargetDue);
 
-    // 後續項目 (5-1 起) 必須為 PENDING，且從 4-4 的日期往後順延
+    // 後續項目 (5-1 起) 必須為 PENDING，且從 4-5 的日期往後順延
     const nextRow = rows[targetIndex + 1];
     expect(nextRow.stageCode).toBe("5-1");
     expect(nextRow.status).toBe("PENDING");
@@ -188,14 +193,14 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
       notes: r.notes,
     }));
 
-    const targetM = mockList.find((m) => m.stageCode === "4-4")!;
-    // 推進 4-4
+    const targetM = mockList.find((m) => m.stageCode === "4-5")!;
+    // 推進 4-5
     const advanceResult = ScheduleEngine.advanceMilestone(mockList, targetM.id);
 
-    // 4-4 應完成，5-1 應自動啟動成為 IN_PROGRESS
-    const updated44 = advanceResult.updatedMilestones.find((m) => m.stageCode === "4-4");
+    // 4-5 應完成，5-1 應自動啟動成為 IN_PROGRESS
+    const updated45 = advanceResult.updatedMilestones.find((m) => m.stageCode === "4-5");
     const updated51 = advanceResult.updatedMilestones.find((m) => m.stageCode === "5-1");
-    expect(updated44?.status).toBe("COMPLETED");
+    expect(updated45?.status).toBe("COMPLETED");
     expect(updated51?.status).toBe("IN_PROGRESS");
     expect(advanceResult.newCurrentStage).toBe("PROD_SHIP");
   });

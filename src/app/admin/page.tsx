@@ -75,7 +75,7 @@ function parseUserAgent(ua?: string) {
 }
 
 const CONFIGURABLE_CUSTOMER_TYPES = [
-  { key: "CABINET_FACTORY", label: "工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，預設【4-4 拆單並提交生產】" },
+  { key: "CABINET_FACTORY", label: "工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，預設【4-5 拆單並提交生產】" },
   { key: "DESIGN_COMPANY", label: "設計公司", badge: "設計提案", desc: "自備空間配置底圖，預設【3-1 設計圖】" },
   { key: "DEALER_COMPANY", label: "經銷公司", badge: "經銷通路", desc: "常態簽約經銷夥伴，自備規格需求，預設【3-2 報價單】" },
   { key: "CONSTRUCTION", label: "建設/營造", badge: "工程營造", desc: "建設建案或工程標案，預設由【1-1 客源開發】開始" },
@@ -704,27 +704,28 @@ export default function AdminPage() {
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {Object.entries(MILESTONE_STAGE_LABELS)
-              .filter(([code]) => code !== "X-2")
-              .map(([code, label]) => (
-              <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
-                <span className="text-xs font-bold text-slate-700 truncate" title={label}>
-                  [{code}] {label}
-                </span>
-                <div className="mt-2 flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min="1"
-                    value={stageDays[code] ?? 3}
-                    onChange={(e) =>
-                      setStageDays({ ...stageDays, [code]: Number(e.target.value) || 1 })
-                    }
-                    className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
-                  />
-                  <span className="text-xs text-slate-500">天</span>
+            {STANDARD_MILESTONE_STAGE_CODES.map((code) => {
+              const label = MILESTONE_STAGE_LABELS[code];
+              return (
+                <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
+                  <span className="text-xs font-bold text-slate-700 truncate" title={label}>
+                    [{code}] {label}
+                  </span>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      value={stageDays[code] ?? 3}
+                      onChange={(e) =>
+                        setStageDays({ ...stageDays, [code]: Number(e.target.value) || 1 })
+                      }
+                      className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
+                    />
+                    <span className="text-xs text-slate-500">天</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
-import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
+import { MILESTONE_STAGE_LABELS, MILESTONE_STAGE_HINTS } from "@/lib/constants";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
@@ -331,9 +331,17 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
               <div className="space-y-3 text-xs">
                 <div>
                   <span className="block font-semibold text-slate-400">時程事項</span>
-                  <span className="mt-0.5 block text-sm font-bold text-slate-900">
-                    {activeEvent.milestone.stageName || MILESTONE_STAGE_LABELS[activeEvent.milestone.stageCode] || activeEvent.milestone.stageCode}
-                  </span>
+                  <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-slate-900">
+                      {activeEvent.milestone.stageName || MILESTONE_STAGE_LABELS[activeEvent.milestone.stageCode] || activeEvent.milestone.stageCode}
+                    </span>
+                    {MILESTONE_STAGE_HINTS[activeEvent.milestone.stageCode] && (
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-xs">
+                        <span>💡</span>
+                        <span>{MILESTONE_STAGE_HINTS[activeEvent.milestone.stageCode]}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="block font-semibold text-slate-400">關聯案場</span>

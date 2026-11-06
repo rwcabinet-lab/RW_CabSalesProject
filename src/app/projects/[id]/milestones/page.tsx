@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import {
   MILESTONE_STAGE_LABELS,
+  MILESTONE_STAGE_HINTS,
   PHASE_LABELS,
   PROJECT_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
@@ -1100,7 +1101,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     // 行內編輯
                     <div className="space-y-3">
                       <div className="flex justify-between items-center font-bold text-sm">
-                        <span>編輯進度 — {MILESTONE_STAGE_LABELS[m.stageCode]}</span>
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          <span>編輯進度 — {MILESTONE_STAGE_LABELS[m.stageCode]}</span>
+                          {MILESTONE_STAGE_HINTS[m.stageCode] && (
+                            <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <span>💡</span>
+                              <span>{MILESTONE_STAGE_HINTS[m.stageCode]}</span>
+                            </span>
+                          )}
+                        </span>
                         <button type="button" onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600">
                           <X className="w-4 h-4" />
                         </button>
@@ -1192,6 +1201,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               <span className="font-bold text-sm text-slate-900">
                                 {MILESTONE_STAGE_LABELS[m.stageCode]}
                               </span>
+                              {MILESTONE_STAGE_HINTS[m.stageCode] && (
+                                <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                                  <span>💡</span>
+                                  <span>{MILESTONE_STAGE_HINTS[m.stageCode]}</span>
+                                </span>
+                              )}
                               {!isSubsequent && (
                                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                                   isProjectLost
@@ -1549,6 +1564,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <p className="text-slate-600 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
                 完成後，系統將自動啟動排在下一個順位的子進度，並連動更新案件總表當前進度。
               </p>
+              {MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode] && (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2 font-medium">
+                  <span className="text-sm">💡</span>
+                  <span>提示：{MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode]}</span>
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">實際完成日</label>
                 <input
