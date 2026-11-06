@@ -26,7 +26,11 @@ import type {
 import { useWorkbenchQuery, useCustomersQuery, useUsersQuery, useColumnConfigQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
-import { WorkbenchCreateTaskModal, WorkbenchCompleteTaskModal } from "@/components/workbench/WorkbenchModals";
+import {
+  WorkbenchCreateTaskModal,
+  WorkbenchCompleteTaskModal,
+  WorkbenchAdvanceMilestoneModal,
+} from "@/components/workbench/WorkbenchModals";
 import { WorkbenchAddProjectPanel, WorkbenchEditProjectRow } from "@/components/workbench/WorkbenchProjectForms";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { toast } from "@/stores/useToastStore";
@@ -79,6 +83,7 @@ export default function SalesWorkbenchPage() {
   const closeEditProject = useWorkbenchStore((s) => s.closeEditProject);
   const setShowTaskModal = useWorkbenchStore((s) => s.setShowTaskModal);
   const setTaskToComplete = useWorkbenchStore((s) => s.setTaskToComplete);
+  const setProjectToAdvance = useWorkbenchStore((s) => s.setProjectToAdvance);
 
   // 伺服端狀態單一真實來源 (Single Source of Truth from TanStack Query)
   const projects = workbenchData?.myProjects ?? EMPTY_PROJECTS;
@@ -159,12 +164,17 @@ export default function SalesWorkbenchPage() {
     );
   }, [sortedProjects]);
 
-  const pendingTasks = useMemo(() => {
-    return tasks.filter((task) => !task.isCompleted);
+  // 待辦事項區域：只顯示自行新建與主管指派的待辦（排除 milestoneId 關聯之正規里程碑待辦）
+  const manualTasks = useMemo(() => {
+    return tasks.filter((task) => !task.milestoneId);
   }, [tasks]);
 
+  const pendingTasks = useMemo(() => {
+    return manualTasks.filter((task) => !task.isCompleted);
+  }, [manualTasks]);
+
   const isAdmin = currentUser.role === "ADMIN";
-  const visibleTasks = isAdmin ? tasks : pendingTasks;
+  const visibleTasks = isAdmin ? manualTasks : pendingTasks;
 
   const handleDeleteProject = async (project: WorkbenchProjectDTO) => {
     if (
@@ -225,6 +235,7 @@ export default function SalesWorkbenchPage() {
         <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-base font-bold flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-blue-600" /> 待辦事項
+            <span className="text-xs font-normal text-slate-500">（個人自建與主管交辦）</span>
             <SectionHelpButton sectionId="workbench-tasks" />
           </h2>
           <button
@@ -332,7 +343,7 @@ export default function SalesWorkbenchPage() {
           </div>
         ) : (
           <p className="py-6 text-center text-sm text-slate-500">
-            {isAdmin ? "目前沒有待辦事項" : "目前沒有待處理事項"}
+            {isAdmin ? "目前沒有自建或主管指派待辦" : "目前沒有待處理的自建或主管交辦事項"}
           </p>
         )}
       </div>
@@ -539,9 +550,24 @@ export default function SalesWorkbenchPage() {
                         case "stageProgress":
                           return (
                             <td key={col.key} className="p-3 font-bold text-slate-700">
-                              {p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}
-                              <div className="mt-1 text-[10px] font-normal text-slate-500">
-                                {p.currentStage === "LOST" ? "—" : p.isClosed ? "已請款" : p.activeMilestone?.stageName || "完結"}
+                              <div>{p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
+                              <div className="mt-1 text-[11px] font-normal">
+                                {p.currentStage === "LOST" ? (
+                                  <span className="text-slate-400">—</span>
+                                ) : p.isClosed ? (
+                                  <span className="text-emerald-700 font-semibold">已請款完結</span>
+                                ) : p.activeMilestone ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                    {p.activeMilestone.stageName}
+                                    {p.activeMilestone.plannedDueDate && (
+                                      <span className="text-[10px] text-blue-600 font-normal">
+                                        ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">完結</span>
+                                )}
                               </div>
                             </td>
                           );
@@ -568,7 +594,17 @@ export default function SalesWorkbenchPage() {
                         case "actions":
                           return (
                             <td key={col.key} className="p-3 text-center align-middle">
-                              <div className="flex items-center justify-center gap-2">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {p.activeMilestone && !p.isClosed && p.currentStage !== "LOST" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setProjectToAdvance(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                    title={`推進當前進度：${p.activeMilestone.stageName}`}
+                                  >
+                                    項目推進
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => openEditProject(p)}
@@ -624,6 +660,8 @@ export default function SalesWorkbenchPage() {
       />
 
       <WorkbenchCompleteTaskModal onInvalidate={invalidateWorkbench} />
+
+      <WorkbenchAdvanceMilestoneModal onInvalidate={invalidateWorkbench} />
     </div>
   );
 }

@@ -42,6 +42,11 @@ interface WorkbenchState {
   completionNotes: string;
   completionDate: string;
 
+  // 項目推進 Modal
+  projectToAdvance: WorkbenchProjectDTO | null;
+  advanceNotes: string;
+  advanceDate: string;
+
   // Actions
   setSearchQuery: (val: string) => void;
   setStatusFilter: (val: string) => void;
@@ -65,6 +70,11 @@ interface WorkbenchState {
   setCompletionNotes: (notes: string) => void;
   setCompletionDate: (date: string) => void;
   resetTaskModal: () => void;
+
+  setProjectToAdvance: (project: WorkbenchProjectDTO | null) => void;
+  setAdvanceNotes: (notes: string) => void;
+  setAdvanceDate: (date: string) => void;
+  resetAdvanceModal: () => void;
 }
 
 const getDefaultTaskDueDatetime = () =>
@@ -109,6 +119,10 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   taskToComplete: null,
   completionNotes: "",
   completionDate: getTodayDate(),
+
+  projectToAdvance: null,
+  advanceNotes: "",
+  advanceDate: getTodayDate(),
 
   setSearchQuery: (val) => set({ searchQuery: val }),
   setStatusFilter: (val) => set({ statusFilter: val }),
@@ -188,5 +202,20 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
     set({
       showTaskModal: false,
       newTaskData: { ...initialTaskForm, dueDatetime: getDefaultTaskDueDatetime() },
+    }),
+
+  setProjectToAdvance: (project) =>
+    set({
+      projectToAdvance: project,
+      advanceNotes: "",
+      advanceDate: getTodayDate(),
+    }),
+  setAdvanceNotes: (notes) => set({ advanceNotes: notes }),
+  setAdvanceDate: (date) => set({ advanceDate: date }),
+  resetAdvanceModal: () =>
+    set({
+      projectToAdvance: null,
+      advanceNotes: "",
+      advanceDate: getTodayDate(),
     }),
 }));
