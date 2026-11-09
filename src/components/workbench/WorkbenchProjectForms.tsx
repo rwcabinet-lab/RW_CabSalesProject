@@ -12,6 +12,7 @@ import {
   CUSTOMER_TYPE_START_STAGE_CODES,
   MILESTONE_STAGE_LABELS,
 } from "@/lib/constants";
+import { CustomerSearchSelect } from "@/components/workbench/CustomerSearchSelect";
 import type { CustomerDTO, UserDTO, WorkbenchDashboardDTO } from "@/types/dto";
 
 interface WorkbenchProjectFormsProps {
@@ -92,13 +93,12 @@ export function WorkbenchAddProjectPanel({
             className="w-full border rounded p-1.5 mt-1"
           />
         </label>
-        <label>
-          客戶 *
-          <select
-            required
+        <div>
+          <label className="block text-slate-700 font-semibold mb-0">客戶 *</label>
+          <CustomerSearchSelect
+            customers={customers}
             value={newProjectData.customerId}
-            onChange={(e) => {
-              const nextCustId = e.target.value;
+            onChange={(nextCustId) => {
               const selectedCust = customers.find((c) => c.id === nextCustId);
               setNewProjectData((prev) => {
                 const defaultRep =
@@ -112,16 +112,8 @@ export function WorkbenchAddProjectPanel({
                 };
               });
             }}
-            className="w-full border rounded p-1.5 mt-1"
-          >
-            <option value="">選擇客戶</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
         <label>
           主責業務
           <select
@@ -319,13 +311,12 @@ export function WorkbenchEditProjectRow({
                 className="w-full border rounded p-1.5 mt-1 bg-white"
               />
             </label>
-            <label className="font-semibold text-slate-700">
-              客戶 *
-              <select
-                required
+            <div>
+              <label className="block font-semibold text-slate-700 mb-0">客戶 *</label>
+              <CustomerSearchSelect
+                customers={customers}
                 value={newProjectData.customerId}
-                onChange={(e) => {
-                  const nextCustId = e.target.value;
+                onChange={(nextCustId) => {
                   const selectedCust = customers.find((c) => c.id === nextCustId);
                   setNewProjectData((prev) => {
                     const defaultRep =
@@ -339,16 +330,8 @@ export function WorkbenchEditProjectRow({
                     };
                   });
                 }}
-                className="w-full border rounded p-1.5 mt-1 bg-white"
-              >
-                <option value="">選擇客戶</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
             <label className="font-semibold text-slate-700">
               主責業務
               <select
