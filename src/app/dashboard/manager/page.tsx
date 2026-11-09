@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw } from "lucide-react";
+import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw, Pin } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
@@ -21,6 +21,7 @@ import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTask
 import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjectStatusReport";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
+import { usePinnedProjects, sortProjectsWithPins } from "@/hooks/usePinnedProjects";
 
 const todayDate = () => getTaiwanDateString();
 
@@ -98,6 +99,8 @@ export default function ManagerDashboardPage() {
   const isAdmin = sessionUser?.role === "ADMIN";
   const loading = dashboardLoading && !data;
   const loadError = dashboardError instanceof Error ? dashboardError.message : "";
+
+  const { pinnedSet, isPinned, togglePin } = usePinnedProjects(sessionUser?.id);
 
   const invalidateManager = async () => {
     await Promise.all([
@@ -229,9 +232,9 @@ export default function ManagerDashboardPage() {
     });
   }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, searchQuery]);
 
-  // 依進場日與狀態排序
+  // 依進場日與狀態排序（支援圖釘置頂）
   const sortedOverview = useMemo(() => {
-    return [...filteredOverview].sort((a, b) => {
+    return sortProjectsWithPins(filteredOverview, pinnedSet, (a, b) => {
       if (statusSort !== "NONE") {
         const getStatusWeight = (item: typeof a) => {
           if (item.currentStage === "LOST") return 5;
@@ -253,7 +256,7 @@ export default function ManagerDashboardPage() {
       if (!dateB) return -1;
       return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
     });
-  }, [filteredOverview, statusSort, dateSort]);
+  }, [filteredOverview, statusSort, dateSort, pinnedSet]);
 
   const toggleDateSort = () => {
     if (dateSort === "NONE") setDateSort("ASC");
@@ -597,9 +600,19 @@ export default function ManagerDashboardPage() {
 
         {/* 篩選結果摘要 */}
         <div className="px-6 py-2.5 bg-blue-50/50 border-b flex flex-wrap items-center gap-4 text-xs text-blue-900 font-semibold">
-          <div>
-            篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedOverview.length}</span> 案，報價總額{" "}
-            <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedOverview.length}</span> 案
+            </span>
+            {sortedOverview.some((p) => pinnedSet.has(p.id)) && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                <Pin className="w-3 h-3 fill-amber-700 -rotate-45" />
+                {sortedOverview.filter((p) => pinnedSet.has(p.id)).length} 案置頂中
+              </span>
+            )}
+            <span>
+              ，報價總額 <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+            </span>
           </div>
         </div>
 
@@ -648,7 +661,12 @@ export default function ManagerDashboardPage() {
                 </tr>
               ) : (
                 sortedOverview.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50 [&>td]:align-middle">
+                  <tr
+                    key={p.id}
+                    className={`hover:bg-slate-50 [&>td]:align-middle transition-colors ${
+                      isPinned(p.id) ? "border-l-4 border-l-amber-400 bg-amber-50/20" : ""
+                    }`}
+                  >
                   {visibleColumns.map((col) => {
                     switch (col.key) {
                       case "trafficLight":
@@ -664,13 +682,47 @@ export default function ManagerDashboardPage() {
                             </span>
                           </td>
                         );
-                      case "projectName":
+                      case "projectName": {
+                        const pinned = isPinned(p.id);
                         return (
                           <td key={col.key} className="p-3 font-bold">
-                            {p.projectName}
-                            {p.siteAddress && <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>}
+                            <div className="flex items-start gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const nowPinned = togglePin(p.id);
+                                  if (nowPinned) {
+                                    toast.success(`已將案件「${p.projectName}」置頂`);
+                                  } else {
+                                    toast.info(`已取消案件「${p.projectName}」置頂`);
+                                  }
+                                }}
+                                className={`mt-0.5 p-1 rounded transition-colors shrink-0 ${
+                                  pinned
+                                    ? "text-amber-500 hover:text-amber-600 bg-amber-50 hover:bg-amber-100 ring-1 ring-amber-300"
+                                    : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
+                                }`}
+                                title={pinned ? "取消置頂" : "置頂案件至清單最上方"}
+                                aria-label={pinned ? "取消置頂" : "置頂案件至清單最上方"}
+                              >
+                                <Pin className={`w-3.5 h-3.5 ${pinned ? "fill-amber-500 -rotate-45" : ""}`} />
+                              </button>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-slate-900">{p.projectName}</span>
+                                  {pinned && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
+                                      <Pin className="w-2.5 h-2.5 fill-amber-700 -rotate-45 inline" /> 置頂
+                                    </span>
+                                  )}
+                                </div>
+                                {p.siteAddress && <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>}
+                              </div>
+                            </div>
                           </td>
                         );
+                      }
                       case "customer":
                         return (
                           <td key={col.key} className="p-3">
