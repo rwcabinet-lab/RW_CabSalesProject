@@ -86,7 +86,7 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   // ⑥ 安裝及驗收
   "6-1": "進場安裝",
   "6-2": "監工及現場處置",
-  "6-3": "工程驗收",
+  "6-3": "內部驗收",
   "6-4": "提交成果驗收",
   "6-5": "加減帳",
   // ⑦ 請款/售後

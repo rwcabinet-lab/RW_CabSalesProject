@@ -107,6 +107,7 @@ describe("Section Documentation System (各頁面區塊專用說明文件系統)
       "圓餅/環圈圖",
       "時程延誤與異常警示清單",
       "24 項標準里程碑",
+      "工程驗收",
     ];
 
     for (const badTerm of forbiddenTerms) {
