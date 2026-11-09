@@ -240,6 +240,38 @@ export async function PUT(
       });
     }
 
+    if (action === "withdrawAudit") {
+      if (!milestoneId || typeof milestoneId !== "string") {
+        return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
+      }
+      if (notes !== undefined && typeof notes !== "string") {
+        return NextResponse.json({ error: "撤回原因格式無效" }, { status: 400 });
+      }
+      const milestone = initialMilestones.find((item) => item.id === milestoneId);
+      if (!milestone) return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
+      if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
+        return NextResponse.json({ error: "此里程碑不需要審核" }, { status: 400 });
+      }
+
+      await DataService.withdrawMilestoneReview(
+        projectId,
+        milestoneId,
+        user.id,
+        isManager,
+        notes,
+        initialMilestones,
+      );
+      const updatedMilestones = initialMilestones.map((m) =>
+        m.id === milestoneId ? { ...m, auditSubmitted: false } : m
+      );
+      return NextResponse.json({
+        success: true,
+        project,
+        milestones: attachTrafficLights(updatedMilestones),
+        message: "已成功撤回審核，進度已恢復為進行中",
+      });
+    }
+
     if (action === "returnToProduction") {
       if (!isManager) {
         return NextResponse.json({ error: "僅主管可回到第三階段" }, { status: 403 });

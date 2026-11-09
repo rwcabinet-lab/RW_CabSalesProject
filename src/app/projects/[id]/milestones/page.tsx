@@ -27,6 +27,7 @@ import {
   Sparkles,
   RotateCcw,
   RefreshCw,
+  Undo2,
 } from "lucide-react";
 import {
   MILESTONE_STAGE_LABELS,
@@ -573,6 +574,43 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       toast.error(err instanceof Error ? err.message : "提交審核失敗");
     } finally {
       setSubmittingAudit(false);
+    }
+  };
+
+  const [withdrawingAudit, setWithdrawingAudit] = useState(false);
+
+  // 撤回審核處理
+  const handleWithdrawAudit = async (targetMilestone: MilestoneWithLight) => {
+    const stageName = MILESTONE_STAGE_LABELS[targetMilestone.stageCode] || "此項目";
+    if (!window.confirm(`確定要撤回【${stageName}】的審核嗎？\n撤回後進度將恢復為未送審的進行中狀態，並交還給負責人員重新編輯與送審。`)) {
+      return;
+    }
+    setWithdrawingAudit(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdrawAudit", milestoneId: targetMilestone.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "撤回審核失敗");
+      toast.success(`已成功撤回【${stageName}】的審核，進度已恢復為進行中。`);
+      if (result.project && result.milestones) {
+        applyMilestonesData(result);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => (tRes.ok ? tRes.json() : null))
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "撤回審核失敗");
+    } finally {
+      setWithdrawingAudit(false);
     }
   };
 
@@ -1265,6 +1303,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition"
                             >
                               <Send className="w-3 h-3" /> {currentUserId === m.assignedToId ? "提交審核" : "代送審核"}
+                            </button>
+                          )}
+
+                          {/* [撤回審核]：審核進行中時，提交者、進度負責人或主管/主責業務可執行撤回 */}
+                          {isActive && !isProjectLost && isAuditStage && isAuditSubmitted && (currentUserId === m.assignedToId || canReviewAudit) && (
+                            <button
+                              type="button"
+                              onClick={() => handleWithdrawAudit(m)}
+                              disabled={withdrawingAudit}
+                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition"
+                              title={currentUserId === m.assignedToId ? "撤回提交的審核" : "退回/撤回此審核"}
+                            >
+                              <Undo2 className="w-3 h-3" /> {withdrawingAudit ? "撤回中..." : (currentUserId === m.assignedToId ? "撤回審核" : "退回/撤回")}
                             </button>
                           )}
 

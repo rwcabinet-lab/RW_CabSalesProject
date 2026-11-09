@@ -6,7 +6,7 @@ import {
   TaskPriority,
   TaskType,
 } from "@prisma/client";
-import { BadRequestError, ConflictError, NotFoundError } from "../errors";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../errors";
 import {
   AUDIT_STAGE_CODES,
   MILESTONE_DEFAULT_DAYS,
@@ -218,6 +218,80 @@ export const MilestoneService = {
         isCompleted: false,
         completedAt: null,
         resultNotes: notes || null,
+      },
+    });
+  },
+
+  async withdrawMilestoneReview(
+    projectId: string,
+    milestoneId: string,
+    userId: string,
+    isManager: boolean,
+    notes?: string,
+    existingMilestones?: ProjectMilestoneItem[],
+  ) {
+    const milestone = existingMilestones
+      ? existingMilestones.find((m) => m.id === milestoneId)
+      : await prisma.projectMilestone.findFirst({
+          where: { id: milestoneId, projectId },
+          select: { id: true, stageCode: true, status: true, priority: true, plannedDueDate: true, phase: true, assignedToId: true },
+        });
+    if (!milestone) throw new NotFoundError("找不到此里程碑");
+    if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
+      throw new BadRequestError("此里程碑不需要審核");
+    }
+    if (
+      milestone.status !== MilestoneStatus.IN_PROGRESS &&
+      milestone.status !== MilestoneStatus.OVERDUE
+    ) {
+      throw new ConflictError("只能撤回目前進行中的審核項目");
+    }
+
+    const task = await prisma.salesTask.findUnique({
+      where: { milestoneId },
+      include: {
+        project: {
+          select: { salesRepId: true },
+        },
+      },
+    });
+
+    if (!task || !task.subject.startsWith("【需審核】") || task.isCompleted) {
+      throw new ConflictError("此進度未在審核中或已完成審核");
+    }
+
+    const projectSalesRepId = task.project?.salesRepId || null;
+    const canWithdraw =
+      isManager ||
+      userId === projectSalesRepId ||
+      userId === milestone.assignedToId ||
+      userId === task.assignedById;
+
+    if (!canWithdraw) {
+      throw new ForbiddenError("僅進度負責人、提交者、主責業務或主管可撤回審核");
+    }
+
+    const isDrawing =
+      milestone.phase === "PROPOSAL" ||
+      milestone.phase === "PRE_PROD" ||
+      milestone.stageCode.startsWith("3-") ||
+      milestone.stageCode.startsWith("4-");
+
+    const targetAssigneeId = milestone.assignedToId || projectSalesRepId || userId;
+    const cleanSubject = MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode] || "里程碑任務";
+
+    await prisma.salesTask.update({
+      where: { milestoneId },
+      data: {
+        assignedToId: targetAssigneeId,
+        assignedById: userId,
+        taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+        subject: cleanSubject,
+        dueDatetime: milestone.plannedDueDate ? new Date(milestone.plannedDueDate) : task.dueDatetime,
+        priority: (milestone.priority as TaskPriority) || TaskPriority.MEDIUM,
+        isCompleted: false,
+        completedAt: null,
+        resultNotes: notes ? `[已撤回審核] ${notes}` : null,
       },
     });
   },
