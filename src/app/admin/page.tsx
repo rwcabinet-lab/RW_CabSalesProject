@@ -655,7 +655,7 @@ export default function AdminPage() {
                     case "amount":
                       return (
                         <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
-                          <div className="font-bold text-slate-900">$38.5 萬</div>
+                          <div className="font-bold text-slate-900">$385,000</div>
                           <div className="text-[10px] text-slate-400">2 戶</div>
                         </td>
                       );

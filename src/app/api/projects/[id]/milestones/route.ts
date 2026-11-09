@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "@/lib/schedule-engine";
+import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE, getTaiwanDateString } from "@/lib/schedule-engine";
 import { getUserFromRequest, getRolePages } from "@/lib/access-control";
 import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
 import { AppError, handleApiError } from "@/lib/errors";
@@ -108,6 +108,7 @@ export async function PUT(
       stageCode,
       reason,
       actualDueDate,
+      installationDate,
       isCompleted,
       orderedMilestoneIds,
       milestoneDates,
@@ -421,7 +422,19 @@ export async function PUT(
     }
 
     if (action === "advance") {
-      if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
+      const isDispatch =
+        targetMilestone?.stageCode === "4-3" ||
+        targetMilestone?.stageCode === "5-3";
+
+      if (isDispatch) {
+        const effInstallationDate = (installationDate || actualDueDate)?.trim();
+        if (!effInstallationDate) {
+          return NextResponse.json({ error: "請設定進場日期" }, { status: 400 });
+        }
+        if (!isValidDateOnly(effInstallationDate)) {
+          return NextResponse.json({ error: "進場日期格式無效" }, { status: 400 });
+        }
+      } else if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
         return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
       }
       if (project.currentStage === "WRAP_UP") {
@@ -460,19 +473,24 @@ export async function PUT(
       }
 
       // 快速推進此里程碑完成，並啟動下一里程碑
+      const effInstallationDate = isDispatch ? (installationDate || actualDueDate)?.trim() : undefined;
       const result = await DataService.advanceMilestone(
         projectId,
         milestoneId,
         {
           notes,
           attachments,
-          completedDate: actualDueDate,
+          completedDate: isDispatch
+            ? (actualDueDate && actualDueDate !== effInstallationDate ? actualDueDate : getTaiwanDateString())
+            : actualDueDate,
+          installationDate: effInstallationDate,
         },
         initialMilestones,
       );
 
       const updatedProject = {
         ...project,
+        ...(effInstallationDate ? { expectedDate: effInstallationDate } : {}),
         currentStage: result.newStage,
         isDelayed: result.isDelayed,
       };

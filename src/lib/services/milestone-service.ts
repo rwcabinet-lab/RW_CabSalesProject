@@ -560,7 +560,7 @@ export const MilestoneService = {
   async advanceMilestone(
     projectId: string,
     milestoneId: string,
-    options?: { notes?: string; attachments?: string; completedDate?: string },
+    options?: { notes?: string; attachments?: string; completedDate?: string; installationDate?: string },
     existingMilestones?: ProjectMilestoneItem[]
   ) {
     const [list, projectRecord] = await Promise.all([
@@ -640,9 +640,21 @@ export const MilestoneService = {
         }
       }
     }
+    const projectUpdateData: Prisma.ProjectUpdateInput = {
+      currentStage: result.newCurrentStage as ProjectStage,
+      isDelayed: result.isProjectDelayed,
+    };
+    const installDate = options?.installationDate || (
+      (list.find((m) => m.id === milestoneId)?.stageCode === "4-3" || list.find((m) => m.id === milestoneId)?.stageCode === "5-3")
+        ? options?.completedDate
+        : undefined
+    );
+    if (installDate) {
+      projectUpdateData.expectedDate = new Date(`${installDate.slice(0, 10)}T00:00:00.000Z`);
+    }
     operations.push(prisma.project.update({
       where: { id: projectId },
-      data: { currentStage: result.newCurrentStage as ProjectStage, isDelayed: result.isProjectDelayed },
+      data: projectUpdateData,
     }));
     await prisma.$transaction(operations);
     return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };

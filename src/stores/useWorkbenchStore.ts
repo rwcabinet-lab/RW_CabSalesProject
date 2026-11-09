@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { TaskDTO, WorkbenchProjectDTO } from "@/types/dto";
-import { toTenThousands } from "@/lib/currency";
 
 export interface ProjectFormData {
   projectName: string;
@@ -177,8 +176,8 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
           siteCondition: p.siteCondition,
           expectedDate: p.expectedDate ? p.expectedDate.slice(0, 10) : "",
           unitCount: p.unitCount?.toString() || "",
-          cost: p.cost != null ? String(toTenThousands(p.cost)) : "",
-          quoteAmount: p.quoteAmount != null ? String(toTenThousands(p.quoteAmount)) : "",
+          cost: p.cost != null ? String(Math.round(Number(p.cost))) : "",
+          quoteAmount: p.quoteAmount != null ? String(Math.round(Number(p.quoteAmount))) : "",
           salesRepId: p.salesRepId || "",
         },
       };
@@ -190,12 +189,14 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
     set((state) => ({
       newTaskData: typeof data === "function" ? data(state.newTaskData) : { ...state.newTaskData, ...data },
     })),
-  setTaskToComplete: (task) =>
+  setTaskToComplete: (task) => {
+    const isDispatch = task?.subject === "派工" || task?.subject?.includes("派工");
     set({
       taskToComplete: task,
       completionNotes: "",
-      completionDate: getTodayDate(),
-    }),
+      completionDate: isDispatch ? "" : getTodayDate(),
+    });
+  },
   setCompletionNotes: (notes) => set({ completionNotes: notes }),
   setCompletionDate: (date) => set({ completionDate: date }),
   resetTaskModal: () =>
@@ -204,12 +205,17 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
       newTaskData: { ...initialTaskForm, dueDatetime: getDefaultTaskDueDatetime() },
     }),
 
-  setProjectToAdvance: (project) =>
+  setProjectToAdvance: (project) => {
+    const isDispatch =
+      project?.activeMilestone?.stageCode === "4-3" ||
+      project?.activeMilestone?.stageCode === "5-3" ||
+      project?.activeMilestone?.stageName === "派工";
     set({
       projectToAdvance: project,
       advanceNotes: "",
-      advanceDate: getTodayDate(),
-    }),
+      advanceDate: isDispatch ? "" : getTodayDate(),
+    });
+  },
   setAdvanceNotes: (notes) => set({ advanceNotes: notes }),
   setAdvanceDate: (date) => set({ advanceDate: date }),
   resetAdvanceModal: () =>

@@ -4,6 +4,7 @@ import {
   toTenThousands,
   formatTenThousands,
   formatNTD,
+  formatCurrency,
 } from "@/lib/currency";
 
 describe("Currency Utilities (萬元與整數元金融精確度)", () => {
@@ -67,6 +68,14 @@ describe("Currency Utilities (萬元與整數元金融精確度)", () => {
       expect(formatNTD(null)).toBe("$0");
       expect(formatNTD(undefined)).toBe("$0");
       expect(formatNTD("")).toBe("$0");
+    });
+  });
+
+  describe("formatCurrency (新台幣元格式化別名)", () => {
+    it("行為與 formatNTD 完全一致", () => {
+      expect(formatCurrency(385000)).toBe("$385,000");
+      expect(formatCurrency(0)).toBe("$0");
+      expect(formatCurrency(null)).toBe("$0");
     });
   });
 });

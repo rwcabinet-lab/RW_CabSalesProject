@@ -2,7 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { SalesWorkloadDTO, StageBottleneckDTO } from "@/types/dto";
-import { formatTenThousands } from "@/lib/currency";
+import { formatNTD } from "@/lib/currency";
 import { CUSTOMER_TYPE_LABELS } from "@/lib/constants";
 
 interface SalesWorkloadChartProps {
@@ -111,7 +111,7 @@ export function CustomerTypeDistributionChart({ data }: CustomerTypeDistribution
           cursor={{ fill: "#f1f5f9" }}
           formatter={(value: any, name: any) => {
             if (name === "客戶數量") return [`${value} 家`, name];
-            return [formatTenThousands(Number(value)), name];
+            return [formatNTD(Number(value)), name];
           }}
           contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
         />

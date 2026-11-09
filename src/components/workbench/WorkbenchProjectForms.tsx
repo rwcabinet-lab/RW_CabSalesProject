@@ -4,7 +4,6 @@ import { useState } from "react";
 import { X, Edit3 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
-import { fromTenThousands } from "@/lib/currency";
 import { toast } from "@/stores/useToastStore";
 import { QUERY_KEYS, useCustomerTypeStartStagesQuery } from "@/hooks/useQueries";
 import {
@@ -53,8 +52,8 @@ export function WorkbenchAddProjectPanel({
         ...newProjectData,
         startStageCode: effectiveStartCode,
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
-        cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
-        quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
+        cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
+        quoteAmount: newProjectData.quoteAmount ? Math.round(Number(newProjectData.quoteAmount)) : undefined,
         salesRepId: newProjectData.salesRepId || undefined,
       };
       const res = await fetch("/api/projects", {
@@ -155,20 +154,22 @@ export function WorkbenchAddProjectPanel({
           />
         </label>
         <label>
-          成本金額（萬）
+          成本金額（元）
           <input
             type="number"
-            step="0.01"
+            step="1"
+            placeholder="例如：250000"
             value={newProjectData.cost}
             onChange={(e) => setNewProjectData({ cost: e.target.value })}
             className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
           />
         </label>
         <label>
-          報價（萬）
+          報價（元）
           <input
             type="number"
-            step="0.01"
+            step="1"
+            placeholder="例如：350000"
             value={newProjectData.quoteAmount}
             onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
             className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
@@ -236,8 +237,8 @@ export function WorkbenchEditProjectRow({
       const payload = {
         ...newProjectData,
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
-        cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
-        quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
+        cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
+        quoteAmount: newProjectData.quoteAmount ? Math.round(Number(newProjectData.quoteAmount)) : undefined,
         salesRepId: newProjectData.salesRepId || undefined,
       };
       const res = await fetch("/api/projects", {
@@ -373,20 +374,22 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              成本金額（萬）
+              成本金額（元）
               <input
                 type="number"
-                step="0.01"
+                step="1"
+                placeholder="例如：250000"
                 value={newProjectData.cost}
                 onChange={(e) => setNewProjectData({ cost: e.target.value })}
                 className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
               />
             </label>
             <label className="font-semibold text-slate-700">
-              報價（萬）
+              報價（元）
               <input
                 type="number"
-                step="0.01"
+                step="1"
+                placeholder="例如：350000"
                 value={newProjectData.quoteAmount}
                 onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
                 className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"

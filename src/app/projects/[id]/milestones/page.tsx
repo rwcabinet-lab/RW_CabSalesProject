@@ -53,7 +53,7 @@ import type {
   TrafficLightDTO,
   UserDTO,
 } from "@/types/dto";
-import { formatTenThousands, fromTenThousands, toTenThousands } from "@/lib/currency";
+import { formatNTD } from "@/lib/currency";
 
 interface MilestoneWithLight extends MilestoneDTO {
   trafficLight: TrafficLightDTO;
@@ -190,8 +190,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       siteCondition: project.siteCondition || "",
       expectedDate: project.expectedDate ? project.expectedDate.slice(0, 10) : "",
       unitCount: project.unitCount != null ? String(project.unitCount) : "",
-      cost: project.cost != null ? String(toTenThousands(project.cost)) : "",
-      quoteAmount: project.quoteAmount != null ? String(toTenThousands(project.quoteAmount)) : "",
+      cost: project.cost != null ? String(Math.round(Number(project.cost))) : "",
+      quoteAmount: project.quoteAmount != null ? String(Math.round(Number(project.quoteAmount))) : "",
       salesRepId: project.salesRepId || "",
     });
     setProjectEditError("");
@@ -211,8 +211,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         siteCondition: projectEditForm.siteCondition,
         expectedDate: projectEditForm.expectedDate || undefined,
         unitCount: projectEditForm.unitCount ? Number(projectEditForm.unitCount) : undefined,
-        cost: projectEditForm.cost ? fromTenThousands(Number(projectEditForm.cost)) : undefined,
-        quoteAmount: projectEditForm.quoteAmount ? fromTenThousands(Number(projectEditForm.quoteAmount)) : undefined,
+        cost: projectEditForm.cost ? Math.round(Number(projectEditForm.cost)) : undefined,
+        quoteAmount: projectEditForm.quoteAmount ? Math.round(Number(projectEditForm.quoteAmount)) : undefined,
         salesRepId: projectEditForm.salesRepId || undefined,
       };
       const res = await fetch("/api/projects", {
@@ -618,6 +618,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const handleAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!completionModal) return;
+    const isDispatch = completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3";
+    if (isDispatch && !completionModal.actualDueDate.trim()) {
+      toast.error("請設定進場日期");
+      return;
+    }
     setAdvancing(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/milestones`, {
@@ -626,7 +631,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         body: JSON.stringify({
           action: "advance",
           milestoneId: completionModal.milestone.id,
-          actualDueDate: completionModal.actualDueDate,
+          actualDueDate: isDispatch ? todayDate() : completionModal.actualDueDate,
+          installationDate: isDispatch ? completionModal.actualDueDate.trim() : undefined,
           notes: completionModal.notes,
         }),
       });
@@ -918,8 +924,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
             <div><span className="text-slate-400">預定進場日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
-            <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatTenThousands(project.quoteAmount) : project.totalAmount != null ? formatTenThousands(project.totalAmount) : "未填"}</span></div>
-            <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatTenThousands(project.cost) : "未填"}</span></div>
+            <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatNTD(project.quoteAmount) : project.totalAmount != null ? formatNTD(project.totalAmount) : "未填"}</span></div>
+            <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatNTD(project.cost) : "未填"}</span></div>
             <div className="sm:col-span-2 lg:col-span-1"><span className="text-slate-400">現況說明：</span><span className="font-semibold text-slate-700">{project.siteCondition || "未填"}</span></div>
           </div>
         </section>
@@ -1324,7 +1330,10 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             (!isAuditStage || (isAuditSubmitted && canReviewAudit)) && (
                             <button
                               type="button"
-                              onClick={() => setCompletionModal({ milestone: m, actualDueDate: todayDate(), notes: "" })}
+                              onClick={() => {
+                                const isDispatch = m.stageCode === "4-3" || m.stageCode === "5-3";
+                                setCompletionModal({ milestone: m, actualDueDate: isDispatch ? "" : todayDate(), notes: "" });
+                              }}
                               className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
                             >
                               <Sparkles className="w-3 h-3" /> {isAuditStage ? "審核完成" : "進度完成"}
@@ -1626,7 +1635,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 </div>
               )}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">實際完成日</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  {completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3" ? "進場日期" : "實際完成日"}
+                </label>
                 <input
                   type="date"
                   required
@@ -1811,20 +1822,22 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">成本金額（萬）</label>
+                  <label className="block font-semibold text-slate-700 mb-1">成本金額（元）</label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="1"
+                    placeholder="例如：250000"
                     value={projectEditForm.cost}
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, cost: e.target.value })}
                     className="w-full border rounded p-2 text-xs text-right tabular-nums"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">報價（萬）</label>
+                  <label className="block font-semibold text-slate-700 mb-1">報價（元）</label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="1"
+                    placeholder="例如：350000"
                     value={projectEditForm.quoteAmount}
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, quoteAmount: e.target.value })}
                     className="w-full border rounded p-2 text-xs text-right tabular-nums"

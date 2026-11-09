@@ -8,7 +8,7 @@ import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
-import { formatTenThousands } from "@/lib/currency";
+import { formatNTD } from "@/lib/currency";
 
 const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   LONGMEI_STORE: "隆美",
@@ -169,7 +169,7 @@ export default function CustomerStatsPage() {
             累計成交總額
           </div>
           <div className="text-3xl font-black text-emerald-600 tabular-nums">
-            {formatTenThousands(data.kpi.totalSignedSum || 0)}
+            {formatNTD(data.kpi.totalSignedSum || 0)}
           </div>
         </div>
 
@@ -179,7 +179,7 @@ export default function CustomerStatsPage() {
             客戶案場報價總額
           </div>
           <div className="text-3xl font-black text-indigo-600 tabular-nums">
-            {formatTenThousands(data.kpi.totalQuoteSum)}
+            {formatNTD(data.kpi.totalQuoteSum)}
           </div>
         </div>
       </div>
@@ -348,10 +348,10 @@ export default function CustomerStatsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-right font-bold text-emerald-600 tabular-nums">
-                    {c.totalSignedAmount > 0 ? formatTenThousands(c.totalSignedAmount) : "-"}
+                    {c.totalSignedAmount > 0 ? formatNTD(c.totalSignedAmount) : "-"}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-900 tabular-nums">
-                    {c.totalQuoteAmount > 0 ? formatTenThousands(c.totalQuoteAmount) : "-"}
+                    {c.totalQuoteAmount > 0 ? formatNTD(c.totalQuoteAmount) : "-"}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500">
                     {c.latestProjectName ? (

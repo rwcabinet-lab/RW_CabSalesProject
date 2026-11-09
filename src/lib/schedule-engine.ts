@@ -4,7 +4,7 @@ import {
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
 } from "./constants";
-import { ConflictError } from "./errors";
+import { BadRequestError, ConflictError } from "./errors";
 
 export interface TrafficLightStatus {
   color: "RED" | "YELLOW" | "GREEN" | "GRAY";
@@ -285,13 +285,12 @@ export const ScheduleEngine = {
   advanceMilestone(
     milestones: ProjectMilestoneItem[],
     targetMilestoneId: string,
-    options?: { notes?: string; attachments?: string; completedDate?: string }
+    options?: { notes?: string; attachments?: string; completedDate?: string; installationDate?: string }
   ): {
     updatedMilestones: ProjectMilestoneItem[];
     newCurrentStage: string;
     isProjectDelayed: boolean;
   } {
-    const nowDate = (options?.completedDate || getTaiwanDateString(new Date())).slice(0, 10);
     const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
     const targetIndex = sorted.findIndex((m) => m.id === targetMilestoneId);
 
@@ -303,18 +302,45 @@ export const ScheduleEngine = {
       throw new ConflictError("只能完成目前進行中的里程碑");
     }
 
+    const targetMilestone = sorted[targetIndex];
+    const isDispatch = targetMilestone.stageCode === "4-3" || targetMilestone.stageCode === "5-3";
+    const nowDate = (options?.completedDate || getTaiwanDateString(new Date())).slice(0, 10);
+
+    let installationDate = options?.installationDate?.trim().slice(0, 10);
+    if (isDispatch) {
+      if (!installationDate && options?.completedDate && options.completedDate.trim()) {
+        installationDate = options.completedDate.trim().slice(0, 10);
+      }
+      if (!installationDate) {
+        throw new BadRequestError("請設定進場日期");
+      }
+    }
+
     // 1. 標記當前進度為已完成
     sorted[targetIndex] = {
       ...sorted[targetIndex],
       status: "COMPLETED",
-      actualDueDate: nowDate,
+      actualDueDate: isDispatch
+        ? (options?.completedDate && options.completedDate !== installationDate ? options.completedDate.slice(0, 10) : getTaiwanDateString(new Date()))
+        : nowDate,
       notes: options?.notes || sorted[targetIndex].notes,
       attachments: options?.attachments || sorted[targetIndex].attachments,
     };
 
+    // 2. 若為派工項目，同步設定「進場安裝」(6-1) 的進場日期 (plannedDueDate)
+    if (isDispatch && installationDate) {
+      const installIndex = sorted.findIndex((m) => m.stageCode === "6-1");
+      if (installIndex !== -1) {
+        sorted[installIndex] = {
+          ...sorted[installIndex],
+          plannedDueDate: installationDate,
+        };
+      }
+    }
+
     let newCurrentStage = STAGE_CODE_TO_PROJECT_STAGE[sorted[targetIndex].stageCode] || "CONTACT";
 
-    // 2. 啟動下一進度
+    // 3. 啟動下一進度
     const nextIndex = targetIndex + 1;
     if (nextIndex < sorted.length) {
       sorted[nextIndex] = { ...sorted[nextIndex], status: "IN_PROGRESS" };

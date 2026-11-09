@@ -43,3 +43,10 @@ export function formatNTD(amount: number | string | null | undefined): string {
   if (Number.isNaN(num)) return "$0";
   return `$${Math.round(num).toLocaleString("zh-TW")}`;
 }
+
+/**
+ * 格式化為新台幣元貨幣字串（別名，與 formatNTD 相同）
+ */
+export function formatCurrency(amount: number | string | null | undefined): string {
+  return formatNTD(amount);
+}

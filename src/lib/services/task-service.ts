@@ -242,12 +242,16 @@ export const TaskService = {
         if (combined?.project.currentStage === "WRAP_UP" || combined?.project.currentStage === "LOST") {
           throw new ConflictError("案件已進入額外階段，無法完成一般里程碑");
         }
+        const isDispatchTask =
+          combined?.milestones.find((m) => m.id === taskBeforeUpdate.milestoneId)?.stageCode === "4-3" ||
+          combined?.milestones.find((m) => m.id === taskBeforeUpdate.milestoneId)?.stageCode === "5-3";
         await MilestoneService.advanceMilestone(
           taskBeforeUpdate.projectId,
           taskBeforeUpdate.milestoneId,
           {
             notes: resultNotes,
             completedDate: completedAt,
+            installationDate: isDispatchTask ? completedAt : undefined,
           },
           combined?.milestones,
         );

@@ -6,7 +6,7 @@ import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, 
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
-import { formatTenThousands } from "@/lib/currency";
+import { formatNTD } from "@/lib/currency";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import type { ApiResponse, AssignableUserDTO, ColumnItemDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
@@ -383,7 +383,7 @@ export default function ManagerDashboardPage() {
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">已簽約/生產預估總額</div>
-          <div className="text-right text-3xl font-black tabular-nums">{formatTenThousands(data.kpi.signedTotal)}</div>
+          <div className="text-right text-3xl font-black tabular-nums">{formatNTD(data.kpi.signedTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">成交率</div>
@@ -760,7 +760,7 @@ export default function ManagerDashboardPage() {
                         return (
                           <td key={col.key} className="p-3">
                             <div className="tabular-nums font-bold text-slate-900">
-                              {formatTenThousands(p.quoteAmount ?? p.totalAmount ?? 0)}
+                              {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
                             </div>
                             <div className="text-[10px] text-slate-500">
                               {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}

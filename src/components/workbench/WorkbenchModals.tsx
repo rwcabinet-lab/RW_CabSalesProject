@@ -152,9 +152,18 @@ export function WorkbenchCompleteTaskModal({ onInvalidate }: CompleteTaskModalPr
 
   if (!taskToComplete) return null;
 
+  const isDispatch =
+    taskToComplete.subject === "派工" ||
+    taskToComplete.subject?.includes("派工");
+
   const handleCompleteTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskToComplete) return;
+
+    if (isDispatch && !completionDate.trim()) {
+      setCompletionError("請設定進場日期");
+      return;
+    }
 
     const completedAt = completionDate || getTaiwanDateString();
     setCompletingTask(true);
@@ -203,7 +212,7 @@ export function WorkbenchCompleteTaskModal({ onInvalidate }: CompleteTaskModalPr
           [{taskToComplete.projectName}] {taskToComplete.subject}
         </p>
         <label className="mb-4 block text-sm font-semibold">
-          實際完成日
+          {isDispatch ? "進場日期" : "實際完成日"}
           <input
             type="date"
             required
@@ -274,6 +283,10 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
 
   const currentStageCode = projectToAdvance.activeMilestone.stageCode;
   const currentStageName = projectToAdvance.activeMilestone.stageName;
+  const isDispatch =
+    currentStageCode === "4-3" ||
+    currentStageCode === "5-3" ||
+    currentStageName === "派工";
   const currentIndex = STANDARD_MILESTONE_STAGE_CODES.indexOf(currentStageCode);
   const nextStageCode =
     currentIndex !== -1 && currentIndex + 1 < STANDARD_MILESTONE_STAGE_CODES.length
@@ -284,6 +297,11 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
   const handleAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectToAdvance.activeMilestone) return;
+
+    if (isDispatch && !advanceDate.trim()) {
+      setAdvanceError("請設定進場日期");
+      return;
+    }
 
     setAdvancing(true);
     setAdvanceError("");
@@ -296,7 +314,8 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
         body: JSON.stringify({
           action: "advance",
           milestoneId: projectToAdvance.activeMilestone.id,
-          actualDueDate: advanceDate || getTaiwanDateString(),
+          actualDueDate: isDispatch ? getTaiwanDateString() : (advanceDate || getTaiwanDateString()),
+          installationDate: isDispatch ? advanceDate.trim() : undefined,
           notes: advanceNotes.trim() || undefined,
         }),
       });
@@ -395,7 +414,7 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
         </div>
 
         <label className="mb-4 block text-xs font-bold text-slate-700">
-          實際完成日
+          {isDispatch ? "進場日期" : "實際完成日"}
           <input
             type="date"
             required

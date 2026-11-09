@@ -6,7 +6,7 @@ import {
   STAGE_CODE_TO_PROJECT_STAGE,
 } from "@/lib/schedule-engine";
 import { ProjectMilestoneItem } from "@/lib/constants";
-import { ConflictError } from "@/lib/errors";
+import { BadRequestError, ConflictError } from "@/lib/errors";
 
 function createMockMilestone(
   id: string,
@@ -376,6 +376,43 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       const result = ScheduleEngine.advanceMilestone([mFinal], "m-final");
       expect(result.updatedMilestones[0].status).toBe("COMPLETED");
       expect(result.newCurrentStage).toBe("DONE");
+    });
+
+    it("推進【派工】未提供進場日期時，應拋出 BadRequestError 強制要求設定", () => {
+      const m43 = createMockMilestone("m-43", "4-3", 15, "IN_PROGRESS");
+      const m44 = createMockMilestone("m-44", "4-4", 16, "PENDING");
+      const m61 = createMockMilestone("m-61", "6-1", 19, "PENDING");
+
+      // 未傳入 installationDate 與 completedDate
+      expect(() =>
+        ScheduleEngine.advanceMilestone([m43, m44, m61], "m-43")
+      ).toThrow(BadRequestError);
+
+      // 傳入空字串
+      expect(() =>
+        ScheduleEngine.advanceMilestone([m43, m44, m61], "m-43", { installationDate: "   " })
+      ).toThrow(BadRequestError);
+    });
+
+    it("推進【派工】提供進場日期時，同步設定【進場安裝】之預定進場日並啟動下一進度", () => {
+      const m43 = createMockMilestone("m-43", "4-3", 15, "IN_PROGRESS");
+      const m44 = createMockMilestone("m-44", "4-4", 16, "PENDING");
+      const m61 = createMockMilestone("m-61", "6-1", 19, "PENDING", "2026-11-20");
+
+      const result = ScheduleEngine.advanceMilestone([m43, m44, m61], "m-43", {
+        installationDate: "2026-12-25",
+        notes: "工班已敲定聖誕節當日進場組裝",
+      });
+
+      const updated43 = result.updatedMilestones.find((m) => m.id === "m-43");
+      const updated44 = result.updatedMilestones.find((m) => m.id === "m-44");
+      const updated61 = result.updatedMilestones.find((m) => m.id === "m-61");
+
+      expect(updated43?.status).toBe("COMPLETED");
+      expect(updated43?.notes).toBe("工班已敲定聖誕節當日進場組裝");
+      expect(updated44?.status).toBe("IN_PROGRESS");
+      // 6-1 進場安裝之進場日期 (plannedDueDate) 成功同步更新為指定日期
+      expect(updated61?.plannedDueDate).toBe("2026-12-25");
     });
   });
 });

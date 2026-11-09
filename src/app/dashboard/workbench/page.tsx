@@ -16,7 +16,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
-import { formatTenThousands } from "@/lib/currency";
+import { formatNTD } from "@/lib/currency";
 import { getTaskScheduleStatus } from "@/lib/schedule-engine";
 import type {
   ApiResponse,
@@ -626,7 +626,7 @@ export default function SalesWorkbenchPage() {
                           return (
                             <td key={col.key} className="p-3">
                               <div className="tabular-nums font-bold text-slate-900">
-                                {formatTenThousands(p.quoteAmount ?? p.totalAmount ?? 0)}
+                                {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
                               </div>
                               <div className="text-[10px] text-slate-500">
                                 {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
