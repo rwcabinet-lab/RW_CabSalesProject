@@ -802,14 +802,23 @@ export const MilestoneService = {
       throw new ConflictError("請由最後一個已完成的里程碑開始回退");
     }
     const target = milestones[targetIndex];
-    if (target.notes?.includes("系統自動略過")) {
-      throw new ConflictError("此進度為建立案場時依客戶類型自動略過之項目，無法回退");
+    const isAutoSkipped = Boolean(target.notes?.includes("系統自動略過"));
+
+    // 配套 2: 若為系統自動略過項目，重新展期預定完成日（避免過期變紅燈）
+    let targetNewPlannedDueDate = target.plannedDueDate;
+    if (isAutoSkipped) {
+      const defaultDaysConfig = await ConfigService.getMilestoneDefaultDays();
+      const defaultDays = Number(defaultDaysConfig[target.stageCode]) || MILESTONE_DEFAULT_DAYS[target.stageCode] || 3;
+      const newDue = new Date();
+      newDue.setDate(newDue.getDate() + defaultDays);
+      targetNewPlannedDueDate = newDue.toISOString().slice(0, 10);
     }
+
     const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
     const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
     let daysToRestore = 0;
-    if (isRegularStage && target.plannedDueDate && target.actualDueDate) {
+    if (isRegularStage && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
       const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
       const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
       const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
@@ -823,6 +832,11 @@ export const MilestoneService = {
       if (idx === targetIndex) {
         updated.status = MilestoneStatus.IN_PROGRESS;
         updated.actualDueDate = null;
+        // 配套 2 & 3: 展期預定日，且只限第一次回退系統自動略過項目時清空該備註，避免誤清使用者輸入資訊
+        if (isAutoSkipped) {
+          updated.plannedDueDate = targetNewPlannedDueDate;
+          updated.notes = null;
+        }
       } else if (idx === targetIndex + 1 && m.status !== "COMPLETED") {
         updated.status = MilestoneStatus.PENDING;
       }
@@ -862,17 +876,55 @@ export const MilestoneService = {
       }
     }
 
+    const projectRecord = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { salesRepId: true },
+    });
+    const targetAssigneeId = target.assignedToId || projectRecord?.salesRepId;
+    const isDrawing =
+      target.phase === "PROPOSAL" ||
+      target.phase === "PRE_PROD" ||
+      target.stageCode.startsWith("3-") ||
+      target.stageCode.startsWith("4-");
+
     await prisma.$transaction(async (tx) => {
-      // 1. 回退目標里程碑狀態並清空實際完成日
+      // 1. 回退目標里程碑狀態並清空實際完成日（若為自動略過項目，同步更新重新展期之預定日並清空備註）
       await tx.projectMilestone.update({
         where: { id: target.id },
-        data: { status: evaluatedTarget.status, actualDueDate: null },
+        data: {
+          status: evaluatedTarget.status,
+          actualDueDate: null,
+          ...(isAutoSkipped && targetNewPlannedDueDate ? { plannedDueDate: new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`) } : {}),
+          ...(isAutoSkipped ? { notes: null } : {}),
+        },
       });
-      // 2. 重置關聯任務為未完成
-      await tx.salesTask.updateMany({
-        where: { milestoneId: target.id },
-        data: { isCompleted: false, completedAt: null },
-      });
+      // 2. 配套 1: 重置關聯任務為未完成，若無待辦任務（如自動略過項目）則自動補建對應類型之待辦任務
+      if (targetAssigneeId) {
+        const targetDue = targetNewPlannedDueDate
+          ? new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`)
+          : target.plannedDueDate
+            ? new Date(target.plannedDueDate)
+            : new Date();
+        await tx.salesTask.upsert({
+          where: { milestoneId: target.id },
+          update: {
+            isCompleted: false,
+            completedAt: null,
+            dueDatetime: targetDue,
+            ...(isAutoSkipped ? { resultNotes: null } : {}),
+          },
+          create: {
+            projectId,
+            milestoneId: target.id,
+            assignedToId: targetAssigneeId,
+            taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+            subject: MILESTONE_STAGE_LABELS[target.stageCode as MilestoneStageCode] || "里程碑任務",
+            dueDatetime: targetDue,
+            priority: (target.priority as TaskPriority) || TaskPriority.MEDIUM,
+            isCompleted: false,
+          },
+        });
+      }
       // 3. 更新案場階段與逾期評估
       await tx.project.update({
         where: { id: projectId },

@@ -206,18 +206,25 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(advanceResult.newCurrentStage).toBe("PROD_SHIP");
   });
 
-  it("防呆機制：嘗試回退系統自動略過之里程碑時應拋出 ConflictError", () => {
+  it("回退機制：允許回退系統自動略過之里程碑，並清空自動略過標記備註", () => {
     const autoSkippedMilestone = {
       id: "m-skip",
       status: "COMPLETED",
       notes: "【系統自動略過：依客戶類型（工廠）跳轉】",
     };
 
-    expect(() => {
-      if (autoSkippedMilestone.notes?.includes("系統自動略過")) {
-        throw new ConflictError("此進度為建立案場時依客戶類型自動略過之項目，無法回退");
-      }
-    }).toThrow(ConflictError);
+    const isAutoSkipped = Boolean(autoSkippedMilestone.notes?.includes("系統自動略過"));
+    expect(isAutoSkipped).toBe(true);
+
+    // 回退後應還原為進行中並清空自動略過標記
+    const rolledBackMilestone = {
+      ...autoSkippedMilestone,
+      status: "IN_PROGRESS",
+      notes: isAutoSkipped ? null : autoSkippedMilestone.notes,
+    };
+
+    expect(rolledBackMilestone.status).toBe("IN_PROGRESS");
+    expect(rolledBackMilestone.notes).toBeNull();
   });
 
   it("管理設定動態覆寫：優先採用動態設定之客戶類型起始進度", () => {

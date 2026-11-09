@@ -4,17 +4,51 @@ import { prisma } from "@/lib/prisma";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { MilestoneStatus, TaskPriority, TaskType } from "@prisma/client";
 
+const mockTx = {
+  projectMilestone: {
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  salesTask: {
+    upsert: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  project: {
+    update: vi.fn(),
+  },
+  $executeRaw: vi.fn(),
+};
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    appConfig: {
+      findUnique: vi.fn(),
+    },
+    project: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
     projectMilestone: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     salesTask: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       upsert: vi.fn(),
+      deleteMany: vi.fn(),
     },
+    $transaction: vi.fn((callback) => {
+      if (typeof callback === "function") {
+        return callback(mockTx);
+      }
+      return Promise.resolve(callback);
+    }),
   },
 }));
 
@@ -162,6 +196,111 @@ describe("Milestone Audit Withdrawal Mechanism (里程碑審核撤回與駁回�
         subject: "設計圖",
         resultNotes: "[已撤回審核] 報價折率有誤退回重擬",
       }),
+    });
+  });
+
+  describe("回退至「系統自動略過」項目與配套機制", () => {
+    it("回退系統自動略過之里程碑時，成功回退且清空自動略過備註、自動展期並補建待辦任務", async () => {
+      const mockMilestonesList = [
+        {
+          id: "m-skip-31",
+          projectId: "proj-100",
+          stageCode: "3-1",
+          stageOrder: 1,
+          phase: "PROPOSAL",
+          status: MilestoneStatus.COMPLETED,
+          plannedDueDate: "2026-11-01",
+          actualDueDate: "2026-11-01",
+          notes: "【系統自動略過：依客戶類型（經銷公司）跳轉】",
+          assignedToId: "user-rep",
+        },
+        {
+          id: "m-active-32",
+          projectId: "proj-100",
+          stageCode: "3-2",
+          stageOrder: 2,
+          phase: "PROPOSAL",
+          status: MilestoneStatus.IN_PROGRESS,
+          plannedDueDate: "2026-11-15",
+          actualDueDate: null,
+          notes: null,
+          assignedToId: "user-rep",
+        },
+      ];
+
+      vi.mocked(prisma.project.findUnique).mockResolvedValueOnce({
+        salesRepId: "user-rep",
+      } as any);
+
+      const result = await MilestoneService.rollbackMilestone(
+        "proj-100",
+        "m-skip-31",
+        mockMilestonesList as any
+      );
+
+      const rolledBack = result.find((m) => m.id === "m-skip-31");
+      expect(rolledBack?.status).toBe(MilestoneStatus.IN_PROGRESS);
+      // 配套 3: 清空自動略過備註
+      expect(rolledBack?.notes).toBeNull();
+      // 配套 2: 預定日展期，不應維持過去之建案日 2026-11-01
+      expect(rolledBack?.plannedDueDate).not.toBe("2026-11-01");
+
+      // 配套 1: 待辦任務自動 upsert 補建
+      expect(mockTx.salesTask.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { milestoneId: "m-skip-31" },
+          create: expect.objectContaining({
+            milestoneId: "m-skip-31",
+            assignedToId: "user-rep",
+            subject: "設計圖",
+            isCompleted: false,
+          }),
+        })
+      );
+    });
+
+    it("回退一般手動推進之里程碑時，保留原使用者輸入之備註不被誤清", async () => {
+      const mockMilestonesList = [
+        {
+          id: "m-normal-11",
+          projectId: "proj-100",
+          stageCode: "1-1",
+          stageOrder: 1,
+          phase: "DEVELOP",
+          status: MilestoneStatus.COMPLETED,
+          plannedDueDate: "2026-11-25",
+          actualDueDate: "2026-11-20",
+          notes: "業主現場確認尺寸，已手動填報",
+          assignedToId: "user-rep",
+        },
+        {
+          id: "m-active-12",
+          projectId: "proj-100",
+          stageCode: "1-2",
+          stageOrder: 2,
+          phase: "DEVELOP",
+          status: MilestoneStatus.IN_PROGRESS,
+          plannedDueDate: "2026-11-10",
+          actualDueDate: null,
+          notes: null,
+          assignedToId: "user-rep",
+        },
+      ];
+
+      vi.mocked(prisma.project.findUnique).mockResolvedValueOnce({
+        salesRepId: "user-rep",
+      } as any);
+
+      const result = await MilestoneService.rollbackMilestone(
+        "proj-100",
+        "m-normal-11",
+        mockMilestonesList as any
+      );
+
+      const rolledBack = result.find((m) => m.id === "m-normal-11");
+      expect(rolledBack?.status).toBe(MilestoneStatus.IN_PROGRESS);
+      // 保留原使用者輸入之備註
+      expect(rolledBack?.notes).toBe("業主現場確認尺寸，已手動填報");
     });
   });
 });
