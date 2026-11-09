@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { fromTenThousands } from "@/lib/currency";
 import { toast } from "@/stores/useToastStore";
-import { QUERY_KEYS } from "@/hooks/useQueries";
+import { QUERY_KEYS, useCustomerTypeStartStagesQuery } from "@/hooks/useQueries";
 import {
   CUSTOMER_TYPE_LABELS,
   CUSTOMER_TYPE_START_STAGE_CODES,
@@ -35,8 +35,14 @@ export function WorkbenchAddProjectPanel({
   const setNewProjectData = useWorkbenchStore((s) => s.setNewProjectData);
 
   const [saving, setSaving] = useState(false);
+  const { data: customerTypeStages } = useCustomerTypeStartStagesQuery();
   const selectedCust = customers.find((c) => c.id === newProjectData.customerId);
-  const autoStartCode = selectedCust ? CUSTOMER_TYPE_START_STAGE_CODES[selectedCust.customerType] : undefined;
+  const effectiveStartCode = selectedCust
+    ? customerTypeStages?.[selectedCust.customerType] ||
+      CUSTOMER_TYPE_START_STAGE_CODES[selectedCust.customerType] ||
+      "1-1"
+    : undefined;
+  const isCustomStart = Boolean(effectiveStartCode && effectiveStartCode !== "1-1");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +51,7 @@ export function WorkbenchAddProjectPanel({
     try {
       const payload = {
         ...newProjectData,
+        startStageCode: effectiveStartCode,
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
         cost: newProjectData.cost ? fromTenThousands(Number(newProjectData.cost)) : undefined,
         quoteAmount: newProjectData.quoteAmount ? fromTenThousands(Number(newProjectData.quoteAmount)) : undefined,
@@ -79,9 +86,9 @@ export function WorkbenchAddProjectPanel({
         </button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        {selectedCust && autoStartCode && (
+        {selectedCust && isCustomStart && effectiveStartCode && (
           <div className="col-span-full text-xs text-emerald-800 bg-emerald-100/70 border border-emerald-200 px-3 py-1.5 rounded flex items-center gap-1.5">
-            <span>💡 依客戶類型【{CUSTOMER_TYPE_LABELS[selectedCust.customerType] || selectedCust.customerType}】，建立案場時進度將自動略過前期階段，直接推進至【{autoStartCode} {MILESTONE_STAGE_LABELS[autoStartCode]}】</span>
+            <span>💡 依客戶類型【{CUSTOMER_TYPE_LABELS[selectedCust.customerType] || selectedCust.customerType}】，建立案場時進度將自動略過前期階段，直接推進至【{effectiveStartCode} {MILESTONE_STAGE_LABELS[effectiveStartCode] || effectiveStartCode}】</span>
           </div>
         )}
         <label>

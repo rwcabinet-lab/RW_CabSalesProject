@@ -120,7 +120,7 @@ describe("新增案場之客戶欄位關鍵字搜尋與選取邏輯", () => {
   });
 
   describe("選定客戶後與案場表單連動邏輯", () => {
-    it("選中特定客戶時，應能連動取得對應業務與起始階段代碼", () => {
+    it("選中特定客戶時，應能連動取得對應業務與預設起始階段代碼", () => {
       const selected = mockCustomers.find((c) => c.name === "正道系統櫥櫃製造廠");
       expect(selected).toBeDefined();
       if (!selected) return;
@@ -128,9 +128,43 @@ describe("新增案場之客戶欄位關鍵字搜尋與選取邏輯", () => {
       // 檢查業務連動
       expect(selected.salesRepId).toBe("u1");
 
-      // 檢查自動推進起始進度 (工廠類為 4-5)
+      // 檢查預設起始進度
       const startStage = CUSTOMER_TYPE_START_STAGE_CODES[selected.customerType];
       expect(startStage).toBe("4-5");
+    });
+
+    it("管理頁面設定起始進度時，應優先採用管理員設定而非寫死常數", () => {
+      // 模擬管理員在管理設定將【工廠】改為 1-1（不略過）
+      const adminConfig: Record<string, string> = {
+        CABINET_FACTORY: "1-1",
+        DESIGN_COMPANY: "3-1",
+      };
+
+      const selected = mockCustomers.find((c) => c.name === "正道系統櫥櫃製造廠");
+      expect(selected).toBeDefined();
+      if (!selected) return;
+
+      const dynamicCode = adminConfig[selected.customerType] || CUSTOMER_TYPE_START_STAGE_CODES[selected.customerType] || "1-1";
+      expect(dynamicCode).toBe("1-1");
+
+      // 設為 1-1 時，isCustomStart 應為 false（不跳轉、不顯示自動略過前期階段提示）
+      const isCustomStart = dynamicCode !== "1-1";
+      expect(isCustomStart).toBe(false);
+    });
+
+    it("管理頁面設定自訂進度（如 4-1）時，應正確判定為自訂跳轉並顯示對應進度代碼", () => {
+      const adminConfig: Record<string, string> = {
+        CABINET_FACTORY: "4-1",
+      };
+
+      const selected = mockCustomers.find((c) => c.name === "正道系統櫥櫃製造廠");
+      expect(selected).toBeDefined();
+      if (!selected) return;
+
+      const dynamicCode = adminConfig[selected.customerType] || CUSTOMER_TYPE_START_STAGE_CODES[selected.customerType] || "1-1";
+      expect(dynamicCode).toBe("4-1");
+      const isCustomStart = dynamicCode !== "1-1";
+      expect(isCustomStart).toBe(true);
     });
 
     it("選中設計公司客戶時，起始階段應為 3-1", () => {

@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/hooks/useQueries";
 import {
   Check,
   Pencil,
@@ -85,6 +87,7 @@ const CONFIGURABLE_CUSTOMER_TYPES = [
 ];
 
 export default function AdminPage() {
+  const queryClient = useQueryClient();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [permissions, setPermissions] = useState<RolePermission[]>([]);
   const [configTab, setConfigTab] = useState<"columns" | "stageDays" | "customerTypes">("columns");
@@ -390,6 +393,7 @@ export default function AdminPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "儲存各客戶類型起始進度失敗");
       }
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customerTypeStartStages });
       setNotice("各客戶類型預設起始進度已成功儲存至全域設定！");
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存各客戶類型起始進度失敗");

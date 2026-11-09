@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { PageAccessKey } from "@/lib/page-access";
+import type { MilestoneStageCode } from "@/lib/constants";
 import type {
   ApiResponse,
   ColumnItemDTO,
@@ -34,6 +35,7 @@ export const QUERY_KEYS = {
   projectTasks: (projectId: string, isCompleted: boolean) =>
     ["projects", projectId, "tasks", isCompleted ? "completed" : "active"] as const,
   columnConfig: ["projects", "columns-config"] as const,
+  customerTypeStartStages: ["projects", "start-stages-config"] as const,
   workbench: ["dashboard", "workbench"] as const,
   managerDashboard: () => ["dashboard", "manager"] as const,
   managerCustomerStats: ["dashboard", "manager", "customers"] as const,
@@ -105,6 +107,24 @@ export function useColumnConfigQuery() {
         throw new Error(data.error || "無法取得全域案件欄位設定");
       }
       return data.columns;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 取得管理頁面設定之各客戶類型預設起始進度設定（快取 5 分鐘）
+ */
+export function useCustomerTypeStartStagesQuery() {
+  return useQuery({
+    queryKey: QUERY_KEYS.customerTypeStartStages,
+    queryFn: async (): Promise<Record<string, MilestoneStageCode>> => {
+      const res = await fetch("/api/projects/config/start-stages", { cache: "no-store" });
+      const data = (await res.json()) as ApiResponse<{ customerTypeStages: Record<string, MilestoneStageCode> }>;
+      if (!res.ok || !data.customerTypeStages) {
+        throw new Error(data.error || "無法取得各客戶類型起始進度設定");
+      }
+      return data.customerTypeStages;
     },
     staleTime: 5 * 60 * 1000,
   });
