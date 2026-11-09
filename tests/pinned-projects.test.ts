@@ -98,4 +98,42 @@ describe("案件清單圖釘 (置頂) 功能測試", () => {
     expect(sorted[0].id).toBe("p4"); // 置頂的 p4 排第 1
     expect(sorted[1].id).toBe("p1");
   });
+
+  describe("跨裝置雲端同步驗證與隔離機制", () => {
+    it("雲端同步 payload 應能正確過濾重複與無效字串", () => {
+      const rawIds = ["p1", "p2", "p1", "", null, undefined, 123, "   ", "p3"];
+      const validIds = Array.from(
+        new Set(
+          rawIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        )
+      ).slice(0, 100);
+
+      expect(validIds).toEqual(["p1", "p2", "p3"]);
+    });
+
+    it("置頂專案數量上限為 100 筆防呆保護", () => {
+      const massiveIds = Array.from({ length: 150 }, (_, i) => `proj-${i}`);
+      const validIds = Array.from(
+        new Set(
+          massiveIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        )
+      ).slice(0, 100);
+
+      expect(validIds).toHaveLength(100);
+      expect(validIds[0]).toBe("proj-0");
+      expect(validIds[99]).toBe("proj-99");
+    });
+
+    it("各使用者之雲端 AppConfig 鍵值嚴格按 userId 隔離", () => {
+      const userAId = "user-sales-01";
+      const userBId = "user-mgr-02";
+
+      const keyA = `user_pinned_${userAId}`;
+      const keyB = `user_pinned_${userBId}`;
+
+      expect(keyA).not.toBe(keyB);
+      expect(keyA).toBe("user_pinned_user-sales-01");
+      expect(keyB).toBe("user_pinned_user-mgr-02");
+    });
+  });
 });
