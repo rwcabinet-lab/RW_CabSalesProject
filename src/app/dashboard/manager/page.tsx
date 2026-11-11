@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw, Pin } from "lucide-react";
+import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw, Pin, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
+import { useManagerStore } from "@/stores/useManagerStore";
+import { useShallow } from "zustand/react/shallow";
 import { formatNTD } from "@/lib/currency";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
@@ -46,13 +48,37 @@ const StageBottlenecksChart = dynamic(
 export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
 
-  // 過濾條件：預設排除已流標與已立帳 (進行中)
-  const [searchQuery, setSearchQuery] = useState("");
-  const [stageFilter, setStageFilter] = useState("ACTIVE");
-  const [businessFilter, setBusinessFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [dateSort, setDateSort] = useState<"NONE" | "ASC" | "DESC">("NONE");
-  const [statusSort, setStatusSort] = useState<"NONE" | "URGENT_FIRST" | "NORMAL_FIRST">("NONE");
+  // 案場總覽過濾條件 (由 useManagerStore 全域持久化管理，切換頁面不重置)
+  const {
+    searchQuery,
+    stageFilter,
+    businessFilter,
+    statusFilter,
+    dateSort,
+    statusSort,
+  } = useManagerStore(
+    useShallow((s) => ({
+      searchQuery: s.searchQuery,
+      stageFilter: s.stageFilter,
+      businessFilter: s.businessFilter,
+      statusFilter: s.statusFilter,
+      dateSort: s.dateSort,
+      statusSort: s.statusSort,
+    }))
+  );
+
+  const setSearchQuery = useManagerStore((s) => s.setSearchQuery);
+  const setStageFilter = useManagerStore((s) => s.setStageFilter);
+  const setBusinessFilter = useManagerStore((s) => s.setBusinessFilter);
+  const setStatusFilter = useManagerStore((s) => s.setStatusFilter);
+  const toggleDateSort = useManagerStore((s) => s.toggleDateSort);
+  const toggleStatusSort = useManagerStore((s) => s.toggleStatusSort);
+  const resetFilters = useManagerStore((s) => s.resetFilters);
+  const initFromStorage = useManagerStore((s) => s.initFromStorage);
+
+  useEffect(() => {
+    initFromStorage();
+  }, [initFromStorage]);
   const [workloadRoleFilter, setWorkloadRoleFilter] = useState<"ALL" | "SALES" | "ASSISTANT" | "SITE_ENGINEER">("ALL");
   const [workloadOnlyActive, setWorkloadOnlyActive] = useState(true);
 
@@ -257,18 +283,6 @@ export default function ManagerDashboardPage() {
       return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
     });
   }, [filteredOverview, statusSort, dateSort, pinnedSet]);
-
-  const toggleDateSort = () => {
-    if (dateSort === "NONE") setDateSort("ASC");
-    else if (dateSort === "ASC") setDateSort("DESC");
-    else setDateSort("NONE");
-  };
-
-  const toggleStatusSort = () => {
-    if (statusSort === "NONE") setStatusSort("URGENT_FIRST");
-    else if (statusSort === "URGENT_FIRST") setStatusSort("NORMAL_FIRST");
-    else setStatusSort("NONE");
-  };
 
   const totalFilteredAmount = useMemo(() => {
     return sortedOverview.reduce(
@@ -596,6 +610,19 @@ export default function ManagerDashboardPage() {
               <option value="BILLED">請款</option>
             </select>
           </label>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`inline-flex h-7 items-center gap-1.5 px-2.5 rounded border text-xs font-semibold transition-colors ${
+              searchQuery.trim() || statusFilter || businessFilter || stageFilter !== "ACTIVE" || dateSort !== "NONE" || statusSort !== "NONE"
+                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+            title="回復預設篩選條件"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            回復預設
+          </button>
         </div>
 
         {/* 篩選結果摘要 */}

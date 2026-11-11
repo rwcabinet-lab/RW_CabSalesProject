@@ -55,6 +55,7 @@ interface WorkbenchState {
   toggleDateSort: () => void;
   toggleStatusSort: () => void;
   resetFilters: () => void;
+  initFromStorage: () => void;
 
   setProjectPanelOpen: (open: boolean) => void;
   setEditingProjectId: (id: string | null) => void;
@@ -102,12 +103,37 @@ const initialTaskForm: TaskFormData = {
   priority: "HIGH",
 };
 
-export const useWorkbenchStore = create<WorkbenchState>((set) => ({
+const WORKBENCH_STORAGE_KEY = "cab_sales_workbench_filters";
+
+interface WorkbenchFilterFields {
+  searchQuery: string;
+  statusFilter: string;
+  stageFilter: string;
+  dateSort: "NONE" | "ASC" | "DESC";
+  statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
+}
+
+const DEFAULT_WORKBENCH_FILTERS: WorkbenchFilterFields = {
   searchQuery: "",
   statusFilter: "",
   stageFilter: "ACTIVE",
   dateSort: "NONE",
   statusSort: "NONE",
+};
+
+function saveWorkbenchFilters(partial: Partial<WorkbenchFilterFields>) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(WORKBENCH_STORAGE_KEY);
+    const existing = raw ? JSON.parse(raw) : DEFAULT_WORKBENCH_FILTERS;
+    localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify({ ...existing, ...partial }));
+  } catch {
+    // fallback
+  }
+}
+
+export const useWorkbenchStore = create<WorkbenchState>((set) => ({
+  ...DEFAULT_WORKBENCH_FILTERS,
 
   isProjectPanelOpen: false,
   editingProjectId: null,
@@ -123,32 +149,69 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   advanceNotes: "",
   advanceDate: getTodayDate(),
 
-  setSearchQuery: (val) => set({ searchQuery: val }),
-  setStatusFilter: (val) => set({ statusFilter: val }),
-  setStageFilter: (val) => set({ stageFilter: val }),
-  setDateSort: (val) => set({ dateSort: val }),
-  setStatusSort: (val) => set({ statusSort: val }),
+  setSearchQuery: (val) => {
+    set({ searchQuery: val });
+    saveWorkbenchFilters({ searchQuery: val });
+  },
+  setStatusFilter: (val) => {
+    set({ statusFilter: val });
+    saveWorkbenchFilters({ statusFilter: val });
+  },
+  setStageFilter: (val) => {
+    set({ stageFilter: val });
+    saveWorkbenchFilters({ stageFilter: val });
+  },
+  setDateSort: (val) => {
+    set({ dateSort: val });
+    saveWorkbenchFilters({ dateSort: val });
+  },
+  setStatusSort: (val) => {
+    set({ statusSort: val });
+    saveWorkbenchFilters({ statusSort: val });
+  },
   toggleDateSort: () =>
-    set((state) => ({
-      dateSort: state.dateSort === "NONE" ? "ASC" : state.dateSort === "ASC" ? "DESC" : "NONE",
-    })),
+    set((state) => {
+      const next = state.dateSort === "NONE" ? "ASC" : state.dateSort === "ASC" ? "DESC" : "NONE";
+      saveWorkbenchFilters({ dateSort: next });
+      return { dateSort: next };
+    }),
   toggleStatusSort: () =>
-    set((state) => ({
-      statusSort:
+    set((state) => {
+      const next =
         state.statusSort === "NONE"
           ? "URGENT_FIRST"
           : state.statusSort === "URGENT_FIRST"
           ? "NORMAL_FIRST"
-          : "NONE",
-    })),
-  resetFilters: () =>
-    set({
-      searchQuery: "",
-      statusFilter: "",
-      stageFilter: "ACTIVE",
-      dateSort: "NONE",
-      statusSort: "NONE",
+          : "NONE";
+      saveWorkbenchFilters({ statusSort: next });
+      return { statusSort: next };
     }),
+  resetFilters: () => {
+    set(DEFAULT_WORKBENCH_FILTERS);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(WORKBENCH_STORAGE_KEY, JSON.stringify(DEFAULT_WORKBENCH_FILTERS));
+      } catch {}
+    }
+  },
+  initFromStorage: () => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(WORKBENCH_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        set({
+          searchQuery: typeof parsed.searchQuery === "string" ? parsed.searchQuery : "",
+          statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "",
+          stageFilter: typeof parsed.stageFilter === "string" ? parsed.stageFilter : "ACTIVE",
+          dateSort: ["NONE", "ASC", "DESC"].includes(parsed.dateSort) ? parsed.dateSort : "NONE",
+          statusSort: ["NONE", "URGENT_FIRST", "NORMAL_FIRST"].includes(parsed.statusSort) ? parsed.statusSort : "NONE",
+        });
+      }
+    } catch {
+      // fallback
+    }
+  },
 
   setProjectPanelOpen: (open) => set({ isProjectPanelOpen: open }),
   setEditingProjectId: (id) => set({ editingProjectId: id }),

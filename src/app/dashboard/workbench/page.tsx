@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import Link from "next/link";
 import {
   CheckSquare,
@@ -12,6 +12,7 @@ import {
   Search,
   RefreshCw,
   Pin,
+  RotateCcw,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -86,6 +87,12 @@ export default function SalesWorkbenchPage() {
   const setShowTaskModal = useWorkbenchStore((s) => s.setShowTaskModal);
   const setTaskToComplete = useWorkbenchStore((s) => s.setTaskToComplete);
   const setProjectToAdvance = useWorkbenchStore((s) => s.setProjectToAdvance);
+  const resetFilters = useWorkbenchStore((s) => s.resetFilters);
+  const initFromStorage = useWorkbenchStore((s) => s.initFromStorage);
+
+  useEffect(() => {
+    initFromStorage();
+  }, [initFromStorage]);
 
   // 伺服端狀態單一真實來源 (Single Source of Truth from TanStack Query)
   const projects = workbenchData?.myProjects ?? EMPTY_PROJECTS;
@@ -431,6 +438,19 @@ export default function SalesWorkbenchPage() {
               <option value="BILLED">請款</option>
             </select>
           </label>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`inline-flex h-7 items-center gap-1.5 px-2.5 rounded border text-xs font-semibold transition-colors ${
+              searchQuery.trim() || statusFilter || stageFilter !== "ACTIVE" || dateSort !== "NONE" || statusSort !== "NONE"
+                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+            title="回復預設篩選條件"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            回復預設
+          </button>
         </div>
 
         {/* 篩選結果摘要 */}

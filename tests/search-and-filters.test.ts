@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
+import { useManagerStore } from "@/stores/useManagerStore";
+import { useViewsStore } from "@/stores/useViewsStore";
 import type { WorkbenchProjectDTO, ManagerProjectOverviewDTO } from "@/types/dto";
 
 describe("搜尋與篩選條件功能測試", () => {
@@ -329,6 +331,72 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(useWorkbenchStore.getState().stageFilter).toBe("ACTIVE");
       expect(useWorkbenchStore.getState().dateSort).toBe("NONE");
       expect(useWorkbenchStore.getState().statusSort).toBe("NONE");
+    });
+
+    it("useManagerStore 正確持久化管理主管總控之篩選狀態、排序與 resetFilters", () => {
+      const store = useManagerStore.getState();
+      store.resetFilters();
+
+      expect(store.searchQuery).toBe("");
+      expect(store.statusFilter).toBe("");
+      expect(store.businessFilter).toBe("");
+      expect(store.stageFilter).toBe("ACTIVE");
+      expect(store.dateSort).toBe("NONE");
+      expect(store.statusSort).toBe("NONE");
+
+      store.setSearchQuery("南港");
+      store.setStatusFilter("YELLOW");
+      store.setBusinessFilter("陳小明");
+      store.setStageFilter("PRE_PROD");
+      store.toggleDateSort();
+      store.toggleStatusSort();
+
+      expect(useManagerStore.getState().searchQuery).toBe("南港");
+      expect(useManagerStore.getState().statusFilter).toBe("YELLOW");
+      expect(useManagerStore.getState().businessFilter).toBe("陳小明");
+      expect(useManagerStore.getState().stageFilter).toBe("PRE_PROD");
+      expect(useManagerStore.getState().dateSort).toBe("ASC");
+      expect(useManagerStore.getState().statusSort).toBe("URGENT_FIRST");
+
+      // 點擊【回復預設】
+      store.resetFilters();
+      expect(useManagerStore.getState().searchQuery).toBe("");
+      expect(useManagerStore.getState().statusFilter).toBe("");
+      expect(useManagerStore.getState().businessFilter).toBe("");
+      expect(useManagerStore.getState().stageFilter).toBe("ACTIVE");
+      expect(useManagerStore.getState().dateSort).toBe("NONE");
+      expect(useManagerStore.getState().statusSort).toBe("NONE");
+    });
+
+    it("useViewsStore 正確管理視覺時程之篩選狀態與 resetFilters", () => {
+      const store = useViewsStore.getState();
+      store.resetFilters();
+
+      expect(store.searchQuery).toBe("");
+      expect(store.salesFilter).toBe("");
+      expect(store.typeFilter).toBe("");
+      expect(store.stageFilter).toBe("");
+      expect(store.statusFilter).toBe("");
+
+      store.setSearchQuery("別墅");
+      store.setSalesFilter("王大明");
+      store.setTypeFilter("DESIGN_COMPANY");
+      store.setStageFilter("INSTALL");
+      store.setStatusFilter("GREEN");
+
+      expect(useViewsStore.getState().searchQuery).toBe("別墅");
+      expect(useViewsStore.getState().salesFilter).toBe("王大明");
+      expect(useViewsStore.getState().typeFilter).toBe("DESIGN_COMPANY");
+      expect(useViewsStore.getState().stageFilter).toBe("INSTALL");
+      expect(useViewsStore.getState().statusFilter).toBe("GREEN");
+
+      // 點擊【回復預設】
+      store.resetFilters();
+      expect(useViewsStore.getState().searchQuery).toBe("");
+      expect(useViewsStore.getState().salesFilter).toBe("");
+      expect(useViewsStore.getState().typeFilter).toBe("");
+      expect(useViewsStore.getState().stageFilter).toBe("");
+      expect(useViewsStore.getState().statusFilter).toBe("");
     });
   });
 });

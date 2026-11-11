@@ -44,7 +44,7 @@ describe("Milestone Assignee & Task Lifecycle Logic (方案 A + 方案 B 待辦�
       stageOrder: 3,
       status: "PENDING",
       priority: "MEDIUM",
-      plannedDueDate: "2026-11-10",
+      plannedDueDate: "2026-11-30",
       actualDueDate: null,
       notes: null,
       attachments: null,
@@ -71,7 +71,7 @@ describe("Milestone Assignee & Task Lifecycle Logic (方案 A + 方案 B 待辦�
           milestoneId: "m-3",
           assignedToId: "user-engineer",
           isCompleted: false,
-          milestone: { id: "m-3", status: "PENDING", plannedDueDate: "2026-11-10" },
+          milestone: { id: "m-3", status: "PENDING", plannedDueDate: "2026-11-30" },
         },
       ];
 

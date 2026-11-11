@@ -19,6 +19,8 @@ import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { useViewsDataQuery } from "@/hooks/useQueries";
 import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
+import { useViewsStore } from "@/stores/useViewsStore";
+import { useShallow } from "zustand/react/shallow";
 
 const STAGE_FILTER_OPTIONS = [
   { value: "", label: "全部階段" },
@@ -60,12 +62,34 @@ export default function VisualViewsPage() {
   const tasks = viewsData?.tasks ?? EMPTY_TASKS;
   const staff = viewsData?.staff ?? EMPTY_STAFF;
 
-  // 篩選條件狀態
-  const [searchQuery, setSearchQuery] = useState("");
-  const [salesFilter, setSalesFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  // 篩選條件狀態 (由 useViewsStore 全域持久化管理，切換頁面不重置)
+  const {
+    searchQuery,
+    salesFilter,
+    typeFilter,
+    stageFilter,
+    statusFilter,
+  } = useViewsStore(
+    useShallow((s) => ({
+      searchQuery: s.searchQuery,
+      salesFilter: s.salesFilter,
+      typeFilter: s.typeFilter,
+      stageFilter: s.stageFilter,
+      statusFilter: s.statusFilter,
+    }))
+  );
+
+  const setSearchQuery = useViewsStore((s) => s.setSearchQuery);
+  const setSalesFilter = useViewsStore((s) => s.setSalesFilter);
+  const setTypeFilter = useViewsStore((s) => s.setTypeFilter);
+  const setStageFilter = useViewsStore((s) => s.setStageFilter);
+  const setStatusFilter = useViewsStore((s) => s.setStatusFilter);
+  const resetFilters = useViewsStore((s) => s.resetFilters);
+  const initFromStorage = useViewsStore((s) => s.initFromStorage);
+
+  useEffect(() => {
+    initFromStorage();
+  }, [initFromStorage]);
 
   const loading = viewsLoading && !viewsData;
   const loadError = viewsError instanceof Error ? viewsError.message : "";
@@ -163,14 +187,6 @@ export default function VisualViewsPage() {
     statusFilter,
   ].filter(Boolean).length;
 
-  const resetFilters = () => {
-    setSearchQuery("");
-    setSalesFilter("");
-    setTypeFilter("");
-    setStageFilter("");
-    setStatusFilter("");
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-16">
@@ -243,16 +259,19 @@ export default function VisualViewsPage() {
             <span>時程綜合篩選條件</span>
             <SectionHelpButton sectionId="views-filters" />
           </div>
-          {activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>重設篩選 ({activeFilterCount})</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition ${
+              activeFilterCount > 0
+                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+            title="回復預設篩選條件"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>回復預設{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+          </button>
         </div>
         <div className="p-4 space-y-3">
           {/* 第一列：搜尋輸入框與下拉篩選選單 */}
