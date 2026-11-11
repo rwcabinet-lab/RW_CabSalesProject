@@ -154,7 +154,7 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   INSTALL: "安裝及驗收",
   CLOSURE: "立帳/結案",
   CLOSED: "已結案",
-  BILLED: "已立帳",
+  BILLED: "已結案",
   WRAP_UP: "收尾",
   LOST: "流標",
   INQUIRY: "接洽期",
