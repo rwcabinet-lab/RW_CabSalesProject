@@ -486,6 +486,17 @@ export const MilestoneService = {
         });
       }
 
+      // 雙向同步：若修改 6-1 進場安裝預定日，同步更新專案主檔 expectedDate
+      if (currentMilestone.stageCode === "6-1" && updates.plannedDueDate !== undefined) {
+        const newExpectedDate = updates.plannedDueDate
+          ? new Date(`${updates.plannedDueDate.slice(0, 10)}T00:00:00.000Z`)
+          : null;
+        await tx.project.update({
+          where: { id: projectId },
+          data: { expectedDate: newExpectedDate },
+        });
+      }
+
       // 執行後續進度日期同步平移
       if (shiftedMilestoneUpdates.length > 0) {
         // 先查出後續里程碑中確實存在待辦任務者，避免對不存在任務之里程碑逐一發送無效的 updateMany 查詢
@@ -508,6 +519,18 @@ export const MilestoneService = {
               data: { dueDatetime: shiftDate },
             });
           }
+        }
+
+        // 雙向同步：若連鎖平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
+        const shift61 = shiftedMilestoneUpdates.find((s) => {
+          const target = fullMilestones.find((m) => m.id === s.id);
+          return target?.stageCode === "6-1";
+        });
+        if (shift61) {
+          await tx.project.update({
+            where: { id: projectId },
+            data: { expectedDate: new Date(`${shift61.newDateStr}T00:00:00.000Z`) },
+          });
         }
       }
 
@@ -795,6 +818,16 @@ export const MilestoneService = {
                 },
               })
             );
+            if (m.stageCode === "6-1") {
+              operations.push(
+                prisma.project.update({
+                  where: { id: projectId },
+                  data: {
+                    expectedDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                  },
+                })
+              );
+            }
           }
         }
       }
@@ -966,6 +999,17 @@ export const MilestoneService = {
           SET due_datetime = due_datetime + (${daysToRestore} * INTERVAL '1 day')
           WHERE milestone_id = ANY(${shiftMilestoneIds}::text[]) AND is_completed = false
         `;
+
+        // 雙向同步：若還原平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
+        const shifted61 = updatedList.find(
+          (m, idx) => idx > targetIndex && m.stageCode === "6-1" && m.plannedDueDate
+        );
+        if (shifted61?.plannedDueDate) {
+          await tx.project.update({
+            where: { id: projectId },
+            data: { expectedDate: new Date(`${shifted61.plannedDueDate}T00:00:00.000Z`) },
+          });
+        }
       }
     });
 
@@ -1425,7 +1469,7 @@ export const MilestoneService = {
       async (tx) => {
         const existing = await tx.projectMilestone.findMany({
           where: { projectId },
-          select: { id: true, status: true, stageOrder: true, plannedDueDate: true },
+          select: { id: true, status: true, stageOrder: true, plannedDueDate: true, stageCode: true },
           orderBy: { stageOrder: "asc" },
         });
         const existingIdSet = new Set(existing.map((m) => m.id));
@@ -1506,6 +1550,18 @@ export const MilestoneService = {
               }
             })
           );
+
+          // 雙向同步：若自訂排序有包含 6-1 預定完成日更新，同步更新專案主檔 expectedDate
+          const m61ToUpdate = toUpdate.find((item) => {
+            const m = existing.find((ex) => ex.id === item.id);
+            return m?.stageCode === "6-1" && item.data.plannedDueDate !== undefined;
+          });
+          if (m61ToUpdate) {
+            await tx.project.update({
+              where: { id: projectId },
+              data: { expectedDate: m61ToUpdate.data.plannedDueDate || null },
+            });
+          }
         }
 
         const updated = await tx.projectMilestone.findMany({

@@ -61,7 +61,8 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
   function generateMilestoneRows(
     customerType: string,
     customStartCode?: string,
-    today: Date = new Date("2026-11-04T00:00:00.000Z")
+    today: Date = new Date("2026-11-04T00:00:00.000Z"),
+    expectedDate?: string
   ) {
     const allCodes = STANDARD_MILESTONE_STAGE_CODES;
     const targetStartCode =
@@ -92,6 +93,10 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
         plannedDueDate = new Date(today);
         actualDueDate = new Date(today);
         notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
+      } else if (code === "6-1" && expectedDate) {
+        status = isActive ? "IN_PROGRESS" : "PENDING";
+        plannedDueDate = new Date(`${expectedDate.slice(0, 10)}T00:00:00.000Z`);
+        cursorDate = new Date(plannedDueDate);
       } else if (isActive) {
         status = "IN_PROGRESS";
         const days = MILESTONE_DEFAULT_DAYS[code] || 3;
@@ -254,5 +259,26 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     // 2-3 應為 IN_PROGRESS
     const active = rows.find((r) => r.stageCode === "2-3");
     expect(active?.status).toBe("IN_PROGRESS");
+  });
+
+  it("建立案件時若提供預定進場日，6-1 進場安裝預定日同步初始化且後續進度依其順推", () => {
+    const { rows } = generateMilestoneRows(
+      "INDIVIDUAL",
+      undefined,
+      new Date("2026-11-04T00:00:00.000Z"),
+      "2027-08-15"
+    );
+    const m61 = rows.find((r) => r.stageCode === "6-1");
+    expect(m61).toBeDefined();
+    expect(m61?.plannedDueDate.toISOString().slice(0, 10)).toBe("2027-08-15");
+
+    // 6-2 追補料與 7-3 結案應從 2027-08-15 往後遞延
+    const m62 = rows.find((r) => r.stageCode === "6-2");
+    expect(m62).toBeDefined();
+    expect(m62!.plannedDueDate > m61!.plannedDueDate).toBe(true);
+
+    const m73 = rows.find((r) => r.stageCode === "7-3");
+    expect(m73).toBeDefined();
+    expect(m73!.plannedDueDate > m62!.plannedDueDate).toBe(true);
   });
 });

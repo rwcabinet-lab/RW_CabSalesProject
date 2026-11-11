@@ -260,6 +260,11 @@ export const ProjectService = {
         plannedDueDate = new Date(today);
         actualDueDate = new Date(today);
         notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
+      } else if (code === "6-1" && data.expectedDate) {
+        status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
+        const dateStr = data.expectedDate.slice(0, 10);
+        plannedDueDate = new Date(`${dateStr}T00:00:00.000Z`);
+        cursorDate = new Date(plannedDueDate);
       } else if (isActive) {
         status = MilestoneStatus.IN_PROGRESS;
         const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
@@ -442,6 +447,29 @@ export const ProjectService = {
         relationLoadStrategy: "join",
         include: projectInclude,
       });
+
+      // 雙向同步：若更新案件主檔之 expectedDate，同步更新未完成之 6-1 進場安裝預定日
+      if (data.expectedDate !== undefined) {
+        const newExpectedDate = data.expectedDate
+          ? new Date(`${data.expectedDate.slice(0, 10)}T00:00:00.000Z`)
+          : null;
+        const m61 = await tx.projectMilestone.findFirst({
+          where: { projectId: id, stageCode: "6-1" },
+          select: { id: true, status: true },
+        });
+        if (m61 && m61.status !== MilestoneStatus.COMPLETED) {
+          await tx.projectMilestone.update({
+            where: { id: m61.id },
+            data: { plannedDueDate: newExpectedDate },
+          });
+          if (newExpectedDate) {
+            await tx.salesTask.updateMany({
+              where: { milestoneId: m61.id, isCompleted: false },
+              data: { dueDatetime: newExpectedDate },
+            });
+          }
+        }
+      }
 
       return {
         id: p.id,
