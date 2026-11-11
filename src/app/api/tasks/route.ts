@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "找不到該案場" }, { status: 404 });
     }
     if (targetProject.currentStage === "LOST" || targetProject.currentStage === "CLOSED" || targetProject.currentStage === "BILLED") {
-      return NextResponse.json({ error: "此案場已流標或請款完成，無法新增待辦任務" }, { status: 409 });
+      return NextResponse.json({ error: "此案場已流標或立帳完成，無法新增待辦任務" }, { status: 409 });
     }
 
     const newTask = await DataService.addTask({

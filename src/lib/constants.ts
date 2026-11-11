@@ -36,7 +36,7 @@ export const CUSTOMER_TYPE_LABELS: Record<string, string> = {
 
 /** 各客戶類型建立案場時的預設起始進度 */
 export const CUSTOMER_TYPE_START_STAGE_CODES: Partial<Record<string, MilestoneStageCode>> = {
-  CABINET_FACTORY: "4-5", // 工廠 ➔ 4-5 拆單並提交生產
+  CABINET_FACTORY: "4-5", // 工廠 ➔ 4-5 對圖
   DESIGN_COMPANY: "3-1",  // 設計公司 ➔ 3-1 設計圖
   DEALER_COMPANY: "3-2",  // 經銷公司 ➔ 3-2 報價單
   // 向下相容別名
@@ -78,22 +78,22 @@ export const MILESTONE_STAGE_LABELS: Record<MilestoneStageCode, string> = {
   "4-2": "二次場勘",
   "4-3": "派工",
   "4-4": "施工圖",
-  "4-5": "拆單並提交生產",
+  "4-5": "對圖",
   // ⑤ 生產及派送
   "5-1": "生產",
   "5-2": "出貨",
   "5-3": "派工", // 歷史向下相容
   // ⑥ 安裝及驗收
   "6-1": "進場安裝",
-  "6-2": "監工及現場處置",
-  "6-3": "內部驗收",
-  "6-4": "提交成果驗收",
-  "6-5": "加減帳",
-  // ⑦ 請款/售後
-  "7-1": "批價",
-  "7-2": "請款",
-  "7-3": "追蹤二次回購",
-  "7-4": "追蹤二次回購",
+  "6-2": "追補料",
+  "6-3": "收尾",
+  "6-4": "內部驗收",
+  "6-5": "提交成果驗收",
+  // ⑦ 立帳/結案
+  "7-1": "加減帳",
+  "7-2": "立帳",
+  "7-3": "結案",
+  "7-4": "結案",
   // 額外階段
   "X-1": "收尾",
   "X-2": "流標",
@@ -115,8 +115,7 @@ export const AUDIT_STAGE_CODES = new Set<string>([
 /** 哪些進度屬於報價相關 (只有此類項目歷次紀錄才有報價欄位) */
 export const QUOTE_STAGE_CODES = new Set<string>([
   "3-2", // 報價單
-  "6-5", // 加減帳
-  "7-1", // 批價
+  "7-1", // 加減帳
 ]);
 
 /** 各子進度預設作業天數 */
@@ -126,7 +125,7 @@ export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
   "3-1": 5, "3-2": 5, "3-3": 3, "3-4": 2, "3-5": 5, "3-6": 2,
   "4-1": 2, "4-2": 2, "4-3": 2, "4-4": 5, "4-5": 3,
   "5-1": 12, "5-2": 1, "5-3": 2,
-  "6-1": 5, "6-2": 5, "6-3": 2, "6-4": 2, "6-5": 5,
+  "6-1": 5, "6-2": 3, "6-3": 2, "6-4": 2, "6-5": 2,
   "7-1": 3, "7-2": 5, "7-3": 30, "7-4": 30,
   "X-1": 5, "X-2": 0,
 };
@@ -138,8 +137,8 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
   PRE_PROD:    "第四階段：生產前確認/拆單",
   PROD_SHIP:   "第五階段：生產及派送",
   INSTALL:     "第六階段：安裝及驗收",
-  CLOSURE:     "第七階段：請款/售後",
-  EXTRA:       "額外階段：收尾/流標",
+  CLOSURE:     "第七階段：立帳/結案",
+  EXTRA:       "額外階段：流標",
   // 向下相容
   CONTACT:     "接洽期",
   DESIGN:      "設計確認期",
@@ -153,9 +152,9 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   PRE_PROD: "生產前確認/拆單",
   PROD_SHIP: "生產及派送",
   INSTALL: "安裝及驗收",
-  CLOSURE: "請款/售後",
-  CLOSED: "請款",
-  BILLED: "請款",
+  CLOSURE: "立帳/結案",
+  CLOSED: "已結案",
+  BILLED: "已立帳",
   WRAP_UP: "收尾",
   LOST: "流標",
   INQUIRY: "接洽期",

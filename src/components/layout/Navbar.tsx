@@ -1,10 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, BarChart3, HardHat, LogOut, Settings, UserCog } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  BarChart3,
+  HardHat,
+  LogOut,
+  Settings,
+  UserCog,
+  Sparkles,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useSessionQuery, useChangelogQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { ChangelogModal } from "@/components/changelog/ChangelogModal";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "案場筆記", icon: LayoutDashboard },
@@ -19,6 +30,10 @@ export function Navbar() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user } = useSessionQuery();
+  const { data: changelogData } = useChangelogQuery();
+
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const latestVersion = changelogData?.latestVersion || "v1.3.2";
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -53,30 +68,48 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* 導覽連結 — 使用 prefetch 消除首次點擊延遲 */}
-        <nav className="flex items-center space-x-0.5 sm:space-x-1">
-          {navItems.filter((item) => user?.accessiblePages.includes(item.key)).map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch={true}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
-                <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        {/* 導覽連結與改版資訊（附圖紅圈處） */}
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <nav className="flex items-center space-x-0.5 sm:space-x-1">
+            {navItems.filter((item) => user?.accessiblePages.includes(item.key)).map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href ||
+                pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch={true}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* 附圖紅圈處：改版資訊入口按鈕 */}
+          <button
+            type="button"
+            onClick={() => setIsChangelogOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md text-sm font-medium text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+            title="檢視系統改版資訊與更新歷程"
+          >
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="hidden sm:inline">改版資訊</span>
+            {latestVersion && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 leading-none">
+                {latestVersion}
+              </span>
+            )}
+          </button>
+        </div>
 
         {/* 使用者資訊 */}
         <div className="flex items-center gap-2 pl-2 sm:pl-4 border-l border-slate-200">
@@ -113,6 +146,13 @@ export function Navbar() {
           </button>
         </div>
       </div>
+
+      {/* 改版資訊彈窗 */}
+      <ChangelogModal
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
+        isAdmin={user?.role === "ADMIN"}
+      />
     </header>
   );
 }

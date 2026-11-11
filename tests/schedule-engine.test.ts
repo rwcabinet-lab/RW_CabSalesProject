@@ -208,7 +208,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       expect(ScheduleEngine.isProjectClosed({ currentStage: "DONE" })).toBe(true);
     });
 
-    it("當 7-2 (請款) 里程碑已完成時應視為已結案", () => {
+    it("當 7-2 (立帳) 里程碑已完成時應視為已結案", () => {
       const milestones = [
         createMockMilestone("m-72", "7-2", 10, "COMPLETED", "2026-10-15"),
       ];
@@ -217,7 +217,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       ).toBe(true);
     });
 
-    it("未完成請款之進行中案場應判定為未結案", () => {
+    it("未完成立帳之進行中案場應判定為未結案", () => {
       const milestones = [
         createMockMilestone("m-72", "7-2", 10, "IN_PROGRESS", "2026-11-15"),
       ];

@@ -112,7 +112,7 @@ export default function SalesWorkbenchPage() {
   };
 
   // 預定進場日與狀態排序
-  // 過濾邏輯：預設排除已流標/請款 (stageFilter === "ACTIVE")
+  // 過濾邏輯：預設排除已流標/立帳 (stageFilter === "ACTIVE")
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       let match = true;
@@ -432,10 +432,10 @@ export default function SalesWorkbenchPage() {
               <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
               <option value="PROD_SHIP">第五階段：生產及派送</option>
               <option value="INSTALL">第六階段：安裝及驗收</option>
-              <option value="CLOSURE">第七階段：請款/售後</option>
+              <option value="CLOSURE">第七階段：立帳/結案</option>
               <option value="WRAP_UP">收尾</option>
               <option value="LOST">流標</option>
-              <option value="BILLED">請款</option>
+              <option value="BILLED">立帳</option>
             </select>
           </label>
           <button
@@ -620,12 +620,12 @@ export default function SalesWorkbenchPage() {
                         case "stageProgress":
                           return (
                             <td key={col.key} className="p-3 font-bold text-slate-700">
-                              <div>{p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
+                              <div>{p.isClosed ? "立帳" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
                               <div className="mt-1 text-[11px] font-normal">
                                 {p.currentStage === "LOST" ? (
                                   <span className="text-slate-400">—</span>
                                 ) : p.isClosed ? (
-                                  <span className="text-emerald-700 font-semibold">已請款完結</span>
+                                  <span className="text-emerald-700 font-semibold">已立帳完結</span>
                                 ) : p.activeMilestone ? (
                                   <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
                                     {p.activeMilestone.stageName}

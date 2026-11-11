@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { PageAccessKey } from "@/lib/page-access";
 import type { MilestoneStageCode } from "@/lib/constants";
+import type { ChangelogEntry } from "@/lib/changelog";
 import type {
   ApiResponse,
   ColumnItemDTO,
@@ -42,6 +43,7 @@ export const QUERY_KEYS = {
   managerProjectStatus: (year?: string | number, month?: string | number) =>
     ["dashboard", "manager", "status-report", String(year || "2026"), String(month || "10")] as const,
   viewsData: ["views", "data"] as const,
+  changelog: ["changelog"] as const,
 };
 
 /**
@@ -300,5 +302,28 @@ export function useProjectTasksQuery(projectId: string, isCompleted: boolean) {
     },
     enabled: Boolean(projectId),
     staleTime: 30 * 1000,
+  });
+}
+
+export interface ChangelogResponseDTO {
+  success: boolean;
+  changelogs: ChangelogEntry[];
+  latestVersion: string;
+}
+
+/**
+ * 取得系統改版資訊與更新歷程
+ */
+export function useChangelogQuery() {
+  return useQuery({
+    queryKey: QUERY_KEYS.changelog,
+    queryFn: async (): Promise<ChangelogResponseDTO> => {
+      const res = await fetch("/api/changelog", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error("無法讀取改版資訊");
+      }
+      return (await res.json()) as ChangelogResponseDTO;
+    },
+    staleTime: 60 * 1000,
   });
 }

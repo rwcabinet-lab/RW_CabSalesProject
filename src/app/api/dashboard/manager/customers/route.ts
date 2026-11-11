@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       return signedProjectIds.has(p.id) || isPastContractStage;
     };
 
-    // Helper to check if project is closed (依據 [請款] 里程碑是否完成)
+    // Helper to check if project is closed (依據 [立帳] 里程碑是否完成)
     const isProjectClosed = (p: { id: string; currentStage: string }) => {
       return closedProjectIds.has(p.id) || p.currentStage === "CLOSED" || p.currentStage === "BILLED";
     };

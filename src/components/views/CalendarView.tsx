@@ -56,7 +56,7 @@ function taskTypeLabel(task: TaskDTO): string {
     case "QUOTE_FOLLOWUP":
       return "報價追蹤";
     case "PAYMENT_REMINDER":
-      return "請款提醒";
+      return "立帳提醒";
   }
 }
 

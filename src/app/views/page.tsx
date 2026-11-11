@@ -31,8 +31,8 @@ const STAGE_FILTER_OPTIONS = [
   { value: "PRE_PROD", label: "第四階段：生產前確認/拆單" },
   { value: "PROD_SHIP", label: "第五階段：生產及派送" },
   { value: "INSTALL", label: "第六階段：安裝及驗收" },
-  { value: "CLOSURE", label: "第七階段：請款/售後" },
-  { value: "BILLED", label: "請款" },
+  { value: "CLOSURE", label: "第七階段：立帳/結案" },
+  { value: "BILLED", label: "立帳" },
   { value: "WRAP_UP", label: "收尾" },
   { value: "LOST", label: "流標" },
 ];
@@ -41,7 +41,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "", label: "全部狀態" },
   { value: "RED", label: "🔴 逾期卡關" },
   { value: "GREEN", label: "🟢 進度正常" },
-  { value: "BILLED", label: "🏁 已請款" },
+  { value: "BILLED", label: "🏁 已立帳" },
   { value: "LOST", label: "⚪ 流標" },
 ];
 
@@ -377,7 +377,7 @@ export default function VisualViewsPage() {
             {delayedCount > 0 && (
               <span className="text-red-700 font-bold">🔴 逾期卡關 {delayedCount} 案</span>
             )}
-            <span className="text-teal-700">🏁 已請款 {closedCount} 案</span>
+            <span className="text-teal-700">🏁 已立帳 {closedCount} 案</span>
             {lostCount > 0 && (
               <span className="text-slate-500">⚪ 流標 {lostCount} 案</span>
             )}

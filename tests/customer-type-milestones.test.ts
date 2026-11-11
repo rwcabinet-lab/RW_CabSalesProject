@@ -23,8 +23,15 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
     expect(MILESTONE_STAGE_LABELS["3-6"]).toBe("送約/簽約");
     expect(MILESTONE_STAGE_LABELS["4-3"]).toBe("派工");
     expect(MILESTONE_STAGE_LABELS["4-4"]).toBe("施工圖");
-    expect(MILESTONE_STAGE_LABELS["4-5"]).toBe("拆單並提交生產");
+    expect(MILESTONE_STAGE_LABELS["4-5"]).toBe("對圖");
     expect(MILESTONE_STAGE_LABELS["6-1"]).toBe("進場安裝");
+    expect(MILESTONE_STAGE_LABELS["6-2"]).toBe("追補料");
+    expect(MILESTONE_STAGE_LABELS["6-3"]).toBe("收尾");
+    expect(MILESTONE_STAGE_LABELS["6-4"]).toBe("內部驗收");
+    expect(MILESTONE_STAGE_LABELS["6-5"]).toBe("提交成果驗收");
+    expect(MILESTONE_STAGE_LABELS["7-1"]).toBe("加減帳");
+    expect(MILESTONE_STAGE_LABELS["7-2"]).toBe("立帳");
+    expect(MILESTONE_STAGE_LABELS["7-3"]).toBe("結案");
     expect(MILESTONE_STAGE_HINTS["4-3"]).toBe("請指定進場安裝日期");
 
     // 提案簡報與提案簡報製作取消/不需審核

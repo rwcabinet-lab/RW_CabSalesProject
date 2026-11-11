@@ -77,7 +77,7 @@ function parseUserAgent(ua?: string) {
 }
 
 const CONFIGURABLE_CUSTOMER_TYPES = [
-  { key: "CABINET_FACTORY", label: "工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，預設【4-5 拆單並提交生產】" },
+  { key: "CABINET_FACTORY", label: "工廠", badge: "代工加工", desc: "通常自備施工圖與拆單規格，預設【4-5 對圖】" },
   { key: "DESIGN_COMPANY", label: "設計公司", badge: "設計提案", desc: "自備空間配置底圖，預設【3-1 設計圖】" },
   { key: "DEALER_COMPANY", label: "經銷公司", badge: "經銷通路", desc: "常態簽約經銷夥伴，自備規格需求，預設【3-2 報價單】" },
   { key: "CONSTRUCTION", label: "建設/營造", badge: "工程營造", desc: "建設建案或工程標案，預設由【1-1 客源開發】開始" },

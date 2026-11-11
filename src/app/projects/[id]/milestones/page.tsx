@@ -1019,18 +1019,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <span className="text-xs text-slate-400">拖曳圖卡可即時預覽調整未開始子進度順序</span>
           </div>
 
-          {/* 收尾與流標按鈕移到[收尾/已流標]頁面 */}
+          {/* 額外階段：流標操作 */}
           {activePhase === "EXTRA" && (
             <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">收尾與流標階段操作</h3>
+                  <h3 className="text-sm font-bold text-slate-800">流標階段操作</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {isProjectLost
                       ? "此案件目前處於流標狀態，所有里程碑進度與時程已停止計算。"
-                      : project?.currentStage === "WRAP_UP"
-                      ? "此案件目前處於收尾，可記錄後續收尾項目或流標。"
-                      : "案場若進入尾聲需要收尾追蹤，或未能成案需終止，可在此切換階段。"}
+                      : "案場若未能成案需終止，可在此切換階段為流標。"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1046,32 +1044,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </button>
                   )}
                   {!isProjectLost && (
-                    <>
-                      {project?.currentStage !== "WRAP_UP" && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSpecialAdvanceError("");
-                            setSpecialAdvanceModal({ stageCode: "X-1", stageName: "收尾", reason: "" });
-                          }}
-                          className="rounded-lg border border-amber-300 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
-                        >
-                          <Archive className="w-3.5 h-3.5" />
-                          收尾
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSpecialAdvanceError("");
-                          setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
-                        }}
-                        className="rounded-lg border border-red-300 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        流標
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSpecialAdvanceError("");
+                        setSpecialAdvanceModal({ stageCode: "X-2", stageName: "流標", reason: "" });
+                      }}
+                      className="rounded-lg border border-red-300 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      流標
+                    </button>
                   )}
                 </div>
               </div>

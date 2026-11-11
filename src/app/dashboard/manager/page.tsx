@@ -224,7 +224,7 @@ export default function ManagerDashboardPage() {
   };
 
   // 預定進場日排序
-  // 案場總覽過濾：預設排除已流標/請款
+  // 案場總覽過濾：預設排除已流標/立帳
   const allProjectsOverview = data?.allProjectsOverview ?? EMPTY_OVERVIEW;
 
   const filteredOverview = useMemo(() => {
@@ -604,10 +604,10 @@ export default function ManagerDashboardPage() {
               <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
               <option value="PROD_SHIP">第五階段：生產及派送</option>
               <option value="INSTALL">第六階段：安裝及驗收</option>
-              <option value="CLOSURE">第七階段：請款/售後</option>
+              <option value="CLOSURE">第七階段：立帳/結案</option>
               <option value="WRAP_UP">收尾</option>
               <option value="LOST">流標</option>
-              <option value="BILLED">請款</option>
+              <option value="BILLED">立帳</option>
             </select>
           </label>
           <button
@@ -770,7 +770,7 @@ export default function ManagerDashboardPage() {
                       case "stageProgress":
                         return (
                           <td key={col.key} className="p-3 font-bold text-slate-700">
-                            {p.isClosed ? "請款" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}
+                            {p.isClosed ? "立帳" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}
                             <div className="mt-1 text-[10px] font-normal text-slate-500">
                               {p.currentStage === "LOST" ? p.currentStageLabel : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
                             </div>

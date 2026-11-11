@@ -125,7 +125,7 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   "5-1": "PROD_SHIP", "5-2": "PROD_SHIP", "5-3": "PROD_SHIP",
   // ⑥ 安裝及驗收
   "6-1": "INSTALL", "6-2": "INSTALL", "6-3": "INSTALL", "6-4": "INSTALL", "6-5": "INSTALL",
-  // ⑦ 請款/售後
+  // ⑦ 立帳/結案
   "7-1": "CLOSURE", "7-2": "CLOSURE", "7-3": "CLOSURE", "7-4": "CLOSURE",
   // 額外階段
   "X-1": "WRAP_UP", "X-2": "LOST",
@@ -179,7 +179,7 @@ export const ScheduleEngine = {
   },
 
   /**
-   * 判定專案是否已請款完成 (BILLED / CLOSED 階段，或 7-2 請款里程碑已完成)
+   * 判定專案是否已立帳完成 (BILLED / CLOSED 階段，或 7-2 立帳里程碑已完成)
    */
   isProjectClosed(
     project: { currentStage: string },
@@ -191,7 +191,7 @@ export const ScheduleEngine = {
 
   /**
    * 評估專案是否逾期卡關：
-   * 1. 已流標 (LOST) 或已請款完成 (BILLED / CLOSED / 7-2 COMPLETED) 視為非逾期 (false)
+   * 1. 已流標 (LOST) 或已立帳完成 (BILLED / CLOSED / 7-2 COMPLETED) 視為非逾期 (false)
    * 2. 活躍里程碑 (OVERDUE 或 IN_PROGRESS) 之時程燈號若為 RED 或狀態為 OVERDUE 則判定為逾期 (true)
    * 3. 否則若活躍里程碑存在且未逾期則為 false；無活躍里程碑時回退專案既有 isDelayed
    */
