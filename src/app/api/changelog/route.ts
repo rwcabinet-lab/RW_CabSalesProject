@@ -10,11 +10,11 @@ const CHANGELOG_CONFIG_KEY = "system_changelog";
 
 function sortChangelogs(list: ChangelogEntry[]): ChangelogEntry[] {
   return [...list].sort((a, b) => {
-    // 優先依日期遞減排序，日期相同時依版本號字串排序
+    // 優先依日期遞減排序
     if (a.date !== b.date) {
       return b.date.localeCompare(a.date);
     }
-    return (b.version || "").localeCompare(a.version || "");
+    return (b.id || "").localeCompare(a.id || "");
   });
 }
 
@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { version, date, title, category, details } = body;
-    if (!version || !date || !title) {
+    if (!date || !title) {
       return NextResponse.json(
-        { error: "版本編號、日期與改版標題為必填項目" },
+        { error: "日期與改版標題為必填項目" },
         { status: 400 }
       );
     }
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     const newEntry: ChangelogEntry = {
       id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      version: String(version).trim(),
+      version: version ? String(version).trim() : undefined,
       date: String(date).trim(),
       title: String(title).trim(),
       category: ["FEAT", "RULE", "OPTIMIZE", "FIX"].includes(category)
@@ -156,9 +156,9 @@ export async function PUT(req: NextRequest) {
 
     // 單筆編輯
     const { id, version, date, title, category, details } = body;
-    if (!id || !version || !date || !title) {
+    if (!id || !date || !title) {
       return NextResponse.json(
-        { error: "缺少必要參數（id、version、date、title）" },
+        { error: "缺少必要參數（id、date、title）" },
         { status: 400 }
       );
     }
@@ -180,7 +180,7 @@ export async function PUT(req: NextRequest) {
         found = true;
         return {
           ...item,
-          version: String(version).trim(),
+          version: version !== undefined ? String(version).trim() : item.version,
           date: String(date).trim(),
           title: String(title).trim(),
           category: ["FEAT", "RULE", "OPTIMIZE", "FIX"].includes(category)
@@ -195,7 +195,20 @@ export async function PUT(req: NextRequest) {
     });
 
     if (!found) {
-      return NextResponse.json({ error: "找不到欲編輯之改版紀錄" }, { status: 404 });
+      // 找不到時自動補充新增該筆項目防呆，確保永不 404
+      const newEntry: ChangelogEntry = {
+        id,
+        version: version ? String(version).trim() : undefined,
+        date: String(date).trim(),
+        title: String(title).trim(),
+        category: ["FEAT", "RULE", "OPTIMIZE", "FIX"].includes(category)
+          ? category
+          : "FEAT",
+        details: safeDetails,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.name || "管理員",
+      };
+      updated.unshift(newEntry);
     }
 
     const sorted = sortChangelogs(updated);

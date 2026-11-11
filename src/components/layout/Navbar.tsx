@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSessionQuery, useChangelogQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { ChangelogModal } from "@/components/changelog/ChangelogModal";
 
 const navItems = [
@@ -30,10 +30,8 @@ export function Navbar() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: user } = useSessionQuery();
-  const { data: changelogData } = useChangelogQuery();
 
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
-  const latestVersion = changelogData?.latestVersion || "v1.3.2";
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -93,22 +91,6 @@ export function Navbar() {
               );
             })}
           </nav>
-
-          {/* 附圖紅圈處：改版資訊入口按鈕 */}
-          <button
-            type="button"
-            onClick={() => setIsChangelogOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md text-sm font-medium text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
-            title="檢視系統改版資訊與更新歷程"
-          >
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <span className="hidden sm:inline">改版資訊</span>
-            {latestVersion && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 leading-none">
-                {latestVersion}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* 使用者資訊 */}
@@ -135,6 +117,16 @@ export function Navbar() {
           >
             <UserCog className="h-4 w-4" />
           </Link>
+          {/* 改版資訊入口（位於帳戶管理與登出中間，只保留圖示） */}
+          <button
+            type="button"
+            onClick={() => setIsChangelogOpen(true)}
+            title="改版資訊"
+            aria-label="改版資訊"
+            className="rounded-md p-2 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600"
+          >
+            <Sparkles className="h-4 w-4 text-amber-500 hover:text-amber-600" />
+          </button>
           <button
             type="button"
             onClick={handleLogout}

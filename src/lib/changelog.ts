@@ -1,6 +1,6 @@
 export interface ChangelogEntry {
   id: string;
-  version: string;
+  version?: string;
   date: string;
   title: string;
   category: "FEAT" | "RULE" | "OPTIMIZE" | "FIX";

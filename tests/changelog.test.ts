@@ -153,9 +153,8 @@ describe("改版資訊功能測試 (Changelog Feature Tests)", () => {
       const req = new NextRequest("http://localhost:3000/api/changelog", {
         method: "POST",
         body: JSON.stringify({
-          version: "", // 缺少版本號
           date: "2026-11-11",
-          title: "測試缺少參數",
+          title: "", // 缺少標題
         }),
       });
 
@@ -163,6 +162,44 @@ describe("改版資訊功能測試 (Changelog Feature Tests)", () => {
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error).toContain("必填項目");
+    });
+
+    it("管理者身分呼叫 PUT 可成功修改改版紀錄內容，且不強制要求版本號", async () => {
+      vi.spyOn(accessControl, "getUserFromRequest").mockResolvedValue({
+        id: "u-admin",
+        name: "系統管理員",
+        role: "ADMIN",
+        email: "admin@example.com",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      let storedConfig = [...DEFAULT_CHANGELOG];
+      vi.spyOn(DataService, "getAppConfig").mockImplementation(async () => storedConfig);
+      vi.spyOn(DataService, "setAppConfig").mockImplementation(async (_key, val) => {
+        storedConfig = val as ChangelogEntry[];
+        return { id: "global", key: "system_changelog", value: JSON.stringify(val), createdAt: new Date(), updatedAt: new Date() };
+      });
+
+      const targetId = DEFAULT_CHANGELOG[0].id;
+      const req = new NextRequest("http://localhost:3000/api/changelog", {
+        method: "PUT",
+        body: JSON.stringify({
+          id: targetId,
+          date: "2026-11-11",
+          title: "成功修改後的改版主題標題",
+          category: "OPTIMIZE",
+          details: ["修改後之項目一", "修改後之項目二"],
+        }),
+      });
+
+      const res = await PUT(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const updatedItem = json.changelogs.find((c: ChangelogEntry) => c.id === targetId);
+      expect(updatedItem.title).toBe("成功修改後的改版主題標題");
+      expect(updatedItem.details).toEqual(["修改後之項目一", "修改後之項目二"]);
     });
 
     it("管理者身分可成功新增改版紀錄，且新版本自動排列於第一位", async () => {

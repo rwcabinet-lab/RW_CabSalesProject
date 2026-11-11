@@ -8,14 +8,13 @@ import {
   Edit2,
   Trash2,
   Calendar,
-  Tag,
   Search,
-  CheckCircle2,
   AlertTriangle,
   RotateCcw,
   Loader2,
   ShieldCheck,
   ChevronRight,
+  Check,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChangelogQuery, QUERY_KEYS } from "@/hooks/useQueries";
@@ -32,17 +31,14 @@ interface ChangelogModalProps {
   isAdmin?: boolean;
 }
 
-interface FormState {
-  id?: string;
-  version: string;
+interface FormFields {
   date: string;
   title: string;
   category: "FEAT" | "RULE" | "OPTIMIZE" | "FIX";
   detailsText: string;
 }
 
-const INITIAL_FORM: FormState = {
-  version: "",
+const INITIAL_FORM: FormFields = {
   date: new Date().toISOString().slice(0, 10),
   title: "",
   category: "FEAT",
@@ -59,26 +55,29 @@ export function ChangelogModal({
   const { data, isLoading } = useChangelogQuery();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FormFields>(INITIAL_FORM);
+  const [isAdding, setIsAdding] = useState(false);
+  const [addForm, setAddForm] = useState<FormFields>(INITIAL_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const changelogs: ChangelogEntry[] = data?.changelogs || DEFAULT_CHANGELOG;
-  const latestVersion = data?.latestVersion || changelogs[0]?.version || "v1.0.0";
 
-  // ESC 鍵關閉
+  // ESC 鍵關閉或取消編輯
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isEditing) {
-          setIsEditing(false);
+        if (editingId) {
+          setEditingId(null);
+        } else if (isAdding) {
+          setIsAdding(false);
         } else {
           onClose();
         }
       }
     },
-    [isEditing, onClose]
+    [editingId, isAdding, onClose]
   );
 
   useEffect(() => {
@@ -92,13 +91,12 @@ export function ChangelogModal({
     };
   }, [isOpen, handleKeyDown]);
 
-  // 篩選搜尋
+  // 篩選搜尋（無版本號，搜尋日期、類別、標題或內容）
   const filteredChangelogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return changelogs;
     return changelogs.filter((item) => {
       return (
-        item.version.toLowerCase().includes(q) ||
         item.date.includes(q) ||
         item.title.toLowerCase().includes(q) ||
         CHANGELOG_CATEGORY_CONFIG[item.category]?.label.toLowerCase().includes(q) ||
@@ -107,38 +105,48 @@ export function ChangelogModal({
     });
   }, [changelogs, searchQuery]);
 
-  // 開啟新增表單
+  // 開啟新增模式
   const handleStartAdd = () => {
-    setFormData({
-      ...INITIAL_FORM,
-      version: `v${(Number(latestVersion.replace(/[^0-9.]/g, "").split(".").pop() || 0) + 1).toString().padStart(1, "0")}`,
+    setEditingId(null);
+    setAddForm({
       date: new Date().toISOString().slice(0, 10),
+      title: "",
+      category: "FEAT",
+      detailsText: "",
     });
-    setIsEditing(true);
+    setIsAdding(true);
   };
 
-  // 開啟編輯表單
+  const handleCancelAdd = () => {
+    setIsAdding(false);
+    setAddForm(INITIAL_FORM);
+  };
+
+  // 開啟該筆卡片的行內編輯模式
   const handleStartEdit = (entry: ChangelogEntry) => {
-    setFormData({
-      id: entry.id,
-      version: entry.version,
+    setIsAdding(false);
+    setEditingId(entry.id);
+    setEditForm({
       date: entry.date,
       title: entry.title,
       category: entry.category,
       detailsText: entry.details.join("\n"),
     });
-    setIsEditing(true);
   };
 
-  // 提交儲存（新增或更新）
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.version.trim() || !formData.date.trim() || !formData.title.trim()) {
-      addToast("版本編號、日期與改版標題不可為空", "error");
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditForm(INITIAL_FORM);
+  };
+
+  // 儲存行內編輯內容
+  const handleSaveEdit = async (id: string) => {
+    if (!editForm.date.trim() || !editForm.title.trim()) {
+      addToast("改版日期與改版標題不可為空", "error");
       return;
     }
 
-    const details = formData.detailsText
+    const details = editForm.detailsText
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
@@ -150,33 +158,29 @@ export function ChangelogModal({
 
     setIsSaving(true);
     try {
-      const isUpdating = Boolean(formData.id);
-      const url = "/api/changelog";
-      const method = isUpdating ? "PUT" : "POST";
       const payload = {
-        id: formData.id,
-        version: formData.version.trim(),
-        date: formData.date.trim(),
-        title: formData.title.trim(),
-        category: formData.category,
+        id,
+        date: editForm.date.trim(),
+        title: editForm.title.trim(),
+        category: editForm.category,
         details,
       };
 
-      const res = await fetch(url, {
-        method,
+      const res = await fetch("/api/changelog", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const result = await res.json();
       if (!res.ok) {
-        throw new Error(result.error || "儲存失敗");
+        throw new Error(result.error || "儲存更新失敗");
       }
 
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
-      addToast(isUpdating ? "改版紀錄更新成功" : "改版紀錄新增成功", "success");
-      setIsEditing(false);
-      setFormData(INITIAL_FORM);
+      addToast("改版紀錄更新成功", "success");
+      setEditingId(null);
+      setEditForm(INITIAL_FORM);
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : "儲存失敗，請重試", "error");
     } finally {
@@ -184,9 +188,57 @@ export function ChangelogModal({
     }
   };
 
+  // 儲存新增紀錄
+  const handleSaveAdd = async () => {
+    if (!addForm.date.trim() || !addForm.title.trim()) {
+      addToast("改版日期與改版標題不可為空", "error");
+      return;
+    }
+
+    const details = addForm.detailsText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (details.length === 0) {
+      addToast("請至少填寫一項改版明細說明", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        date: addForm.date.trim(),
+        title: addForm.title.trim(),
+        category: addForm.category,
+        details,
+      };
+
+      const res = await fetch("/api/changelog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "新增失敗");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
+      addToast("改版紀錄新增成功", "success");
+      setIsAdding(false);
+      setAddForm(INITIAL_FORM);
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : "新增失敗，請重試", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // 刪除改版紀錄
-  const handleDelete = async (id: string, version: string) => {
-    if (!window.confirm(`確定要刪除版本【${version}】的改版紀錄嗎？此操作無法還原。`)) {
+  const handleDelete = async (id: string, title: string) => {
+    if (!window.confirm(`確定要刪除改版紀錄【${title}】嗎？此操作無法還原。`)) {
       return;
     }
 
@@ -200,7 +252,7 @@ export function ChangelogModal({
         throw new Error(result.error || "刪除失敗");
       }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
-      addToast(`已成功刪除版本【${version}】紀錄`, "success");
+      addToast("已成功刪除改版紀錄", "success");
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : "刪除失敗", "error");
     } finally {
@@ -250,7 +302,7 @@ export function ChangelogModal({
         className="relative flex flex-col max-h-[92vh] w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 表頭 Header */}
+        {/* 表頭 Header（已移除版本號資訊） */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50/90 via-slate-50/80 to-white px-5 py-4 sm:px-6 sm:py-4.5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
@@ -264,9 +316,6 @@ export function ChangelogModal({
                 >
                   系統改版資訊與更新歷程
                 </h2>
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
-                  {latestVersion}
-                </span>
                 {isAdmin && (
                   <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
                     <ShieldCheck className="h-3 w-3" />
@@ -281,7 +330,7 @@ export function ChangelogModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {isAdmin && !isEditing && (
+            {isAdmin && !isAdding && (
               <button
                 type="button"
                 onClick={handleStartAdd}
@@ -303,179 +352,44 @@ export function ChangelogModal({
           </div>
         </div>
 
-        {/* 搜尋列與狀態摘要 (僅在非編輯表單時呈現) */}
-        {!isEditing && (
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:px-6">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜尋版本號、日期、標題或改版內容..."
-                className="w-full rounded-md border border-slate-200 bg-white py-1 pl-8 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            <div className="text-xs text-slate-500">
-              共{" "}
-              <span className="font-semibold text-slate-800">
-                {filteredChangelogs.length}
-              </span>{" "}
-              次改版歷程
-            </div>
+        {/* 搜尋列與狀態摘要 */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:px-6">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜尋日期、類別、標題或改版內容..."
+              className="w-full rounded-md border border-slate-200 bg-white py-1 pl-8 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
-        )}
+          <div className="text-xs text-slate-500">
+            共{" "}
+            <span className="font-semibold text-slate-800">
+              {filteredChangelogs.length}
+            </span>{" "}
+            次改版歷程
+          </div>
+        </div>
 
         {/* 彈窗主體區塊 */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-          {/* 管理者新增/編輯表單模式 */}
-          {isEditing ? (
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    {formData.id ? (
-                      <>
-                        <Edit2 className="w-4 h-4 text-blue-600" />
-                        編輯改版紀錄【{formData.version}】
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 text-blue-600" />
-                        新增改版紀錄
-                      </>
-                    )}
-                  </h3>
-                  <span className="text-xs text-slate-500">
-                    * 必填欄位請確實填寫
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      版本編號 *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.version}
-                      onChange={(e) =>
-                        setFormData({ ...formData, version: e.target.value })
-                      }
-                      placeholder="例：v1.3.2"
-                      className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      改版日期 *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.date}
-                      onChange={(e) =>
-                        setFormData({ ...formData, date: e.target.value })
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      改版類別 *
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          category: e.target.value as FormState["category"],
-                        })
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="FEAT">功能新增 (FEAT)</option>
-                      <option value="RULE">業務規則 (RULE)</option>
-                      <option value="OPTIMIZE">體驗優化 (OPTIMIZE)</option>
-                      <option value="FIX">系統修復 (FIX)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    改版主題標題 *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    placeholder="例：新增頂部導覽列改版資訊彈窗與管理在線編輯功能"
-                    className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="mt-3">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    改版明細項目清單 *（每行代表一項，換行自動條列）
-                  </label>
-                  <textarea
-                    rows={6}
-                    required
-                    value={formData.detailsText}
-                    onChange={(e) =>
-                      setFormData({ ...formData, detailsText: e.target.value })
-                    }
-                    placeholder="請輸入條列式改版內容，每行一項：&#10;• 頂部導覽列新增改版資訊入口按鈕&#10;• 全體同仁皆可即時檢視歷次改版日期與主題&#10;• 系統管理者具備直接線上新增與編輯權限"
-                    className="w-full rounded-md border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 leading-relaxed font-mono"
-                  />
-                </div>
-
-                <div className="mt-4 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setFormData(INITIAL_FORM);
-                    }}
-                    disabled={isSaving}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
-                  >
-                    {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    儲存改版紀錄
-                  </button>
-                </div>
-              </div>
-            </form>
-          ) : null}
-
-          {/* 改版歷程清單 (Timeline List) */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500 mb-2" />
               <p className="text-xs">正在載入系統改版紀錄...</p>
             </div>
-          ) : filteredChangelogs.length === 0 ? (
+          ) : filteredChangelogs.length === 0 && !isAdding ? (
             <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-slate-400">
               <AlertTriangle className="w-8 h-8 mx-auto text-amber-400 mb-2" />
               <p className="text-sm font-medium text-slate-600">
@@ -495,13 +409,260 @@ export function ChangelogModal({
               )}
             </div>
           ) : (
-            <div className="relative border-l-2 border-blue-200 ml-4 pl-5 sm:pl-6 space-y-6">
+            <div className="relative border-l-2 border-blue-200 ml-4 pl-5 sm:pl-6 space-y-5">
+              {/* 新增卡片（在時間軸頂部直接展開） */}
+              {isAdding && (
+                <div className="relative rounded-xl border-2 border-blue-500 bg-blue-50/40 p-4 sm:p-5 shadow-sm animate-in fade-in duration-150">
+                  <div className="absolute -left-[31px] sm:-left-[35px] top-4 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-md">
+                    <Plus className="h-3.5 w-3.5" />
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-blue-200 pb-2.5 mb-3">
+                    <span className="text-xs font-bold text-blue-800 flex items-center gap-1.5">
+                      <Plus className="w-4 h-4 text-blue-600" />
+                      新增改版紀錄
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCancelAdd}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          改版日期 *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={addForm.date}
+                          onChange={(e) =>
+                            setAddForm({ ...addForm, date: e.target.value })
+                          }
+                          className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          改版類別 *
+                        </label>
+                        <select
+                          value={addForm.category}
+                          onChange={(e) =>
+                            setAddForm({
+                              ...addForm,
+                              category: e.target.value as FormFields["category"],
+                            })
+                          }
+                          className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="FEAT">功能新增 (FEAT)</option>
+                          <option value="RULE">業務規則 (RULE)</option>
+                          <option value="OPTIMIZE">體驗優化 (OPTIMIZE)</option>
+                          <option value="FIX">系統修復 (FIX)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        改版主題標題 *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={addForm.title}
+                        onChange={(e) =>
+                          setAddForm({ ...addForm, title: e.target.value })
+                        }
+                        placeholder="請輸入改版主題標題..."
+                        className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        改版內容清單 *（每行一項，換行自動條列）
+                      </label>
+                      <textarea
+                        rows={5}
+                        required
+                        value={addForm.detailsText}
+                        onChange={(e) =>
+                          setAddForm({ ...addForm, detailsText: e.target.value })
+                        }
+                        placeholder="請輸入條列式改版內容，每行一項：&#10;• 第一項更新說明&#10;• 第二項更新說明"
+                        className="w-full rounded-md border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 leading-relaxed font-mono"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCancelAdd}
+                        disabled={isSaving}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAdd}
+                        disabled={isSaving}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        確認新增
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 歷次改版項目清單 */}
               {filteredChangelogs.map((item, index) => {
-                const isLatest = index === 0 && !searchQuery;
+                const isLatest = index === 0 && !searchQuery && !isAdding;
+                const isCurrentEditing = editingId === item.id;
                 const categoryConfig =
                   CHANGELOG_CATEGORY_CONFIG[item.category] ||
                   CHANGELOG_CATEGORY_CONFIG.FEAT;
 
+                if (isCurrentEditing) {
+                  {/* 行內編輯模式（該張卡片直接變為輸入表單） */}
+                  return (
+                    <div
+                      key={item.id}
+                      className="relative rounded-xl border-2 border-blue-500 bg-blue-50/40 p-4 sm:p-5 shadow-sm animate-in fade-in duration-150"
+                    >
+                      <div className="absolute -left-[31px] sm:-left-[35px] top-4 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-md">
+                        <Edit2 className="h-3 w-3" />
+                      </div>
+
+                      <div className="flex items-center justify-between border-b border-blue-200 pb-2.5 mb-3">
+                        <span className="text-xs font-bold text-blue-800 flex items-center gap-1.5">
+                          <Edit2 className="w-3.5 h-3.5 text-blue-600" />
+                          編輯改版紀錄
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              改版日期 *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={editForm.date}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, date: e.target.value })
+                              }
+                              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              改版類別 *
+                            </label>
+                            <select
+                              value={editForm.category}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  category: e.target.value as FormFields["category"],
+                                })
+                              }
+                              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="FEAT">功能新增 (FEAT)</option>
+                              <option value="RULE">業務規則 (RULE)</option>
+                              <option value="OPTIMIZE">體驗優化 (OPTIMIZE)</option>
+                              <option value="FIX">系統修復 (FIX)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            改版主題標題 *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={editForm.title}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, title: e.target.value })
+                            }
+                            placeholder="請輸入改版主題標題..."
+                            className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            改版內容清單 *（每行一項，換行自動條列）
+                          </label>
+                          <textarea
+                            rows={6}
+                            required
+                            value={editForm.detailsText}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                detailsText: e.target.value,
+                              })
+                            }
+                            placeholder="請輸入條列式改版內容，每行一項：&#10;• 第一項更新說明&#10;• 第二項更新說明"
+                            className="w-full rounded-md border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 leading-relaxed font-mono"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            取消
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(item.id)}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" />
+                            )}
+                            儲存更新
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                {/* 常規檢視模式（移除版本號資訊） */}
                 return (
                   <div
                     key={item.id}
@@ -522,15 +683,12 @@ export function ChangelogModal({
                       <Sparkles className="h-3 w-3" />
                     </div>
 
-                    {/* 卡片頂部資訊列 */}
+                    {/* 卡片頂部資訊列（無版本號） */}
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
-                          {item.version}
-                        </span>
                         {isLatest && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
-                            最新版本
+                            最新發布
                           </span>
                         )}
                         <span
@@ -550,7 +708,7 @@ export function ChangelogModal({
                           <button
                             type="button"
                             onClick={() => handleStartEdit(item)}
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition"
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition"
                             title="編輯此改版紀錄"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -558,7 +716,7 @@ export function ChangelogModal({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDelete(item.id, item.version)}
+                            onClick={() => handleDelete(item.id, item.title)}
                             disabled={deletingId === item.id}
                             className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-50"
                             title="刪除此改版紀錄"
@@ -616,7 +774,7 @@ export function ChangelogModal({
         {/* 表尾 Footer */}
         <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            {isAdmin && !isEditing && (
+            {isAdmin && (
               <button
                 type="button"
                 onClick={handleResetDefaults}
