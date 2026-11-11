@@ -46,7 +46,8 @@ export function Navbar() {
   if (pathname === "/login") return null;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-sm no-print">
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-sm no-print">
       <div className="max-w-7xl mx-auto flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center space-x-3">
           <Link href="/" className="flex items-center gap-2.5">
@@ -138,13 +139,14 @@ export function Navbar() {
           </button>
         </div>
       </div>
-
-      {/* 改版資訊彈窗 */}
-      <ChangelogModal
-        isOpen={isChangelogOpen}
-        onClose={() => setIsChangelogOpen(false)}
-        isAdmin={user?.role === "ADMIN"}
-      />
     </header>
-  );
+
+    {/* 改版資訊彈窗（置於 header 外部，避免受到 backdrop-blur 限制包含區塊） */}
+    <ChangelogModal
+      isOpen={isChangelogOpen}
+      onClose={() => setIsChangelogOpen(false)}
+      isAdmin={user?.role === "ADMIN"}
+    />
+  </>
+);
 }

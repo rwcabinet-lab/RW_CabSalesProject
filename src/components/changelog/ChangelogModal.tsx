@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Sparkles,
   X,
@@ -60,6 +61,7 @@ export function ChangelogModal({
   const { data, isLoading } = useChangelogQuery();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormFields>(INITIAL_FORM);
   const [isAddingTop, setIsAddingTop] = useState(false);
@@ -69,6 +71,10 @@ export function ChangelogModal({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const changelogs: ChangelogEntry[] = data?.changelogs || DEFAULT_CHANGELOG;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ESC 鍵關閉或取消編輯
   const handleKeyDown = useCallback(
@@ -332,18 +338,18 @@ export function ChangelogModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex justify-center bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-[9999] flex justify-center items-stretch bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="changelog-modal-title"
     >
       <div
-        className="relative flex flex-col h-full w-full max-w-3xl sm:max-w-4xl bg-white shadow-2xl border-x border-slate-200 overflow-hidden"
+        className="relative flex flex-col h-screen max-h-screen w-full max-w-3xl sm:max-w-4xl bg-white shadow-2xl border-x border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 表頭 Header（上下滿版頂部固定、無版本號） */}
@@ -975,6 +981,7 @@ export function ChangelogModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
