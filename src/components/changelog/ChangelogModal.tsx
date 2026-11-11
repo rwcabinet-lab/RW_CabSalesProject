@@ -336,18 +336,18 @@ export function ChangelogModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-[100] flex justify-center bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="changelog-modal-title"
     >
       <div
-        className="relative flex flex-col max-h-[92vh] w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+        className="relative flex flex-col h-full w-full max-w-3xl sm:max-w-4xl bg-white shadow-2xl border-x border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 表頭 Header（無版本號） */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50/90 via-slate-50/80 to-white px-5 py-4 sm:px-6 sm:py-4.5">
+        {/* 表頭 Header（上下滿版頂部固定、無版本號） */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50/90 via-slate-50/80 to-white px-5 py-4 sm:px-6 sm:py-4.5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
               <Sparkles className="h-5 w-5 text-amber-300" />
@@ -397,7 +397,7 @@ export function ChangelogModal({
         </div>
 
         {/* 搜尋列與狀態摘要 */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:px-6">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:px-6">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
@@ -430,8 +430,8 @@ export function ChangelogModal({
           </div>
         </div>
 
-        {/* 彈窗主體區塊：以日期為單位的時間軸 */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+        {/* 彈窗主體區塊：以日期為單位的時間軸，上下滿版內部滾動 */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500 mb-2" />
@@ -950,8 +950,8 @@ export function ChangelogModal({
           )}
         </div>
 
-        {/* 表尾 Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 sm:px-6">
+        {/* 表尾 Footer（底部固定） */}
+        <div className="shrink-0 flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             {isAdmin && (
               <button
