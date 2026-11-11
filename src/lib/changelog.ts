@@ -71,7 +71,7 @@ export const DEFAULT_CHANGELOG: ChangelogEntry[] = [
   {
     id: "cl-20261110-02",
     version: "v1.3.0",
-    date: "2026-11-11",
+    date: "2026-11-10",
     title: "派工完成強制設定進場日期，同步聯動進場安裝預定日與專案預定進場日",
     category: "RULE",
     details: [

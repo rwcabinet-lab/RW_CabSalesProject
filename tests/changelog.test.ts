@@ -269,5 +269,17 @@ describe("改版資訊功能測試 (Changelog Feature Tests)", () => {
       expect(json.message).toContain("已成功回復系統初始改版紀錄");
       expect(setAppConfigSpy).toHaveBeenCalledWith("system_changelog", DEFAULT_CHANGELOG);
     });
+
+    it("同日期的改版內容可正確彙整於同一日期群組區塊中", () => {
+      const map = new Map<string, ChangelogEntry[]>();
+      for (const item of DEFAULT_CHANGELOG) {
+        const d = item.date;
+        if (!map.has(d)) map.set(d, []);
+        map.get(d)!.push(item);
+      }
+      // 驗證 2026-11-11 與 2026-11-10 均有多筆更新彙整在同一天
+      expect(map.get("2026-11-11")?.length).toBeGreaterThanOrEqual(3);
+      expect(map.get("2026-11-10")?.length).toBeGreaterThanOrEqual(2);
+    });
   });
 });
