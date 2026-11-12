@@ -5,6 +5,9 @@ import {
   formatTenThousands,
   formatNTD,
   formatCurrency,
+  formatTotalAmount,
+  getStoredCurrencyUnit,
+  setStoredCurrencyUnit,
 } from "@/lib/currency";
 
 describe("Currency Utilities (萬元與整數元金融精確度)", () => {
@@ -76,6 +79,29 @@ describe("Currency Utilities (萬元與整數元金融精確度)", () => {
       expect(formatCurrency(385000)).toBe("$385,000");
       expect(formatCurrency(0)).toBe("$0");
       expect(formatCurrency(null)).toBe("$0");
+    });
+  });
+
+  describe("formatNTD 與 formatTotalAmount 之單位模式 (元 / 萬)", () => {
+    it("formatNTD 指定 wan 單位模式應正確顯示為帶貨幣符號之萬元字串", () => {
+      expect(formatNTD(350000, "wan")).toBe("$35 萬");
+      expect(formatNTD(125000, "wan")).toBe("$12.5 萬");
+      expect(formatNTD(123400, "wan")).toBe("$12.34 萬");
+      expect(formatNTD(1200000, "wan")).toBe("$120 萬");
+      expect(formatNTD(0, "wan")).toBe("$0 萬");
+      expect(formatNTD(null, "wan")).toBe("$0 萬");
+    });
+
+    it("formatTotalAmount 應依據單位模式顯示 NT$ 前綴之總額字串", () => {
+      expect(formatTotalAmount(350000, "yuan")).toBe("NT$ 350,000");
+      expect(formatTotalAmount(350000, "wan")).toBe("NT$ 35 萬");
+      expect(formatTotalAmount(1250000, "wan")).toBe("NT$ 125 萬");
+      expect(formatTotalAmount(0, "wan")).toBe("NT$ 0 萬");
+      expect(formatTotalAmount(null, "yuan")).toBe("NT$ 0");
+    });
+
+    it("非瀏覽器環境下 getStoredCurrencyUnit 預設回傳 yuan", () => {
+      expect(getStoredCurrencyUnit()).toBe("yuan");
     });
   });
 });

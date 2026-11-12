@@ -21,7 +21,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
-import { formatNTD } from "@/lib/currency";
+import { formatNTD, formatTotalAmount } from "@/lib/currency";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
 import { getTaskScheduleStatus } from "@/lib/schedule-engine";
 import type {
   ApiResponse,
@@ -58,6 +59,8 @@ export default function SalesWorkbenchPage() {
     () => users.filter((u) => isAssignableRole(u.role)),
     [users]
   );
+
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
 
   // Zustand Store 狀態 (篩選、排序、表單暫存與對話框控制 - 使用細粒度 Selector 避免多餘 Re-render)
   const {
@@ -483,7 +486,7 @@ export default function SalesWorkbenchPage() {
               </span>
             )}
             <span>
-              ，報價總額 <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+              ，報價總額 <span className="text-sm font-bold text-blue-700">{formatTotalAmount(totalFilteredAmount, currencyUnit)}</span>
             </span>
           </div>
         </div>
@@ -691,7 +694,7 @@ export default function SalesWorkbenchPage() {
                             return (
                               <td key={col.key} className="p-3">
                                 <div className="tabular-nums font-bold text-slate-900">
-                                  {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
+                                  {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0, currencyUnit)}
                                 </div>
                                 <div className="text-[10px] text-slate-500">
                                   {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
@@ -867,7 +870,7 @@ export default function SalesWorkbenchPage() {
                                 return (
                                   <td key={col.key} className="p-3">
                                     <div className="tabular-nums font-bold text-slate-900">
-                                      {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0)}
+                                      {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0, currencyUnit)}
                                     </div>
                                     <div className="text-[10px] text-slate-500">
                                       {phase.unitCount ? `${phase.unitCount} 戶` : "-"}

@@ -19,6 +19,8 @@ import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { useViewsDataQuery } from "@/hooks/useQueries";
 import { CUSTOMER_TYPE_LABELS, matchesStage } from "@/lib/constants";
+import { formatTotalAmount } from "@/lib/currency";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
 import { useViewsStore } from "@/stores/useViewsStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -56,6 +58,7 @@ const EMPTY_STAFF: CalendarStaffDTO[] = [];
 
 export default function VisualViewsPage() {
   const { data: viewsData, isLoading: viewsLoading, error: viewsError, refetch } = useViewsDataQuery();
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
 
   const [activeTab, setActiveTab] = useState<"gantt" | "calendar">("gantt");
   const projects = viewsData?.projects ?? EMPTY_PROJECTS;
@@ -383,7 +386,7 @@ export default function VisualViewsPage() {
             )}
             <span className="text-slate-300">|</span>
             <span>
-              報價總額：<strong className="text-blue-700 font-mono font-bold">NT$ {totalFilteredAmount.toLocaleString()}</strong>
+              報價總額：<strong className="text-blue-700 font-mono font-bold">{formatTotalAmount(totalFilteredAmount, currencyUnit)}</strong>
             </span>
           </div>
 

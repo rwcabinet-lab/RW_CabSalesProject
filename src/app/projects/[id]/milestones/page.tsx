@@ -54,6 +54,7 @@ import type {
   UserDTO,
 } from "@/types/dto";
 import { formatNTD } from "@/lib/currency";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
 
 interface MilestoneWithLight extends MilestoneDTO {
   trafficLight: TrafficLightDTO;
@@ -100,6 +101,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const projectId = params.id;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
   const [project, setProject] = useState<ProjectDTO | null>(null);
   const { data: projects = [] } = useProjectOptionsQuery();
 
@@ -924,8 +926,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
             <div><span className="text-slate-400">預定進場：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
-            <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatNTD(project.quoteAmount) : project.totalAmount != null ? formatNTD(project.totalAmount) : "未填"}</span></div>
-            <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatNTD(project.cost) : "未填"}</span></div>
+            <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatNTD(project.quoteAmount, currencyUnit) : project.totalAmount != null ? formatNTD(project.totalAmount, currencyUnit) : "未填"}</span></div>
+            <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatNTD(project.cost, currencyUnit) : "未填"}</span></div>
             <div className="sm:col-span-2 lg:col-span-1"><span className="text-slate-400">現況說明：</span><span className="font-semibold text-slate-700">{project.siteCondition || "未填"}</span></div>
           </div>
         </section>
@@ -1400,7 +1402,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   ) : (
                                     <span className="text-slate-400">尚未完成</span>
                                   )}
-                                  {isQuoteStage && r.amount != null && <span>報價：${r.amount.toLocaleString()}</span>}
+                                  {isQuoteStage && r.amount != null && <span>報價：{formatNTD(r.amount, currencyUnit)}</span>}
                                   {r.notes && <span className="text-slate-600 italic">備註：{r.notes}</span>}
                                 </div>
                                 {!isProjectLost && (

@@ -8,7 +8,8 @@ import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 import type { CustomerStatItemDTO as CustomerStatItem, CustomerStatsDashboardDTO as CustomerStatsData } from "@/types/dto";
 import { useManagerCustomerStatsQuery } from "@/hooks/useQueries";
-import { formatNTD } from "@/lib/currency";
+import { formatNTD, formatTotalAmount } from "@/lib/currency";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
 
 const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   LONGMEI_STORE: "隆美",
@@ -22,6 +23,7 @@ const CUSTOMER_TYPE_LABELS: Record<string, string> = {
 
 export default function CustomerStatsPage() {
   const { data, isLoading: loading } = useManagerCustomerStatsQuery();
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [salesFilter, setSalesFilter] = useState("");
@@ -169,7 +171,7 @@ export default function CustomerStatsPage() {
             累計成交總額
           </div>
           <div className="text-3xl font-black text-emerald-600 tabular-nums">
-            {formatNTD(data.kpi.totalSignedSum || 0)}
+            {formatNTD(data.kpi.totalSignedSum || 0, currencyUnit)}
           </div>
         </div>
 
@@ -179,7 +181,7 @@ export default function CustomerStatsPage() {
             客戶案場報價總額
           </div>
           <div className="text-3xl font-black text-indigo-600 tabular-nums">
-            {formatNTD(data.kpi.totalQuoteSum)}
+            {formatNTD(data.kpi.totalQuoteSum, currencyUnit)}
           </div>
         </div>
       </div>
@@ -260,7 +262,7 @@ export default function CustomerStatsPage() {
         <div className="px-6 py-2.5 bg-blue-50/50 border-b flex justify-between items-center text-xs text-blue-900 font-semibold">
           <div>
             篩選結果：共 <span className="text-sm font-bold text-blue-700">{sortedCustomers.length}</span> 家客戶，案場報價總額{" "}
-            <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+            <span className="text-sm font-bold text-blue-700">{formatTotalAmount(totalFilteredAmount, currencyUnit)}</span>
           </div>
           <div className="text-slate-500 font-normal">
             點擊表頭欄位可切換排序
@@ -348,10 +350,10 @@ export default function CustomerStatsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-right font-bold text-emerald-600 tabular-nums">
-                    {c.totalSignedAmount > 0 ? formatNTD(c.totalSignedAmount) : "-"}
+                    {c.totalSignedAmount > 0 ? formatNTD(c.totalSignedAmount, currencyUnit) : "-"}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-900 tabular-nums">
-                    {c.totalQuoteAmount > 0 ? formatNTD(c.totalQuoteAmount) : "-"}
+                    {c.totalQuoteAmount > 0 ? formatNTD(c.totalQuoteAmount, currencyUnit) : "-"}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500">
                     {c.latestProjectName ? (

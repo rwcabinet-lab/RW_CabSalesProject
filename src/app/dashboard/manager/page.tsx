@@ -8,7 +8,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
 import { useManagerStore } from "@/stores/useManagerStore";
 import { useShallow } from "zustand/react/shallow";
-import { formatNTD } from "@/lib/currency";
+import { formatNTD, formatTotalAmount } from "@/lib/currency";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import type { ApiResponse, AssignableUserDTO, ColumnItemDTO, ManagerDashboardDTO, TaskDTO } from "@/types/dto";
@@ -51,6 +52,7 @@ export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
   const projectToAddPhase = useWorkbenchStore((s) => s.projectToAddPhase);
   const setProjectToAddPhase = useWorkbenchStore((s) => s.setProjectToAddPhase);
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
 
   // 案場總覽過濾條件 (由 useManagerStore 全域持久化管理，切換頁面不重置)
   const {
@@ -412,7 +414,7 @@ export default function ManagerDashboardPage() {
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">已簽約/生產預估總額</div>
-          <div className="text-right text-3xl font-black tabular-nums">{formatNTD(data.kpi.signedTotal)}</div>
+          <div className="text-right text-3xl font-black tabular-nums">{formatNTD(data.kpi.signedTotal, currencyUnit)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold mb-1">成交率</div>
@@ -653,7 +655,7 @@ export default function ManagerDashboardPage() {
               </span>
             )}
             <span>
-              ，報價總額 <span className="text-sm font-bold text-blue-700">NT$ {totalFilteredAmount.toLocaleString()}</span>
+              ，報價總額 <span className="text-sm font-bold text-blue-700">{formatTotalAmount(totalFilteredAmount, currencyUnit)}</span>
             </span>
           </div>
         </div>
@@ -850,7 +852,7 @@ export default function ManagerDashboardPage() {
                           return (
                             <td key={col.key} className="p-3">
                               <div className="tabular-nums font-bold text-slate-900">
-                                {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
+                                {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0, currencyUnit)}
                               </div>
                               <div className="text-[10px] text-slate-500">
                                 {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
@@ -1012,7 +1014,7 @@ export default function ManagerDashboardPage() {
                               return (
                                 <td key={col.key} className="p-3">
                                   <div className="tabular-nums font-bold text-slate-900">
-                                    {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0)}
+                                    {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0, currencyUnit)}
                                   </div>
                                   <div className="text-[10px] text-slate-500">
                                     {phase.unitCount ? `${phase.unitCount} 戶` : "-"}

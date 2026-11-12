@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles, RefreshCw } from "lucide-react";
+import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles, RefreshCw, Coins } from "lucide-react";
 import type { UserDTO } from "@/types/dto";
 import { useSessionQuery } from "@/hooks/useQueries";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { useCurrencyStore } from "@/stores/useCurrencyStore";
+import type { CurrencyUnit } from "@/lib/currency";
 
 type UserSession = UserDTO;
 
@@ -74,6 +76,16 @@ export default function SettingsPage() {
   const [currentTheme, setCurrentTheme] = useState("classic");
   const [currentDensity, setCurrentDensity] = useState("normal");
   const [themeSaved, setThemeSaved] = useState(false);
+
+  // 金額顯示單位模式 (元 / 萬)
+  const currencyUnit = useCurrencyStore((s) => s.currencyUnit);
+  const setCurrencyUnit = useCurrencyStore((s) => s.setCurrencyUnit);
+
+  const handleApplyCurrencyUnit = (unit: CurrencyUnit) => {
+    setCurrencyUnit(unit);
+    setThemeSaved(true);
+    setTimeout(() => setThemeSaved(false), 2500);
+  };
 
   useEffect(() => {
     // 讀取目前主題設定
@@ -399,12 +411,68 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* 金額顯示單位模式 (元 / 萬) */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-amber-500" />
+                    <span>金額顯示單位模式：</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    即時範例：{currencyUnit === "wan" ? "$35 萬" : "$350,000"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCurrencyUnit("yuan")}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition ${
+                      currencyUnit === "yuan"
+                        ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 font-bold text-blue-800 shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        元
+                      </span>
+                      <div className="text-left">
+                        <div className="font-bold text-slate-800">元 (NT$)</div>
+                        <div className="text-[10px] text-slate-400">標準千分位（如 $350,000）</div>
+                      </div>
+                    </div>
+                    {currencyUnit === "yuan" && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCurrencyUnit("wan")}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition ${
+                      currencyUnit === "wan"
+                        ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 font-bold text-blue-800 shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        萬
+                      </span>
+                      <div className="text-left">
+                        <div className="font-bold text-slate-800">萬 (萬元)</div>
+                        <div className="text-[10px] text-slate-400">萬元縮寫（如 $35 萬）</div>
+                      </div>
+                    </div>
+                    {currencyUnit === "wan" && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t text-[11px] text-slate-400 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" />
-            風格設定會自動儲存於此瀏覽器，切換頁面直接生效。
+            風格與金額顯示單位設定會自動儲存於此瀏覽器，切換頁面直接生效。
           </div>
         </div>
       </div>
