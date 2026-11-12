@@ -411,25 +411,36 @@ export const ProjectService = {
     }
 
     if (parent.phases.length === 0) {
+      const phase1Name = data.phaseName.trim() || "第 1 期";
+      const phase1ProjectName =
+        phase1Name === "第 1 期"
+          ? parent.projectName
+          : `${parent.projectName} - ${phase1Name}`;
+
       const phase1 = await prisma.project.create({
         data: {
-          projectName: parent.projectName,
+          projectName: phase1ProjectName,
           customerId: parent.customerId,
           siteAddress: parent.siteAddress,
           siteCondition: parent.siteCondition,
-          salesRepId: parent.salesRepId,
+          salesRepId: data.salesRepId || parent.salesRepId,
           salesAssistantId: parent.salesAssistantId,
           currentStage: parent.currentStage,
           isDelayed: parent.isDelayed,
-          expectedDate: parent.expectedDate,
-          unitCount: parent.unitCount,
-          cost: parent.cost,
-          quoteAmount: parent.quoteAmount,
-          estimatedBudget: parent.estimatedBudget,
+          expectedDate: data.expectedDate ? new Date(data.expectedDate) : parent.expectedDate,
+          unitCount: data.unitCount !== undefined ? data.unitCount : parent.unitCount,
+          cost: data.cost !== undefined ? data.cost : parent.cost,
+          quoteAmount: data.quoteAmount !== undefined ? data.quoteAmount : parent.quoteAmount,
+          estimatedBudget:
+            (data.quoteAmount !== undefined ? data.quoteAmount : parent.quoteAmount) ||
+            (data.cost !== undefined ? data.cost : parent.cost) ||
+            parent.estimatedBudget,
           parentId: parent.id,
           phaseNumber: 1,
-          phaseName: "第 1 期",
+          phaseName: phase1Name,
         },
+        relationLoadStrategy: "join",
+        include: projectInclude,
       });
 
       await prisma.projectMilestone.updateMany({
@@ -440,6 +451,15 @@ export const ProjectService = {
         where: { projectId: parent.id },
         data: { projectId: phase1.id },
       });
+
+      // 若有指定預定進場日，連動同步 phase1 的 6-1 里程碑
+      if (data.expectedDate) {
+        const dateStr = data.expectedDate.slice(0, 10);
+        await prisma.projectMilestone.updateMany({
+          where: { projectId: phase1.id, stageCode: "6-1" },
+          data: { plannedDueDate: new Date(`${dateStr}T00:00:00.000Z`) },
+        });
+      }
 
       // 母案轉型為彙總容器，清空履約執行欄位（由各分期動態加總彙整）
       await prisma.project.update({
@@ -453,24 +473,32 @@ export const ProjectService = {
         },
       });
 
-      const phase2Name = data.phaseName.trim() || "第 2 期";
-      const phase2 = await ProjectService.addProject({
-        projectName: `${parent.projectName} - ${phase2Name}`,
-        customerId: parent.customerId,
-        siteAddress: parent.siteAddress,
-        siteCondition: parent.siteCondition || undefined,
-        expectedDate: data.expectedDate,
-        unitCount: data.unitCount,
-        cost: data.cost,
-        quoteAmount: data.quoteAmount,
-        salesRepId: data.salesRepId || parent.salesRepId,
-        startStageCode: data.startStageCode,
-        parentId: parent.id,
-        phaseNumber: 2,
-        phaseName: phase2Name,
-      });
-
-      return phase2!;
+      return {
+        id: phase1.id,
+        projectName: phase1.projectName,
+        customerId: phase1.customerId,
+        customerName: phase1.customer.name,
+        customerType: customerTypeFromDatabase(phase1.customer.customerType),
+        defaultDiscount: Number(phase1.customer.defaultDiscount),
+        siteAddress: phase1.siteAddress,
+        siteCondition: phase1.siteCondition || undefined,
+        salesRepId: phase1.salesRepId,
+        salesRepName: phase1.salesRep.name,
+        customerSalesRepId: phase1.customer.salesRepId,
+        customerSalesRepName: phase1.customer.salesRep.name,
+        salesAssistantId: phase1.salesAssistantId || undefined,
+        salesAssistantName: phase1.salesAssistant?.name,
+        currentStage: phase1.currentStage,
+        isDelayed: phase1.isDelayed,
+        expectedDate: dateValue(phase1.expectedDate),
+        estimatedBudget: phase1.estimatedBudget != null ? Number(phase1.estimatedBudget) : undefined,
+        unitCount: phase1.unitCount ?? undefined,
+        cost: phase1.cost != null ? Number(phase1.cost) : undefined,
+        quoteAmount: phase1.quoteAmount != null ? Number(phase1.quoteAmount) : undefined,
+        parentId: phase1.parentId ?? undefined,
+        phaseNumber: phase1.phaseNumber ?? undefined,
+        phaseName: phase1.phaseName ?? undefined,
+      };
     } else {
       const maxPhaseNum = Math.max(0, ...parent.phases.map((p) => p.phaseNumber || 0));
       const nextPhaseNum = maxPhaseNum + 1;

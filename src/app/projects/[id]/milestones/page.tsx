@@ -1805,6 +1805,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">報價金額（元）</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="例如：350000"
+                    value={projectEditForm.quoteAmount}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, quoteAmount: e.target.value })}
+                    className="w-full border rounded p-2 text-xs text-right tabular-nums"
+                  />
+                </div>
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">成本金額（元）</label>
                   <input
                     type="number"
@@ -1812,17 +1823,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     placeholder="例如：250000"
                     value={projectEditForm.cost}
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, cost: e.target.value })}
-                    className="w-full border rounded p-2 text-xs text-right tabular-nums"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">報價（元）</label>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="例如：350000"
-                    value={projectEditForm.quoteAmount}
-                    onChange={(e) => setProjectEditForm({ ...projectEditForm, quoteAmount: e.target.value })}
                     className="w-full border rounded p-2 text-xs text-right tabular-nums"
                   />
                 </div>

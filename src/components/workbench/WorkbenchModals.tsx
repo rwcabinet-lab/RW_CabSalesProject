@@ -497,12 +497,20 @@ export function WorkbenchAddPhaseModal({
 
   useEffect(() => {
     if (projectToAddPhase) {
+      const hasExistingPhases = Boolean(projectToAddPhase.phases && projectToAddPhase.phases.length > 0);
       const nextNum = (projectToAddPhase.phases?.length || 0) + 1;
       setPhaseName(`第 ${nextNum} 期`);
-      setExpectedDate("");
-      setQuoteAmount("");
-      setCost("");
-      setUnitCount("");
+      if (!hasExistingPhases) {
+        setExpectedDate(projectToAddPhase.expectedDate ? projectToAddPhase.expectedDate.slice(0, 10) : "");
+        setQuoteAmount(projectToAddPhase.quoteAmount != null ? String(projectToAddPhase.quoteAmount) : "");
+        setCost(projectToAddPhase.cost != null ? String(projectToAddPhase.cost) : "");
+        setUnitCount(projectToAddPhase.unitCount != null ? String(projectToAddPhase.unitCount) : "");
+      } else {
+        setExpectedDate("");
+        setQuoteAmount("");
+        setCost("");
+        setUnitCount("");
+      }
       setSalesRepId(projectToAddPhase.salesRepId || selectableUsers[0]?.id || "");
     }
   }, [projectToAddPhase, selectableUsers]);

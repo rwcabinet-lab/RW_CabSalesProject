@@ -62,6 +62,18 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
       expect(totalUnits).toBe(30);
     });
 
+    it("母案報價彙總應支援 totalAmount 備援加總，杜絕子案有預算/成本而母案顯示 0 之問題", () => {
+      const phases: Partial<WorkbenchProjectDTO>[] = [
+        { id: "p1", phaseNumber: 1, quoteAmount: undefined, totalAmount: 11, cost: 11, unitCount: 1 },
+      ];
+
+      const totalQuote = phases.reduce(
+        (sum, p) => sum + (Number(p.quoteAmount) || Number(p.totalAmount) || 0),
+        0
+      );
+      expect(totalQuote).toBe(11);
+    });
+
     it("燈號彙總規則：任一期逾期亮紅燈，次之黃燈，全結案亮灰燈，其餘綠燈", () => {
       const evaluateRollupLight = (colors: ("RED" | "YELLOW" | "GREEN" | "GRAY")[]) => {
         if (colors.includes("RED")) return "RED";
@@ -84,7 +96,7 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
   });
 
   describe("分期動態建立與里程碑遷移 (addProjectPhase)", () => {
-    it("當單期案場首次新增期數時，應將原案場轉為第 1 期並遷移歷史進度，並新建第 2 期", async () => {
+    it("當單期案場首次新增期數時，應將原案場轉為第 1 期並遷移歷史進度（一次建立一期）", async () => {
       const mockParent = {
         id: "master-1",
         projectName: "仁愛大樓案",
@@ -117,33 +129,20 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
         parentId: "master-1",
         phaseNumber: 1,
         phaseName: "第 1 期",
-        customer: { name: "信義建設", customerType: "CONSTRUCTION", defaultDiscount: 1, salesRepId: "sales-1", salesRep: { name: "王業務" } },
-        salesRep: { name: "王業務" },
-      };
-      const mockPhase2 = {
-        id: "phase-2",
-        projectName: "仁愛大樓案 - 第 2 期：高樓層",
-        customerId: "cust-1",
-        siteAddress: "台北市仁愛路",
-        parentId: "master-1",
-        phaseNumber: 2,
-        phaseName: "第 2 期：高樓層",
+        quoteAmount: 600000,
         customer: { name: "信義建設", customerType: "CONSTRUCTION", defaultDiscount: 1, salesRepId: "sales-1", salesRep: { name: "王業務" } },
         salesRep: { name: "王業務" },
       };
 
-      vi.mocked(prisma.project.create)
-        .mockResolvedValueOnce(mockPhase1 as any)
-        .mockResolvedValueOnce(mockPhase2 as any);
-
+      vi.mocked(prisma.project.create).mockResolvedValueOnce(mockPhase1 as any);
       vi.mocked(prisma.projectMilestone.findFirst).mockResolvedValue(null);
 
       const result = await ProjectService.addProjectPhase("master-1", {
-        phaseName: "第 2 期：高樓層",
-        quoteAmount: 350000,
+        phaseName: "第 1 期",
+        quoteAmount: 600000,
       });
 
-      expect(prisma.project.create).toHaveBeenCalledTimes(2);
+      expect(prisma.project.create).toHaveBeenCalledTimes(1);
       expect(prisma.projectMilestone.updateMany).toHaveBeenCalledWith({
         where: { projectId: "master-1" },
         data: { projectId: "phase-1" },
@@ -162,7 +161,7 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
           expectedDate: null,
         },
       });
-      expect(result.id).toBe("phase-2");
+      expect(result.id).toBe("phase-1");
     });
 
     it("當案場已有分期時，新增期數應接續下一個 phaseNumber", async () => {

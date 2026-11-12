@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
         childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
 
         if (childPhases.length > 0) {
-          const totalQuote = childPhases.reduce((sum, c) => sum + (Number(c.quoteAmount) || 0), 0);
+          const totalQuote = childPhases.reduce((sum, c) => sum + (Number(c.quoteAmount) || Number(c.totalAmount) || 0), 0);
           const totalCost = childPhases.reduce((sum, c) => sum + (Number(c.cost) || 0), 0);
           const totalUnits = childPhases.reduce((sum, c) => sum + (Number(c.unitCount) || 0), 0);
 
