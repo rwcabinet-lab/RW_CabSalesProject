@@ -618,18 +618,6 @@ export function WorkbenchAddPhaseModal({
           </label>
 
           <label className="font-semibold text-slate-700">
-            報價金額（元）
-            <input
-              type="number"
-              step="1"
-              value={quoteAmount}
-              onChange={(e) => setQuoteAmount(e.target.value)}
-              placeholder="例如：350000"
-              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal text-right tabular-nums focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </label>
-
-          <label className="font-semibold text-slate-700">
             成本金額（元）
             <input
               type="number"
@@ -637,6 +625,18 @@ export function WorkbenchAddPhaseModal({
               value={cost}
               onChange={(e) => setCost(e.target.value)}
               placeholder="例如：250000"
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal text-right tabular-nums focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            報價金額（元）
+            <input
+              type="number"
+              step="1"
+              value={quoteAmount}
+              onChange={(e) => setQuoteAmount(e.target.value)}
+              placeholder="例如：350000"
               className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal text-right tabular-nums focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </label>

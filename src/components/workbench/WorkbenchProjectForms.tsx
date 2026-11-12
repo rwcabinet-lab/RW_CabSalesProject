@@ -154,17 +154,6 @@ export function WorkbenchAddProjectPanel({
           />
         </label>
         <label>
-          報價金額（元）
-          <input
-            type="number"
-            step="1"
-            placeholder="例如：350000"
-            value={newProjectData.quoteAmount}
-            onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
-            className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
-          />
-        </label>
-        <label>
           成本金額（元）
           <input
             type="number"
@@ -172,6 +161,17 @@ export function WorkbenchAddProjectPanel({
             placeholder="例如：250000"
             value={newProjectData.cost}
             onChange={(e) => setNewProjectData({ cost: e.target.value })}
+            className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
+          />
+        </label>
+        <label>
+          報價金額（元）
+          <input
+            type="number"
+            step="1"
+            placeholder="例如：350000"
+            value={newProjectData.quoteAmount}
+            onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
             className="mt-1 w-full border rounded p-1.5 text-right tabular-nums"
           />
         </label>
@@ -390,18 +390,6 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              報價金額（元） {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
-              <input
-                type="number"
-                step="1"
-                disabled={hasPhases}
-                placeholder="例如：350000"
-                value={newProjectData.quoteAmount}
-                onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
-                className={`mt-1 w-full border rounded p-1.5 text-right tabular-nums ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
-              />
-            </label>
-            <label className="font-semibold text-slate-700">
               成本金額（元） {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
               <input
                 type="number"
@@ -410,6 +398,18 @@ export function WorkbenchEditProjectRow({
                 placeholder="例如：250000"
                 value={newProjectData.cost}
                 onChange={(e) => setNewProjectData({ cost: e.target.value })}
+                className={`mt-1 w-full border rounded p-1.5 text-right tabular-nums ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+              />
+            </label>
+            <label className="font-semibold text-slate-700">
+              報價金額（元） {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
+              <input
+                type="number"
+                step="1"
+                disabled={hasPhases}
+                placeholder="例如：350000"
+                value={newProjectData.quoteAmount}
+                onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
                 className={`mt-1 w-full border rounded p-1.5 text-right tabular-nums ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
             </label>
