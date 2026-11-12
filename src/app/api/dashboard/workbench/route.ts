@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
-    const [myProjects, tasks] = await Promise.all([
+    const [initialProjects, tasks] = await Promise.all([
       DataService.getProjects({
         where: {
           OR: [
@@ -33,6 +33,29 @@ export async function GET(req: NextRequest) {
       }),
       DataService.getTasks({ assignedToId: currentUser.id }),
     ]);
+
+    // 若撈取的專案包含分期子案或母案，補充完整上下層級關係
+    const parentIdsToFetch = initialProjects.map((p) => p.parentId).filter((id): id is string => Boolean(id));
+    const projectIdsSet = new Set(initialProjects.map((p) => p.id));
+    const missingParentIds = parentIdsToFetch.filter((id) => !projectIdsSet.has(id));
+
+    // 同時查詢這些母案底下的所有分期，確保分期結構完整
+    const masterIds = initialProjects.filter((p) => !p.parentId).map((p) => p.id).concat(missingParentIds);
+
+    const [extraParents, extraPhases] = await Promise.all([
+      missingParentIds.length > 0
+        ? DataService.getProjects({ where: { id: { in: missingParentIds } } })
+        : Promise.resolve([]),
+      masterIds.length > 0
+        ? DataService.getProjects({ where: { parentId: { in: masterIds } } })
+        : Promise.resolve([]),
+    ]);
+
+    const allProjectsMap = new Map<string, typeof initialProjects[0]>();
+    for (const p of [...initialProjects, ...extraParents, ...extraPhases]) {
+      allProjectsMap.set(p.id, p);
+    }
+    const myProjects = Array.from(allProjectsMap.values());
 
     const projectIds = myProjects.map((p) => p.id);
     if (projectIds.length === 0) {
@@ -88,6 +111,9 @@ export async function GET(req: NextRequest) {
           cost: p.cost,
           quoteAmount: p.quoteAmount,
           totalAmount: p.quoteAmount ?? null,
+          parentId: p.parentId || null,
+          phaseNumber: p.phaseNumber || null,
+          phaseName: p.phaseName || null,
           activeMilestone: activeMilestone
             ? {
                 id: activeMilestone.id,
@@ -102,10 +128,69 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    const filteredProjects = projectsWithDetails.filter(Boolean);
+    // 依據分期結構組織父子案件
+    const phasesByParent = new Map<string, typeof projectsWithDetails>();
+    for (const p of projectsWithDetails) {
+      if (p.parentId) {
+        const list = phasesByParent.get(p.parentId) || [];
+        list.push(p);
+        phasesByParent.set(p.parentId, list);
+      }
+    }
+
+    const hierarchicalProjects = projectsWithDetails
+      .filter((p) => !p.parentId)
+      .map((parent) => {
+        const childPhases = phasesByParent.get(parent.id) || [];
+        childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
+
+        if (childPhases.length > 0) {
+          const totalQuote = childPhases.reduce((sum, c) => sum + (c.quoteAmount || 0), 0);
+          const totalCost = childPhases.reduce((sum, c) => sum + (c.cost || 0), 0);
+          const totalUnits = childPhases.reduce((sum, c) => sum + (c.unitCount || 0), 0);
+
+          let rolledColor: "RED" | "YELLOW" | "GREEN" | "GRAY" = "GREEN";
+          let rolledLabel = "正常";
+          if (childPhases.some((c) => c.trafficLight.color === "RED")) {
+            rolledColor = "RED";
+            rolledLabel = "逾期";
+          } else if (childPhases.some((c) => c.trafficLight.color === "YELLOW")) {
+            rolledColor = "YELLOW";
+            rolledLabel = "即將到期";
+          } else if (childPhases.every((c) => c.trafficLight.color === "GRAY")) {
+            rolledColor = "GRAY";
+            rolledLabel = "已結案";
+          }
+
+          const isAnyDelayed = childPhases.some((c) => c.isDelayed);
+          const isAllClosed = childPhases.every((c) => c.isClosed);
+          const upcomingDates = childPhases
+            .map((c) => c.expectedDate)
+            .filter(Boolean)
+            .sort();
+
+          return {
+            ...parent,
+            quoteAmount: totalQuote || parent.quoteAmount,
+            totalAmount: totalQuote || parent.quoteAmount || null,
+            cost: totalCost || parent.cost,
+            unitCount: totalUnits || parent.unitCount,
+            isDelayed: isAnyDelayed,
+            isClosed: isAllClosed,
+            expectedDate: upcomingDates[0] || parent.expectedDate || "",
+            trafficLight: { color: rolledColor, label: rolledLabel, daysDiff: 0 },
+            phases: childPhases,
+          };
+        }
+
+        return {
+          ...parent,
+          phases: [],
+        };
+      });
 
     const projectTrafficLightMap = new Map<string, string>();
-    for (const p of filteredProjects) {
+    for (const p of projectsWithDetails) {
       if (p) {
         projectTrafficLightMap.set(p.id, p.trafficLight.label);
       }
@@ -122,7 +207,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       currentUser,
-      myProjects: filteredProjects,
+      myProjects: hierarchicalProjects,
       tasks: tasksWithPausedStatus,
     });
   } catch (error) {

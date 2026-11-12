@@ -149,6 +149,10 @@ export interface ProjectDTO {
   cost?: number;
   quoteAmount?: number;
   totalAmount?: number | null;
+  parentId?: string | null;
+  phaseNumber?: number | null;
+  phaseName?: string | null;
+  phases?: ProjectDTO[];
 }
 
 export interface WorkbenchProjectDTO {
@@ -171,6 +175,10 @@ export interface WorkbenchProjectDTO {
   unitCount?: number;
   cost?: number;
   quoteAmount?: number;
+  parentId?: string | null;
+  phaseNumber?: number | null;
+  phaseName?: string | null;
+  phases?: WorkbenchProjectDTO[];
   activeMilestone: {
     id: string;
     stageCode: MilestoneStageCodeDTO;
@@ -218,6 +226,7 @@ export interface ColumnConfigDTO {
 
 export interface ProjectWithMilestonesDTO extends ProjectDTO {
   milestones: MilestoneDTO[];
+  phases?: ProjectWithMilestonesDTO[];
 }
 
 export interface MilestoneDetailsDTO {
@@ -339,6 +348,10 @@ export interface ManagerProjectOverviewDTO {
   activeMilestoneId: string | null;
   activeMilestoneAssignedTo: string | null;
   unassignedNextMilestoneName: string | null;
+  parentId?: string | null;
+  phaseNumber?: number | null;
+  phaseName?: string | null;
+  phases?: ManagerProjectOverviewDTO[];
 }
 
 export interface AssignableUserDTO {

@@ -283,8 +283,71 @@ export async function GET(req: NextRequest) {
             ? MILESTONE_STAGE_LABELS[milestones[nextIndex].stageCode]
             : null;
         })(),
+        parentId: p.parentId || null,
+        phaseNumber: p.phaseNumber || null,
+        phaseName: p.phaseName || null,
       };
     });
+
+    const phasesByParent = new Map<string, typeof allProjectsOverview>();
+    for (const p of allProjectsOverview) {
+      if (p.parentId) {
+        const list = phasesByParent.get(p.parentId) || [];
+        list.push(p);
+        phasesByParent.set(p.parentId, list);
+      }
+    }
+
+    const hierarchicalManagerProjects = allProjectsOverview
+      .filter((p) => !p.parentId)
+      .map((parent) => {
+        const childPhases = phasesByParent.get(parent.id) || [];
+        childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
+
+        if (childPhases.length > 0) {
+          const totalQuote = childPhases.reduce((sum, c) => sum + (c.quoteAmount || 0), 0);
+          const totalCost = childPhases.reduce((sum, c) => sum + (c.cost || 0), 0);
+          const totalUnits = childPhases.reduce((sum, c) => sum + (c.unitCount || 0), 0);
+
+          let rolledColor: "RED" | "YELLOW" | "GREEN" | "GRAY" = "GREEN";
+          let rolledLabel = "正常";
+          if (childPhases.some((c) => c.trafficLight.color === "RED")) {
+            rolledColor = "RED";
+            rolledLabel = "逾期";
+          } else if (childPhases.some((c) => c.trafficLight.color === "YELLOW")) {
+            rolledColor = "YELLOW";
+            rolledLabel = "即將到期";
+          } else if (childPhases.every((c) => c.trafficLight.color === "GRAY")) {
+            rolledColor = "GRAY";
+            rolledLabel = "已結案";
+          }
+
+          const isAnyDelayed = childPhases.some((c) => c.isDelayed);
+          const isAllClosed = childPhases.every((c) => c.isClosed);
+          const upcomingDates = childPhases
+            .map((c) => c.expectedDate)
+            .filter(Boolean)
+            .sort();
+
+          return {
+            ...parent,
+            quoteAmount: totalQuote || parent.quoteAmount,
+            totalAmount: totalQuote || parent.quoteAmount || null,
+            cost: totalCost || parent.cost,
+            unitCount: totalUnits || parent.unitCount,
+            isDelayed: isAnyDelayed,
+            isClosed: isAllClosed,
+            expectedDate: upcomingDates[0] || parent.expectedDate || "",
+            trafficLight: { color: rolledColor, label: rolledLabel, daysDiff: 0 },
+            phases: childPhases,
+          };
+        }
+
+        return {
+          ...parent,
+          phases: [],
+        };
+      });
 
     // 5. 階段瓶頸分析 (嚴格統計七大階段)
     const sevenStages: Array<{ stage: string; label: string; aliases: string[] }> = [
@@ -340,7 +403,7 @@ export async function GET(req: NextRequest) {
       alertList,
       salesWorkload,
       stageBottlenecks,
-      allProjectsOverview,
+      allProjectsOverview: hierarchicalManagerProjects,
       assignedTasks: assignedTasksWithStatus,
     });
   } catch (error) {

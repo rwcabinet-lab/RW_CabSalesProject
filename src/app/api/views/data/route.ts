@@ -51,8 +51,28 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const phasesByParent = new Map<string, typeof projectsWithMilestones>();
+    for (const p of projectsWithMilestones) {
+      if (p.parentId) {
+        const list = phasesByParent.get(p.parentId) || [];
+        list.push(p);
+        phasesByParent.set(p.parentId, list);
+      }
+    }
+
+    const hierarchicalProjects = projectsWithMilestones
+      .filter((p) => !p.parentId)
+      .map((parent) => {
+        const childPhases = phasesByParent.get(parent.id) || [];
+        childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
+        return {
+          ...parent,
+          phases: childPhases,
+        };
+      });
+
     return NextResponse.json({
-      projects: projectsWithMilestones,
+      projects: hierarchicalProjects,
       tasks,
       staff,
     });

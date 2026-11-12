@@ -60,6 +60,9 @@ export const ProjectService = {
       unitCount: p.unitCount ?? undefined,
       cost: p.cost != null ? Number(p.cost) : undefined,
       quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+      parentId: p.parentId ?? undefined,
+      phaseNumber: p.phaseNumber ?? undefined,
+      phaseName: p.phaseName ?? undefined,
     }));
   },
 
@@ -99,6 +102,9 @@ export const ProjectService = {
       unitCount: p.unitCount ?? undefined,
       cost: p.cost != null ? Number(p.cost) : undefined,
       quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+      parentId: p.parentId ?? undefined,
+      phaseNumber: p.phaseNumber ?? undefined,
+      phaseName: p.phaseName ?? undefined,
     };
   },
 
@@ -191,6 +197,9 @@ export const ProjectService = {
       unitCount: p.unitCount ?? undefined,
       cost: p.cost != null ? Number(p.cost) : undefined,
       quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+      parentId: p.parentId ?? undefined,
+      phaseNumber: p.phaseNumber ?? undefined,
+      phaseName: p.phaseName ?? undefined,
     };
     return { project, milestones: evaluated.milestones };
   },
@@ -206,6 +215,9 @@ export const ProjectService = {
     quoteAmount?: number;
     salesRepId?: string;
     startStageCode?: string;
+    parentId?: string;
+    phaseNumber?: number;
+    phaseName?: string;
   }): Promise<ProjectDetail | undefined> {
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
@@ -307,6 +319,9 @@ export const ProjectService = {
           cost: data.cost,
           quoteAmount: data.quoteAmount,
           estimatedBudget: data.quoteAmount || data.cost,
+          parentId: data.parentId,
+          phaseNumber: data.phaseNumber,
+          phaseName: data.phaseName,
           milestones: {
             createMany: {
               data: milestoneRows,
@@ -363,8 +378,110 @@ export const ProjectService = {
         unitCount: p.unitCount ?? undefined,
         cost: p.cost != null ? Number(p.cost) : undefined,
         quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+        parentId: p.parentId ?? undefined,
+        phaseNumber: p.phaseNumber ?? undefined,
+        phaseName: p.phaseName ?? undefined,
       };
     });
+  },
+
+  async addProjectPhase(
+    parentProjectId: string,
+    data: {
+      phaseName: string;
+      expectedDate?: string;
+      unitCount?: number;
+      cost?: number;
+      quoteAmount?: number;
+      salesRepId?: string;
+      startStageCode?: string;
+    }
+  ): Promise<ProjectDetail> {
+    const parent = await prisma.project.findUnique({
+      where: { id: parentProjectId },
+      include: {
+        phases: {
+          orderBy: { phaseNumber: "asc" },
+        },
+        milestones: true,
+      },
+    });
+    if (!parent) {
+      throw new BadRequestError("找不到母案場");
+    }
+
+    if (parent.phases.length === 0) {
+      const phase1 = await prisma.project.create({
+        data: {
+          projectName: `${parent.projectName} - 第 1 期`,
+          customerId: parent.customerId,
+          siteAddress: parent.siteAddress,
+          siteCondition: parent.siteCondition,
+          salesRepId: parent.salesRepId,
+          salesAssistantId: parent.salesAssistantId,
+          currentStage: parent.currentStage,
+          isDelayed: parent.isDelayed,
+          expectedDate: parent.expectedDate,
+          unitCount: parent.unitCount,
+          cost: parent.cost,
+          quoteAmount: parent.quoteAmount,
+          estimatedBudget: parent.estimatedBudget,
+          parentId: parent.id,
+          phaseNumber: 1,
+          phaseName: "第 1 期",
+        },
+      });
+
+      await prisma.projectMilestone.updateMany({
+        where: { projectId: parent.id },
+        data: { projectId: phase1.id },
+      });
+      await prisma.salesTask.updateMany({
+        where: { projectId: parent.id },
+        data: { projectId: phase1.id },
+      });
+
+      const phase2Name = data.phaseName.trim() || "第 2 期";
+      const phase2 = await ProjectService.addProject({
+        projectName: `${parent.projectName} - ${phase2Name}`,
+        customerId: parent.customerId,
+        siteAddress: parent.siteAddress,
+        siteCondition: parent.siteCondition || undefined,
+        expectedDate: data.expectedDate,
+        unitCount: data.unitCount,
+        cost: data.cost,
+        quoteAmount: data.quoteAmount,
+        salesRepId: data.salesRepId || parent.salesRepId,
+        startStageCode: data.startStageCode,
+        parentId: parent.id,
+        phaseNumber: 2,
+        phaseName: phase2Name,
+      });
+
+      return phase2!;
+    } else {
+      const maxPhaseNum = Math.max(0, ...parent.phases.map((p) => p.phaseNumber || 0));
+      const nextPhaseNum = maxPhaseNum + 1;
+      const phaseName = data.phaseName.trim() || `第 ${nextPhaseNum} 期`;
+
+      const newPhase = await ProjectService.addProject({
+        projectName: `${parent.projectName} - ${phaseName}`,
+        customerId: parent.customerId,
+        siteAddress: parent.siteAddress,
+        siteCondition: parent.siteCondition || undefined,
+        expectedDate: data.expectedDate,
+        unitCount: data.unitCount,
+        cost: data.cost,
+        quoteAmount: data.quoteAmount,
+        salesRepId: data.salesRepId || parent.salesRepId,
+        startStageCode: data.startStageCode,
+        parentId: parent.id,
+        phaseNumber: nextPhaseNum,
+        phaseName,
+      });
+
+      return newPhase!;
+    }
   },
 
   async updateProject(id: string, data: {
@@ -379,6 +496,8 @@ export const ProjectService = {
     salesAssistantId?: string | null;
     salesRepId?: string;
     estimatedBudget?: number | null;
+    phaseName?: string | null;
+    phaseNumber?: number | null;
   }): Promise<ProjectDetail | undefined> {
     if (data.salesRepId) {
       const rep = await prisma.user.findUnique({
@@ -409,6 +528,8 @@ export const ProjectService = {
       ...(data.estimatedBudget !== undefined ? { estimatedBudget: data.estimatedBudget } : {}),
       ...(data.salesAssistantId !== undefined ? { salesAssistantId: data.salesAssistantId || null } : {}),
       ...(data.salesRepId ? { salesRepId: data.salesRepId } : {}),
+      ...(data.phaseName !== undefined ? { phaseName: data.phaseName } : {}),
+      ...(data.phaseNumber !== undefined ? { phaseNumber: data.phaseNumber } : {}),
     };
 
     return await prisma.$transaction(async (tx) => {
@@ -493,6 +614,9 @@ export const ProjectService = {
         unitCount: p.unitCount ?? undefined,
         cost: p.cost != null ? Number(p.cost) : undefined,
         quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+        parentId: p.parentId ?? undefined,
+        phaseNumber: p.phaseNumber ?? undefined,
+        phaseName: p.phaseName ?? undefined,
       };
     });
   },

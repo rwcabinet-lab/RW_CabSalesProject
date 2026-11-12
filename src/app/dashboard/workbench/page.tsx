@@ -13,6 +13,9 @@ import {
   RefreshCw,
   Pin,
   RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -32,6 +35,7 @@ import {
   WorkbenchCreateTaskModal,
   WorkbenchCompleteTaskModal,
   WorkbenchAdvanceMilestoneModal,
+  WorkbenchAddPhaseModal,
 } from "@/components/workbench/WorkbenchModals";
 import { WorkbenchAddProjectPanel, WorkbenchEditProjectRow } from "@/components/workbench/WorkbenchProjectForms";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
@@ -87,8 +91,20 @@ export default function SalesWorkbenchPage() {
   const setShowTaskModal = useWorkbenchStore((s) => s.setShowTaskModal);
   const setTaskToComplete = useWorkbenchStore((s) => s.setTaskToComplete);
   const setProjectToAdvance = useWorkbenchStore((s) => s.setProjectToAdvance);
+  const setProjectToAddPhase = useWorkbenchStore((s) => s.setProjectToAddPhase);
   const resetFilters = useWorkbenchStore((s) => s.resetFilters);
   const initFromStorage = useWorkbenchStore((s) => s.initFromStorage);
+
+  const [expandedMasterIds, setExpandedMasterIds] = useState<Set<string>>(new Set());
+
+  const toggleMasterExpand = (id: string) => {
+    setExpandedMasterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     initFromStorage();
@@ -522,202 +538,380 @@ export default function SalesWorkbenchPage() {
                   </td>
                 </tr>
               ) : (
-                sortedProjects.map((p) => (
-                  <Fragment key={p.id}>
-                  <tr
-                    className={`hover:brightness-95 [&>td]:align-middle transition-colors ${
-                      isPinned(p.id) ? "border-l-4 border-l-amber-400 " : ""
-                    }${
-                      editingProjectId === p.id
-                        ? "bg-emerald-50/70 ring-1 ring-emerald-500"
-                        : p.currentStage === "LOST"
-                        ? "bg-slate-50/80 opacity-75"
-                        : p.currentStage === "WRAP_UP"
-                        ? "bg-amber-50/50"
-                        : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
-                        ? "bg-emerald-50/40"
-                        : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(p.currentStage)
-                        ? "bg-blue-50/40"
-                        : "bg-amber-50/40"
-                    }`}
-                  >
-                    {visibleColumns.map((col) => {
-                      switch (col.key) {
-                        case "trafficLight":
-                          return (
-                            <td key={col.key} className="p-3">
-                              <span
-                                className={`px-2 py-1 rounded-full font-bold ${
-                                  p.currentStage === "LOST" || p.trafficLight.color === "GRAY"
-                                    ? "bg-slate-100 text-slate-600"
-                                    : p.trafficLight.color === "RED"
-                                    ? "bg-red-100 text-red-700"
-                                    : p.trafficLight.color === "YELLOW"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-emerald-100 text-emerald-700"
-                                }`}
-                              >
-                                ● {p.trafficLight.label}
-                              </span>
-                            </td>
-                          );
-                        case "projectName": {
-                          const pinned = isPinned(p.id);
-                          return (
-                            <td key={col.key} className="p-3 font-bold">
-                              <div className="flex items-start gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nowPinned = togglePin(p.id);
-                                    if (nowPinned) {
-                                      toast.success(`已將案件「${p.projectName}」置頂`);
-                                    } else {
-                                      toast.info(`已取消案件「${p.projectName}」置頂`);
-                                    }
-                                  }}
-                                  className={`mt-0.5 p-1 rounded transition-colors shrink-0 ${
-                                    pinned
-                                      ? "text-amber-500 hover:text-amber-600 bg-amber-50 hover:bg-amber-100 ring-1 ring-amber-300"
-                                      : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
+                sortedProjects.map((p) => {
+                  const hasPhases = Boolean(p.phases && p.phases.length > 0);
+                  const isExpanded = expandedMasterIds.has(p.id);
+
+                  return (
+                    <Fragment key={p.id}>
+                    <tr
+                      className={`hover:brightness-95 [&>td]:align-middle transition-colors ${
+                        isPinned(p.id) ? "border-l-4 border-l-amber-400 " : ""
+                      }${
+                        editingProjectId === p.id
+                          ? "bg-emerald-50/70 ring-1 ring-emerald-500"
+                          : p.currentStage === "LOST"
+                          ? "bg-slate-50/80 opacity-75"
+                          : p.currentStage === "WRAP_UP"
+                          ? "bg-amber-50/50"
+                          : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(p.currentStage)
+                          ? "bg-emerald-50/40"
+                          : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(p.currentStage)
+                          ? "bg-blue-50/40"
+                          : "bg-amber-50/40"
+                      }`}
+                    >
+                      {visibleColumns.map((col) => {
+                        switch (col.key) {
+                          case "trafficLight":
+                            return (
+                              <td key={col.key} className="p-3">
+                                <span
+                                  className={`px-2 py-1 rounded-full font-bold ${
+                                    p.currentStage === "LOST" || p.trafficLight.color === "GRAY"
+                                      ? "bg-slate-100 text-slate-600"
+                                      : p.trafficLight.color === "RED"
+                                      ? "bg-red-100 text-red-700"
+                                      : p.trafficLight.color === "YELLOW"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-emerald-100 text-emerald-700"
                                   }`}
-                                  title={pinned ? "取消置頂" : "置頂案件至清單最上方"}
-                                  aria-label={pinned ? "取消置頂" : "置頂案件至清單最上方"}
                                 >
-                                  <Pin className={`w-3.5 h-3.5 ${pinned ? "fill-amber-500 -rotate-45" : ""}`} />
-                                </button>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-slate-900">{p.projectName}</span>
-                                    {pinned && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
-                                        <Pin className="w-2.5 h-2.5 fill-amber-700 -rotate-45 inline" /> 置頂
-                                      </span>
-                                    )}
+                                  ● {p.trafficLight.label}
+                                </span>
+                              </td>
+                            );
+                          case "projectName": {
+                            const pinned = isPinned(p.id);
+                            return (
+                              <td key={col.key} className="p-3 font-bold">
+                                <div className="flex items-start gap-1.5">
+                                  {hasPhases && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleMasterExpand(p.id);
+                                      }}
+                                      className="mt-0.5 p-0.5 rounded hover:bg-slate-200 text-slate-600 shrink-0"
+                                      title={isExpanded ? "收合分期" : "展開分期"}
+                                    >
+                                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const nowPinned = togglePin(p.id);
+                                      if (nowPinned) {
+                                        toast.success(`已將案件「${p.projectName}」置頂`);
+                                      } else {
+                                        toast.info(`已取消案件「${p.projectName}」置頂`);
+                                      }
+                                    }}
+                                    className={`mt-0.5 p-1 rounded transition-colors shrink-0 ${
+                                      pinned
+                                        ? "text-amber-500 hover:text-amber-600 bg-amber-50 hover:bg-amber-100 ring-1 ring-amber-300"
+                                        : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
+                                    }`}
+                                    title={pinned ? "取消置頂" : "置頂案件至清單最上方"}
+                                    aria-label={pinned ? "取消置頂" : "置頂案件至清單最上方"}
+                                  >
+                                    <Pin className={`w-3.5 h-3.5 ${pinned ? "fill-amber-500 -rotate-45" : ""}`} />
+                                  </button>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-slate-900">{p.projectName}</span>
+                                      {hasPhases && (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-2xs">
+                                          <Layers className="w-2.5 h-2.5 inline" /> 共 {p.phases?.length} 期
+                                        </span>
+                                      )}
+                                      {pinned && (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
+                                          <Pin className="w-2.5 h-2.5 fill-amber-700 -rotate-45 inline" /> 置頂
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>
                                   </div>
-                                  <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>
                                 </div>
-                              </div>
-                            </td>
-                          );
+                              </td>
+                            );
+                          }
+                          case "customer":
+                            return (
+                              <td key={col.key} className="p-3">
+                                {p.customerName}{" "}
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
+                                  {p.defaultDiscount === 1 ? "牌價" : `${((p.defaultDiscount || 1) * 10).toFixed(1)}折`}
+                                </span>
+                              </td>
+                            );
+                          case "salesRep":
+                            return (
+                              <td key={col.key} className="p-3 text-slate-700 font-medium">
+                                {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
+                              </td>
+                            );
+                          case "stageProgress":
+                            return (
+                              <td key={col.key} className="p-3 font-bold text-slate-700">
+                                <div>{p.isClosed ? "結案" : hasPhases ? "分期進行中" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
+                                <div className="mt-1 text-[11px] font-normal">
+                                  {p.currentStage === "LOST" ? (
+                                    <span className="text-slate-400">—</span>
+                                  ) : p.isClosed ? (
+                                    <span className="text-emerald-700 font-semibold">已結案</span>
+                                  ) : hasPhases ? (
+                                    <span className="text-indigo-600 font-semibold">共 {p.phases?.length} 個獨立分期進度</span>
+                                  ) : p.activeMilestone ? (
+                                    <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                      {p.activeMilestone.stageName}
+                                      {p.activeMilestone.plannedDueDate && (
+                                        <span className="text-[10px] text-blue-600 font-normal">
+                                          ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">完結</span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          case "quoteAndUnits":
+                          case "amount":
+                            return (
+                              <td key={col.key} className="p-3">
+                                <div className="tabular-nums font-bold text-slate-900">
+                                  {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
+                                </div>
+                                <div className="text-[10px] text-slate-500">
+                                  {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
+                                </div>
+                              </td>
+                            );
+                          case "unitCount":
+                            return null;
+                          case "expectedDate":
+                            return (
+                              <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                {p.expectedDate?.slice(0, 10) || "未設定"}
+                              </td>
+                            );
+                          case "actions":
+                            return (
+                              <td key={col.key} className="p-3 text-center align-middle">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {!hasPhases && p.activeMilestone && !p.isClosed && p.currentStage !== "LOST" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setProjectToAdvance(p)}
+                                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                      title={`推進當前進度：${p.activeMilestone.stageName}`}
+                                    >
+                                      項目推進
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setProjectToAddPhase(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+                                    title="新增分期（各期具備獨立 28 里程碑）"
+                                  >
+                                    ＋ 期數
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditProject(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                                  >
+                                    編輯
+                                  </button>
+                                  <Link
+                                    href={`/projects/${p.id}/milestones`}
+                                    prefetch={true}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                  >
+                                    案件細節
+                                  </Link>
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteProject(p)}
+                                      className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                    >
+                                      刪除
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          default:
+                            return null;
                         }
-                        case "customer":
-                          return (
-                            <td key={col.key} className="p-3">
-                              {p.customerName}{" "}
-                              <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
-                                {p.defaultDiscount === 1 ? "牌價" : `${((p.defaultDiscount || 1) * 10).toFixed(1)}折`}
-                              </span>
-                            </td>
-                          );
-                        case "salesRep":
-                          return (
-                            <td key={col.key} className="p-3 text-slate-700 font-medium">
-                              {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
-                            </td>
-                          );
-                        case "stageProgress":
-                          return (
-                            <td key={col.key} className="p-3 font-bold text-slate-700">
-                              <div>{p.isClosed ? "結案" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
-                              <div className="mt-1 text-[11px] font-normal">
-                                {p.currentStage === "LOST" ? (
-                                  <span className="text-slate-400">—</span>
-                                ) : p.isClosed ? (
-                                  <span className="text-emerald-700 font-semibold">已結案</span>
-                                ) : p.activeMilestone ? (
-                                  <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
-                                    {p.activeMilestone.stageName}
-                                    {p.activeMilestone.plannedDueDate && (
-                                      <span className="text-[10px] text-blue-600 font-normal">
-                                        ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                      })}
+                    </tr>
+                    {editingProjectId === p.id && (
+                      <WorkbenchEditProjectRow
+                        projectId={p.id}
+                        projectName={p.projectName}
+                        colSpan={visibleColumns.length}
+                        customers={customers}
+                        selectableUsers={selectableUsers}
+                        onInvalidate={invalidateWorkbench}
+                      />
+                    )}
+                    {hasPhases && isExpanded && p.phases?.map((phase, pIdx) => {
+                      const isLast = pIdx === (p.phases?.length || 0) - 1;
+                      return (
+                        <tr
+                          key={phase.id}
+                          className={`hover:brightness-95 [&>td]:align-middle bg-slate-50/70 border-l-4 border-l-indigo-400 transition-colors ${
+                            phase.currentStage === "LOST"
+                              ? "opacity-75"
+                              : phase.currentStage === "WRAP_UP"
+                              ? "bg-amber-50/30"
+                              : ["INSTALL", "CLOSURE", "CLOSED", "BILLED", "DONE"].includes(phase.currentStage)
+                              ? "bg-emerald-50/30"
+                              : ["PROPOSAL", "PRE_PROD", "PROD_SHIP"].includes(phase.currentStage)
+                              ? "bg-blue-50/30"
+                              : "bg-slate-50/60"
+                          }`}
+                        >
+                          {visibleColumns.map((col) => {
+                            switch (col.key) {
+                              case "trafficLight":
+                                return (
+                                  <td key={col.key} className="p-3 pl-4">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                                        phase.currentStage === "LOST" || phase.trafficLight.color === "GRAY"
+                                          ? "bg-slate-100 text-slate-600"
+                                          : phase.trafficLight.color === "RED"
+                                          ? "bg-red-100 text-red-700"
+                                          : phase.trafficLight.color === "YELLOW"
+                                          ? "bg-amber-100 text-amber-700"
+                                          : "bg-emerald-100 text-emerald-700"
+                                      }`}
+                                    >
+                                      ● {phase.trafficLight.label}
+                                    </span>
+                                  </td>
+                                );
+                              case "projectName":
+                                return (
+                                  <td key={col.key} className="p-3 pl-6">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-indigo-400 font-mono font-bold select-none text-xs">
+                                        {isLast ? "└─" : "├─"}
                                       </span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400">完結</span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        case "quoteAndUnits":
-                        case "amount":
-                          return (
-                            <td key={col.key} className="p-3">
-                              <div className="tabular-nums font-bold text-slate-900">
-                                {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0)}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                {p.unitCount ? `${p.unitCount} 戶` : "未填戶數"}
-                              </div>
-                            </td>
-                          );
-                        case "unitCount":
-                          return null;
-                        case "expectedDate":
-                          return (
-                            <td key={col.key} className="p-3 text-slate-600 font-medium">
-                              {p.expectedDate?.slice(0, 10) || "未設定"}
-                            </td>
-                          );
-                        case "actions":
-                          return (
-                            <td key={col.key} className="p-3 text-center align-middle">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {p.activeMilestone && !p.isClosed && p.currentStage !== "LOST" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setProjectToAdvance(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
-                                    title={`推進當前進度：${p.activeMilestone.stageName}`}
-                                  >
-                                    項目推進
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => openEditProject(p)}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
-                                >
-                                  編輯
-                                </button>
-                                <Link
-                                  href={`/projects/${p.id}/milestones`}
-                                  prefetch={true}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                                >
-                                  案件細節
-                                </Link>
-                                {isAdmin && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteProject(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
-                                  >
-                                    刪除
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        default:
-                          return null;
-                      }
+                                      <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-black text-indigo-800 shrink-0">
+                                        {phase.phaseName || `第 ${phase.phaseNumber} 期`}
+                                      </span>
+                                      <span className="font-semibold text-slate-800 text-xs truncate">
+                                        {phase.projectName}
+                                      </span>
+                                    </div>
+                                  </td>
+                                );
+                              case "customer":
+                                return (
+                                  <td key={col.key} className="p-3 text-slate-400 text-[11px]">
+                                    同母案 ({phase.customerName})
+                                  </td>
+                                );
+                              case "salesRep":
+                                return (
+                                  <td key={col.key} className="p-3 text-slate-700 font-medium">
+                                    {phase.salesRepName || "-"} {phase.salesAssistantName ? ` / ${phase.salesAssistantName}` : ""}
+                                  </td>
+                                );
+                              case "stageProgress":
+                                return (
+                                  <td key={col.key} className="p-3 font-bold text-slate-700">
+                                    <div>{phase.isClosed ? "結案" : (PROJECT_STAGE_LABELS[phase.currentStage] || phase.currentStage)}</div>
+                                    <div className="mt-1 text-[11px] font-normal">
+                                      {phase.currentStage === "LOST" ? (
+                                        <span className="text-slate-400">—</span>
+                                      ) : phase.isClosed ? (
+                                        <span className="text-emerald-700 font-semibold">已結案</span>
+                                      ) : phase.activeMilestone ? (
+                                        <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                          {phase.activeMilestone.stageName}
+                                          {phase.activeMilestone.plannedDueDate && (
+                                            <span className="text-[10px] text-blue-600 font-normal">
+                                              ({phase.activeMilestone.plannedDueDate.slice(5, 10)})
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">完結</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              case "quoteAndUnits":
+                              case "amount":
+                                return (
+                                  <td key={col.key} className="p-3">
+                                    <div className="tabular-nums font-bold text-slate-900">
+                                      {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0)}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">
+                                      {phase.unitCount ? `${phase.unitCount} 戶` : "-"}
+                                    </div>
+                                  </td>
+                                );
+                              case "expectedDate":
+                                return (
+                                  <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                    {phase.expectedDate?.slice(0, 10) || "未設定"}
+                                  </td>
+                                );
+                              case "actions":
+                                return (
+                                  <td key={col.key} className="p-3 text-center align-middle">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {phase.activeMilestone && !phase.isClosed && phase.currentStage !== "LOST" && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setProjectToAdvance(phase)}
+                                          className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                          title={`推進當前進度：${phase.activeMilestone.stageName}`}
+                                        >
+                                          項目推進
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditProject(phase)}
+                                        className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                                      >
+                                        編輯
+                                      </button>
+                                      <Link
+                                        href={`/projects/${phase.id}/milestones`}
+                                        prefetch={true}
+                                        className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                      >
+                                        時程細節
+                                      </Link>
+                                    </div>
+                                  </td>
+                                );
+                              default:
+                                return null;
+                            }
+                          })}
+                        </tr>
+                      );
                     })}
-                  </tr>
-                  {editingProjectId === p.id && (
-                    <WorkbenchEditProjectRow
-                      projectId={p.id}
-                      projectName={p.projectName}
-                      colSpan={visibleColumns.length}
-                      customers={customers}
-                      selectableUsers={selectableUsers}
-                      onInvalidate={invalidateWorkbench}
-                    />
-                  )}
-                </Fragment>
-              )))}
+                    </Fragment>
+                  );
+                }))}
             </tbody>
           </table>
         </div>
@@ -732,6 +926,11 @@ export default function SalesWorkbenchPage() {
       <WorkbenchCompleteTaskModal onInvalidate={invalidateWorkbench} />
 
       <WorkbenchAdvanceMilestoneModal onInvalidate={invalidateWorkbench} />
+
+      <WorkbenchAddPhaseModal
+        selectableUsers={selectableUsers}
+        onInvalidate={invalidateWorkbench}
+      />
     </div>
   );
 }

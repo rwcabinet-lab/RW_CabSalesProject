@@ -105,7 +105,16 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
       map.set(dateKey, events);
     };
 
+    const allConcreteProjects: ProjectWithMilestonesDTO[] = [];
     for (const project of projects) {
+      if (project.phases && project.phases.length > 0) {
+        allConcreteProjects.push(...project.phases);
+      } else {
+        allConcreteProjects.push(project);
+      }
+    }
+
+    for (const project of allConcreteProjects) {
       const sortedMilestones = [...project.milestones].sort((a, b) => a.stageOrder - b.stageOrder);
       const pausedM = sortedMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
       const pausedOrder = pausedM ? pausedM.stageOrder : null;

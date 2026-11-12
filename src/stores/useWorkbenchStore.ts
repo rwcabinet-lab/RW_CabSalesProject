@@ -46,6 +46,10 @@ interface WorkbenchState {
   advanceNotes: string;
   advanceDate: string;
 
+  // 新增期數 Modal
+  projectToAddPhase: WorkbenchProjectDTO | null;
+  setProjectToAddPhase: (project: WorkbenchProjectDTO | null) => void;
+
   // Actions
   setSearchQuery: (val: string) => void;
   setStatusFilter: (val: string) => void;
@@ -148,6 +152,9 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   projectToAdvance: null,
   advanceNotes: "",
   advanceDate: getTodayDate(),
+
+  projectToAddPhase: null,
+  setProjectToAddPhase: (project) => set({ projectToAddPhase: project }),
 
   setSearchQuery: (val) => {
     set({ searchQuery: val });

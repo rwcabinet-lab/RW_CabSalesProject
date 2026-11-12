@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
@@ -8,7 +9,7 @@ import { QUERY_KEYS } from "@/hooks/useQueries";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
 import { toast } from "@/stores/useToastStore";
 import { MILESTONE_STAGE_LABELS, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
-import type { ApiResponse, TaskDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
+import type { ApiResponse, TaskDTO, UserDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
 
 interface WorkbenchModalsProps {
   currentUserId: string;
@@ -469,6 +470,196 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
             className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors"
           >
             {advancing ? "推進中..." : "確認推進 ➔"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export function WorkbenchAddPhaseModal({
+  selectableUsers,
+  onInvalidate,
+}: {
+  selectableUsers: UserDTO[];
+  onInvalidate: (options?: { includeViews?: boolean }) => Promise<void>;
+}) {
+  const projectToAddPhase = useWorkbenchStore((s) => s.projectToAddPhase);
+  const setProjectToAddPhase = useWorkbenchStore((s) => s.setProjectToAddPhase);
+
+  const [saving, setSaving] = useState(false);
+  const [phaseName, setPhaseName] = useState("");
+  const [expectedDate, setExpectedDate] = useState("");
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [cost, setCost] = useState("");
+  const [unitCount, setUnitCount] = useState("");
+  const [salesRepId, setSalesRepId] = useState("");
+
+  useEffect(() => {
+    if (projectToAddPhase) {
+      const nextNum = (projectToAddPhase.phases?.length || 0) + 1;
+      setPhaseName(`第 ${nextNum} 期`);
+      setExpectedDate("");
+      setQuoteAmount("");
+      setCost("");
+      setUnitCount("");
+      setSalesRepId(projectToAddPhase.salesRepId || selectableUsers[0]?.id || "");
+    }
+  }, [projectToAddPhase, selectableUsers]);
+
+  if (!projectToAddPhase) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phaseName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectToAddPhase.id}/phases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phaseName: phaseName.trim(),
+          expectedDate: expectedDate || undefined,
+          quoteAmount: quoteAmount ? Math.round(Number(quoteAmount)) : undefined,
+          cost: cost ? Math.round(Number(cost)) : undefined,
+          unitCount: unitCount ? Number(unitCount) : undefined,
+          salesRepId: salesRepId || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`已成功為案場「${projectToAddPhase.projectName}」新增期數！`);
+        setProjectToAddPhase(null);
+        void onInvalidate({ includeViews: true });
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "新增期數失敗");
+      }
+    } catch {
+      toast.error("新增期數失敗，請稍後再試");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={() => !saving && setProjectToAddPhase(null)}
+    >
+      <form
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl space-y-4"
+      >
+        <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-800 text-sm">
+              為【{projectToAddPhase.projectName}】新增期數
+            </span>
+            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[11px] font-bold">
+              獨立 28 里程碑
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setProjectToAddPhase(null)}
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <label className="sm:col-span-2 font-semibold text-slate-700">
+            期數名稱 *
+            <input
+              type="text"
+              required
+              value={phaseName}
+              onChange={(e) => setPhaseName(e.target.value)}
+              placeholder="例如：第 2 期：標準層 A 棟"
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            預定進場日（同步 6-1）
+            <input
+              type="date"
+              value={expectedDate}
+              onChange={(e) => setExpectedDate(e.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            主責業務
+            <select
+              value={salesRepId}
+              onChange={(e) => setSalesRepId(e.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              {selectableUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            報價金額（元）
+            <input
+              type="number"
+              step="1"
+              value={quoteAmount}
+              onChange={(e) => setQuoteAmount(e.target.value)}
+              placeholder="例如：350000"
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal text-right tabular-nums focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            成本金額（元）
+            <input
+              type="number"
+              step="1"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="例如：250000"
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal text-right tabular-nums focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700 sm:col-span-2">
+            戶數
+            <input
+              type="number"
+              value={unitCount}
+              onChange={(e) => setUnitCount(e.target.value)}
+              placeholder="例如：12"
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t pt-3">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setProjectToAddPhase(null)}
+            className="rounded px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            取消
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm"
+          >
+            {saving ? "建立中..." : "確認建立期數"}
           </button>
         </div>
       </form>
