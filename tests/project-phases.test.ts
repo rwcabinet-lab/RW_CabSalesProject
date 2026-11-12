@@ -240,13 +240,17 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
   });
 
   describe("分期建立權限管制 (RBAC Permissions)", () => {
-    it("僅系統管理者 (ADMIN) 具備開立分期權限，其餘角色一律禁止", () => {
-      const canAddPhase = (role: string) => role === "ADMIN";
+    it("具備新增案場權限之身分（管理員、理級主管、業務主管、業務、業助、工務）均可開立分期", () => {
+      const CAN_CREATE_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER", "SALES", "ASSISTANT", "SITE_ENGINEER"];
+      const canAddPhase = (role: string) => CAN_CREATE_ROLES.includes(role);
       expect(canAddPhase("ADMIN")).toBe(true);
-      expect(canAddPhase("LEVEL_MANAGER")).toBe(false);
-      expect(canAddPhase("SALES_MANAGER")).toBe(false);
-      expect(canAddPhase("SALES")).toBe(false);
-      expect(canAddPhase("ASSISTANT")).toBe(false);
+      expect(canAddPhase("LEVEL_MANAGER")).toBe(true);
+      expect(canAddPhase("SALES_MANAGER")).toBe(true);
+      expect(canAddPhase("SALES")).toBe(true);
+      expect(canAddPhase("ASSISTANT")).toBe(true);
+      expect(canAddPhase("SITE_ENGINEER")).toBe(true);
+      expect(canAddPhase("GUEST")).toBe(false);
+      expect(canAddPhase("EXTERNAL_VIEWER")).toBe(false);
     });
   });
 });

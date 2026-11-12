@@ -38,8 +38,9 @@ export async function POST(
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    if (user.role !== "ADMIN") {
-      return NextResponse.json({ error: "僅系統管理者可新增案件期數" }, { status: 403 });
+    const CAN_CREATE_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER", "SALES", "ASSISTANT", "SITE_ENGINEER"];
+    if (!CAN_CREATE_ROLES.includes(user.role)) {
+      return NextResponse.json({ error: "沒有新增案場分期之權限" }, { status: 403 });
     }
 
     const body = await req.json();

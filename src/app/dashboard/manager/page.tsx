@@ -862,17 +862,15 @@ export default function ManagerDashboardPage() {
                           return (
                             <td key={col.key} className="p-3 text-center align-middle">
                               <div className="flex items-center justify-center gap-1.5">
-                                {isAdmin && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setProjectToAddPhase(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
-                                    title="新增分期（各期具備獨立 28 里程碑）"
-                                    aria-label="新增分期"
-                                  >
-                                    +
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setProjectToAddPhase(p)}
+                                  className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
+                                  title="新增分期（各期具備獨立 28 里程碑）"
+                                  aria-label="新增分期"
+                                >
+                                  +
+                                </button>
                                 <Link
                                   href={`/projects/${p.id}/milestones`}
                                   prefetch={true}
