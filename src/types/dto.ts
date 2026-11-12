@@ -350,6 +350,14 @@ export interface ManagerProjectOverviewDTO {
   activeMilestoneName: string | null;
   activeMilestoneId: string | null;
   activeMilestoneAssignedTo: string | null;
+  activeMilestone?: {
+    id: string;
+    stageCode: string;
+    phase: string;
+    stageName: string;
+    plannedDueDate?: string | null;
+    status: string;
+  } | null;
   unassignedNextMilestoneName: string | null;
   parentId?: string | null;
   phaseNumber?: number | null;

@@ -232,12 +232,18 @@ export async function GET(req: NextRequest) {
       const lastCompletedMilestone = milestones
         .filter((milestone) => milestone.status === "COMPLETED")
         .sort((a, b) => b.stageOrder - a.stageOrder)[0];
-      const activeMilestone = p.currentStage === "LOST"
+      const ongoingMilestone = p.currentStage === "LOST"
         ? null
         : milestones.find((m) => m.status === "OVERDUE") ||
           milestones.find((m) => m.status === "IN_PROGRESS");
-      const trafficLight = activeMilestone
-        ? ScheduleEngine.getTrafficLight(activeMilestone)
+      const activeMilestone = p.currentStage === "LOST"
+        ? null
+        : milestones.find((m) => m.status === "OVERDUE") ||
+          milestones.find((m) => m.status === "IN_PROGRESS") ||
+          milestones.find((m) => m.status === "PENDING") ||
+          milestones[milestones.length - 1];
+      const trafficLight = ongoingMilestone
+        ? ScheduleEngine.getTrafficLight(ongoingMilestone)
         : { color: "GRAY" as const, label: "無進行中項目", daysDiff: 0 };
 
       const isDelayed = isProjectDelayed(p);
@@ -276,6 +282,16 @@ export async function GET(req: NextRequest) {
           : "完結",
         activeMilestoneId: activeMilestone?.id || null,
         activeMilestoneAssignedTo: activeMilestone?.assignedToName || null,
+        activeMilestone: activeMilestone
+          ? {
+              id: activeMilestone.id,
+              stageCode: activeMilestone.stageCode,
+              phase: activeMilestone.phase,
+              stageName: MILESTONE_STAGE_LABELS[activeMilestone.stageCode],
+              plannedDueDate: activeMilestone.plannedDueDate || null,
+              status: activeMilestone.status,
+            }
+          : null,
         unassignedNextMilestoneName: (() => {
           if (p.currentStage === "WRAP_UP" || p.currentStage === "LOST") return null;
           const nextIndex = milestones.findIndex((milestone) => milestone.status !== "COMPLETED");

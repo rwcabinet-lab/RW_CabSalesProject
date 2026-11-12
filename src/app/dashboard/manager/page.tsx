@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Fragment } from "react";
 import dynamic from "next/dynamic";
-import { Users, CheckSquare, TrendingUp, Sparkles, AlertCircle, Trash2, Search, X, RefreshCw, Pin, RotateCcw, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { Users, CheckSquare, TrendingUp, Sparkles, Trash2, Search, X, RefreshCw, Pin, RotateCcw, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/stores/useToastStore";
@@ -812,15 +812,28 @@ export default function ManagerDashboardPage() {
                               ) : (
                                 <>
                                   <div>{p.isClosed ? "結案" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
-                                  <div className="mt-1 text-[10px] font-normal text-slate-500">
-                                    {p.currentStage === "LOST" ? p.currentStageLabel : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
+                                  <div className="mt-1 text-[11px] font-normal">
+                                    {p.currentStage === "LOST" ? (
+                                      <span className="text-slate-400">—</span>
+                                    ) : p.isClosed ? (
+                                      <span className="text-emerald-700 font-semibold">已結案</span>
+                                    ) : p.activeMilestone ? (
+                                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                        {p.activeMilestone.stageName}
+                                        {p.activeMilestone.plannedDueDate && (
+                                          <span className="text-[10px] text-blue-600 font-normal">
+                                            ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : p.activeMilestoneName && p.activeMilestoneName !== "完結" ? (
+                                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                        {p.activeMilestoneName}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400">完結</span>
+                                    )}
                                   </div>
-                                  {p.unassignedNextMilestoneName && (
-                                    <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">
-                                      <AlertCircle className="h-3 w-3" />
-                                      下一項「{p.unassignedNextMilestoneName}」待指派
-                                    </div>
-                                  )}
                                 </>
                               )}
                             </td>
@@ -960,8 +973,27 @@ export default function ManagerDashboardPage() {
                               return (
                                 <td key={col.key} className="p-3 font-bold text-slate-700">
                                   <div>{phase.isClosed ? "結案" : (PROJECT_STAGE_LABELS[phase.currentStage] || phase.currentStage)}</div>
-                                  <div className="mt-1 text-[10px] font-normal text-slate-500">
-                                    {phase.currentStage === "LOST" ? phase.currentStageLabel : phase.activeMilestoneName || phase.lastCompletedMilestoneName || "—"}
+                                  <div className="mt-1 text-[11px] font-normal">
+                                    {phase.currentStage === "LOST" ? (
+                                      <span className="text-slate-400">—</span>
+                                    ) : phase.isClosed ? (
+                                      <span className="text-emerald-700 font-semibold">已結案</span>
+                                    ) : phase.activeMilestone ? (
+                                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                        {phase.activeMilestone.stageName}
+                                        {phase.activeMilestone.plannedDueDate && (
+                                          <span className="text-[10px] text-blue-600 font-normal">
+                                            ({phase.activeMilestone.plannedDueDate.slice(5, 10)})
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : phase.activeMilestoneName && phase.activeMilestoneName !== "完結" ? (
+                                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                        {phase.activeMilestoneName}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400">完結</span>
+                                    )}
                                   </div>
                                 </td>
                               );
