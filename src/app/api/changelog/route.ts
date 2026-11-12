@@ -39,6 +39,16 @@ export async function GET(req: NextRequest) {
     if (!Array.isArray(changelogs) || changelogs.length === 0) {
       changelogs = DEFAULT_CHANGELOG;
       await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, DEFAULT_CHANGELOG);
+    } else {
+      // 智慧同步：若程式碼發布了新的預設改版條目（依 id 比對），自動補入資料庫
+      const existingIds = new Set(changelogs.map((c) => c.id));
+      const missingDefaultEntries = DEFAULT_CHANGELOG.filter(
+        (def) => !existingIds.has(def.id)
+      );
+      if (missingDefaultEntries.length > 0) {
+        changelogs = sortChangelogs([...missingDefaultEntries, ...changelogs]);
+        await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, changelogs);
+      }
     }
 
     // 非管理者僅能檢視未被隱藏之公開改版紀錄；管理者可取得全量紀錄（包含已標記隱藏項目）
