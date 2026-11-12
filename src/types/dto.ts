@@ -333,6 +333,7 @@ export interface ManagerProjectOverviewDTO {
   defaultDiscount?: number;
   currentStage: string;
   currentStageLabel: string;
+  salesRepId?: string | null;
   salesRepName: string;
   salesAssistantName: string | null;
   isDelayed: boolean;

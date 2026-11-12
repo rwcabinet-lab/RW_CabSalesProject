@@ -24,6 +24,8 @@ import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjec
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
 import { usePinnedProjects, sortProjectsWithPins } from "@/hooks/usePinnedProjects";
+import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
+import { WorkbenchAddPhaseModal } from "@/components/workbench/WorkbenchModals";
 
 const todayDate = () => getTaiwanDateString();
 
@@ -47,6 +49,8 @@ const StageBottlenecksChart = dynamic(
 
 export default function ManagerDashboardPage() {
   const queryClient = useQueryClient();
+  const projectToAddPhase = useWorkbenchStore((s) => s.projectToAddPhase);
+  const setProjectToAddPhase = useWorkbenchStore((s) => s.setProjectToAddPhase);
 
   // 案場總覽過濾條件 (由 useManagerStore 全域持久化管理，切換頁面不重置)
   const {
@@ -838,7 +842,15 @@ export default function ManagerDashboardPage() {
                         case "actions":
                           return (
                             <td key={col.key} className="p-3 text-center align-middle">
-                              <div className="flex items-center justify-center gap-2">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setProjectToAddPhase(p)}
+                                  className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
+                                  title="新增分期（各期具備獨立 28 里程碑）"
+                                >
+                                  ＋ 期數
+                                </button>
                                 <Link
                                   href={`/projects/${p.id}/milestones`}
                                   prefetch={true}
@@ -963,7 +975,15 @@ export default function ManagerDashboardPage() {
                             case "actions":
                               return (
                                 <td key={col.key} className="p-3 text-center align-middle">
-                                  <div className="flex items-center justify-center gap-2">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setProjectToAddPhase(p)}
+                                      className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
+                                      title="為此案新增下一期分期"
+                                    >
+                                      ＋ 期數
+                                    </button>
                                     <Link
                                       href={`/projects/${phase.id}/milestones`}
                                       prefetch={true}
@@ -1017,6 +1037,20 @@ export default function ManagerDashboardPage() {
           assignableUsers={assignableUsers}
           onClose={() => setAssignModal((prev) => ({ ...prev, open: false }))}
           onSuccess={handleTaskAssignedSuccess}
+        />
+      )}
+
+      {/* 新增分期 Modal */}
+      {projectToAddPhase && (
+        <WorkbenchAddPhaseModal
+          selectableUsers={assignableUsers}
+          onInvalidate={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerDashboard() }),
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData }),
+              queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench }),
+            ]);
+          }}
         />
       )}
     </div>

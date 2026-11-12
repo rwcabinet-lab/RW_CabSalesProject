@@ -21,6 +21,17 @@ export interface TaskFormData {
   priority: string;
 }
 
+export type AddPhaseProjectTarget = {
+  id: string;
+  projectName: string;
+  expectedDate?: string | null;
+  salesRepId?: string | null;
+  quoteAmount?: number | null;
+  cost?: number | null;
+  unitCount?: number | null;
+  phases?: Array<{ phaseNumber?: number | null }> | null;
+};
+
 interface WorkbenchState {
   // 篩選與排序
   searchQuery: string;
@@ -47,8 +58,8 @@ interface WorkbenchState {
   advanceDate: string;
 
   // 新增期數 Modal
-  projectToAddPhase: WorkbenchProjectDTO | null;
-  setProjectToAddPhase: (project: WorkbenchProjectDTO | null) => void;
+  projectToAddPhase: AddPhaseProjectTarget | null;
+  setProjectToAddPhase: (project: AddPhaseProjectTarget | null) => void;
 
   // Actions
   setSearchQuery: (val: string) => void;

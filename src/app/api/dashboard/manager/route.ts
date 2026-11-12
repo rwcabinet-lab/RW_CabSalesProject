@@ -252,6 +252,7 @@ export async function GET(req: NextRequest) {
         defaultDiscount: p.defaultDiscount,
         currentStage: p.currentStage,
         currentStageLabel: p.currentStage === "LOST" ? "流標" : isClosed ? "已結案" : stageLabels[p.currentStage] || p.currentStage,
+        salesRepId: p.salesRepId || null,
         salesRepName: p.salesRepName || p.customerSalesRepName,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
