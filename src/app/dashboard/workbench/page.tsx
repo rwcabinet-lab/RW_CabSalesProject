@@ -720,6 +720,20 @@ export default function SalesWorkbenchPage() {
                                       項目推進
                                     </button>
                                   )}
+                                  <Link
+                                    href={`/projects/${p.id}/milestones`}
+                                    prefetch={true}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                  >
+                                    細節
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditProject(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                                  >
+                                    編輯
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => setProjectToAddPhase(p)}
@@ -729,20 +743,6 @@ export default function SalesWorkbenchPage() {
                                   >
                                     +
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditProject(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
-                                  >
-                                    編輯
-                                  </button>
-                                  <Link
-                                    href={`/projects/${p.id}/milestones`}
-                                    prefetch={true}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                                  >
-                                    細節
-                                  </Link>
                                   {isAdmin && (
                                     <button
                                       type="button"

@@ -424,72 +424,6 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-        <div className="flex items-center gap-2 border-b px-6 py-4 font-bold">
-          <CheckSquare className="h-5 w-5 text-blue-600" />
-          <span>已指派任務</span>
-          <SectionHelpButton sectionId="manager-assigned-tasks" />
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">{data.assignedTasks.length}</span>
-        </div>
-        {data.assignedTasks.length ? (
-          <div className="divide-y px-6">
-            {data.assignedTasks.map((task) => {
-              const status = getTaskScheduleStatus(task);
-              const isAlert = status.isOverdue || status.isDueToday;
-
-              return (
-                <article
-                  key={task.id}
-                  className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm px-3 rounded-lg transition-colors ${
-                    isAlert
-                      ? "bg-red-50/70"
-                      : status.isPaused
-                      ? "bg-slate-50/70"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center flex-wrap gap-1.5">
-                      <h3 className={`font-semibold ${isAlert ? "text-red-900" : ""}`}>{task.subject}</h3>
-                      {status.isCompleted && (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                          已完成
-                        </span>
-                      )}
-                      {status.isPaused && !status.isCompleted && (
-                        <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          需追蹤
-                        </span>
-                      )}
-                      {status.isOverdue && (
-                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
-                          已逾期
-                        </span>
-                      )}
-                      {status.isDueToday && (
-                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
-                          已到期
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "進行中"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : ""}>
-                      預定完成：{status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
-                    </span>
-                    <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
-                    <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有已指派任務</p>}
-      </section>
-
       {/* 圖表區塊 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col justify-between">
@@ -562,6 +496,72 @@ export default function ManagerDashboardPage() {
           </div>
         </div>
       </div>
+
+      <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b px-6 py-4 font-bold">
+          <CheckSquare className="h-5 w-5 text-blue-600" />
+          <span>已指派任務</span>
+          <SectionHelpButton sectionId="manager-assigned-tasks" />
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">{data.assignedTasks.length}</span>
+        </div>
+        {data.assignedTasks.length ? (
+          <div className="divide-y px-6">
+            {data.assignedTasks.map((task) => {
+              const status = getTaskScheduleStatus(task);
+              const isAlert = status.isOverdue || status.isDueToday;
+
+              return (
+                <article
+                  key={task.id}
+                  className={`flex flex-wrap items-center justify-between gap-3 py-3 text-sm px-3 rounded-lg transition-colors ${
+                    isAlert
+                      ? "bg-red-50/70"
+                      : status.isPaused
+                      ? "bg-slate-50/70"
+                      : ""
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      <h3 className={`font-semibold ${isAlert ? "text-red-900" : ""}`}>{task.subject}</h3>
+                      {status.isCompleted && (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                          已完成
+                        </span>
+                      )}
+                      {status.isPaused && !status.isCompleted && (
+                        <span className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                          需追蹤
+                        </span>
+                      )}
+                      {status.isOverdue && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已逾期
+                        </span>
+                      )}
+                      {status.isDueToday && (
+                        <span className="rounded bg-red-100 border border-red-200 px-1.5 py-0.5 text-[10px] font-bold text-red-700 animate-pulse">
+                          已到期
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {task.projectName || "未命名案場"}｜指派給：{task.assignedToName || "未知人員"}｜{task.isCompleted ? `已完成${task.completedAt ? `（${task.completedAt}）` : ""}` : "進行中"}｜優先度：{task.priority === "HIGH" ? "高" : task.priority === "LOW" ? "低" : "中"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : ""}>
+                      預定完成：{status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
+                    </span>
+                    <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
+                    <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : <p className="px-6 py-5 text-center text-sm text-slate-500">目前沒有已指派任務</p>}
+      </section>
 
       {/* 統一案件清單 (套用全域欄位設定) */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
@@ -790,18 +790,25 @@ export default function ManagerDashboardPage() {
                         case "customer":
                           return (
                             <td key={col.key} className="p-3">
-                              {p.customerName}{" "}
+                              <div className="font-medium text-slate-900">{p.customerName}</div>
                               {p.defaultDiscount && (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
-                                  {p.defaultDiscount === 1 ? "牌價" : `${(p.defaultDiscount * 10).toFixed(1)}折`}
-                                </span>
+                                <div className="mt-0.5">
+                                  <span className="inline-block text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
+                                    {p.defaultDiscount === 1 ? "牌價" : `${(p.defaultDiscount * 10).toFixed(1)}折`}
+                                  </span>
+                                </div>
                               )}
                             </td>
                           );
                         case "salesRep":
                           return (
                             <td key={col.key} className="p-3 text-slate-700 font-medium">
-                              {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
+                              <div>{p.salesRepName || "-"}</div>
+                              {p.salesAssistantName && (
+                                <div className="text-[11px] text-slate-500 font-normal">
+                                  {p.salesAssistantName}
+                                </div>
+                              )}
                             </td>
                           );
                         case "stageProgress":
@@ -862,6 +869,13 @@ export default function ManagerDashboardPage() {
                           return (
                             <td key={col.key} className="p-3 text-center align-middle">
                               <div className="flex items-center justify-center gap-1.5">
+                                <Link
+                                  href={`/projects/${p.id}/milestones`}
+                                  prefetch={true}
+                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                                >
+                                  細節
+                                </Link>
                                 <button
                                   type="button"
                                   onClick={() => setProjectToAddPhase(p)}
@@ -871,13 +885,6 @@ export default function ManagerDashboardPage() {
                                 >
                                   +
                                 </button>
-                                <Link
-                                  href={`/projects/${p.id}/milestones`}
-                                  prefetch={true}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
-                                >
-                                  細節
-                                </Link>
                                 {isAdmin && (
                                   <button
                                     type="button"
@@ -964,7 +971,12 @@ export default function ManagerDashboardPage() {
                             case "salesRep":
                               return (
                                 <td key={col.key} className="p-3 text-slate-700 font-medium">
-                                  {phase.salesRepName || "-"} {phase.salesAssistantName ? ` / ${phase.salesAssistantName}` : ""}
+                                  <div>{phase.salesRepName || "-"}</div>
+                                  {phase.salesAssistantName && (
+                                    <div className="text-[11px] text-slate-500 font-normal">
+                                      {phase.salesAssistantName}
+                                    </div>
+                                  )}
                                 </td>
                               );
                             case "stageProgress":

@@ -14,6 +14,11 @@ function sortChangelogs(list: ChangelogEntry[]): ChangelogEntry[] {
     if (a.date !== b.date) {
       return b.date.localeCompare(a.date);
     }
+    const timeA = a.updatedAt || "";
+    const timeB = b.updatedAt || "";
+    if (timeA !== timeB) {
+      return timeB.localeCompare(timeA);
+    }
     return (b.id || "").localeCompare(a.id || "");
   });
 }
