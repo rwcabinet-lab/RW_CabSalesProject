@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     // 非管理者僅能檢視未被隱藏之公開改版紀錄；管理者可取得全量紀錄（包含已標記隱藏項目）
     if (user.role !== "ADMIN") {
-      changelogs = changelogs.filter((item) => !item.hidden);
+      changelogs = changelogs.filter((item) => item.hidden !== true);
     }
 
     const sorted = sortChangelogs(changelogs);
@@ -47,7 +47,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(
       { success: true, changelogs: sorted, latestVersion },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        },
+      }
     );
   } catch (err) {
     return handleApiError(err, "讀取改版資訊失敗");

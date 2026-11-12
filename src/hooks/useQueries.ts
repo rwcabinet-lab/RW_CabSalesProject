@@ -313,17 +313,21 @@ export interface ChangelogResponseDTO {
 
 /**
  * 取得系統改版資訊與更新歷程
+ * 依身分（ADMIN / USER）切分快取，杜絕跨身分快取穿透
  */
-export function useChangelogQuery() {
+export function useChangelogQuery(role?: string) {
   return useQuery({
-    queryKey: QUERY_KEYS.changelog,
+    queryKey: role ? ["changelog", role] : QUERY_KEYS.changelog,
     queryFn: async (): Promise<ChangelogResponseDTO> => {
-      const res = await fetch("/api/changelog", { cache: "no-store" });
+      const res = await fetch("/api/changelog", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!res.ok) {
         throw new Error("無法讀取改版資訊");
       }
       return (await res.json()) as ChangelogResponseDTO;
     },
-    staleTime: 60 * 1000,
+    staleTime: 0,
   });
 }

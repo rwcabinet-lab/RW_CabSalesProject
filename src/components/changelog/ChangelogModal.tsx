@@ -19,7 +19,7 @@ import {
   Check,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useChangelogQuery, QUERY_KEYS } from "@/hooks/useQueries";
+import { useChangelogQuery } from "@/hooks/useQueries";
 import { useToastStore } from "@/stores/useToastStore";
 import {
   ChangelogEntry,
@@ -59,7 +59,9 @@ export function ChangelogModal({
 }: ChangelogModalProps) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
-  const { data, isLoading } = useChangelogQuery();
+
+  // 依身分切分快取，杜絕跨身分快取穿透
+  const { data, isLoading, refetch } = useChangelogQuery(isAdmin ? "ADMIN" : "USER");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -71,11 +73,26 @@ export function ChangelogModal({
   const [isSaving, setIsSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const changelogs: ChangelogEntry[] = data?.changelogs || DEFAULT_CHANGELOG;
+  const rawChangelogs: ChangelogEntry[] = data?.changelogs || DEFAULT_CHANGELOG;
+
+  // 雙層權限防呆核心：非管理者身分無條件過濾掉已標記 hidden 的項目
+  const changelogs = useMemo(() => {
+    if (!isAdmin) {
+      return rawChangelogs.filter((item) => item.hidden !== true);
+    }
+    return rawChangelogs;
+  }, [rawChangelogs, isAdmin]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 彈窗開啟時自動確保資料即時更新
+  useEffect(() => {
+    if (isOpen) {
+      refetch();
+    }
+  }, [isOpen, refetch]);
 
   // ESC 鍵關閉或取消編輯
   const handleKeyDown = useCallback(
@@ -105,11 +122,14 @@ export function ChangelogModal({
     };
   }, [isOpen, handleKeyDown]);
 
-  // 篩選搜尋（無版本號，搜尋日期、類別、標題或內容）
+  // 篩選搜尋（非管理者無條件排除 hidden: true）
   const filteredChangelogs = useMemo(() => {
+    const base = isAdmin
+      ? changelogs
+      : changelogs.filter((item) => item.hidden !== true);
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return changelogs;
-    return changelogs.filter((item) => {
+    if (!q) return base;
+    return base.filter((item) => {
       return (
         item.date.includes(q) ||
         item.title.toLowerCase().includes(q) ||
@@ -117,12 +137,14 @@ export function ChangelogModal({
         item.details.some((d) => d.toLowerCase().includes(q))
       );
     });
-  }, [changelogs, searchQuery]);
+  }, [changelogs, searchQuery, isAdmin]);
 
   // 依日期為分隔，同一天的內容彙整在一個區塊中（依日期遞減排序）
+  // 若某日之所有項目皆被隱藏，非管理者端完全排除該空日期區塊
   const groupedChangelogs = useMemo<DateGroup[]>(() => {
     const map = new Map<string, ChangelogEntry[]>();
     for (const item of filteredChangelogs) {
+      if (!isAdmin && item.hidden === true) continue;
       const d = item.date || "未分類日期";
       if (!map.has(d)) {
         map.set(d, []);
@@ -131,11 +153,13 @@ export function ChangelogModal({
     }
 
     const sortedDates = Array.from(map.keys()).sort((a, b) => b.localeCompare(a));
-    return sortedDates.map((date) => ({
-      date,
-      entries: map.get(date)!,
-    }));
-  }, [filteredChangelogs]);
+    return sortedDates
+      .map((date) => ({
+        date,
+        entries: map.get(date)!,
+      }))
+      .filter((group) => group.entries.length > 0);
+  }, [filteredChangelogs, isAdmin]);
 
   const hiddenCount = useMemo(() => {
     return filteredChangelogs.filter((item) => item.hidden).length;
@@ -229,7 +253,7 @@ export function ChangelogModal({
         throw new Error(result.error || "儲存更新失敗");
       }
 
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
+      await queryClient.invalidateQueries({ queryKey: ["changelog"] });
       addToast("改版紀錄更新成功", "success");
       setEditingId(null);
       setEditForm(INITIAL_FORM);
@@ -277,7 +301,7 @@ export function ChangelogModal({
         throw new Error(result.error || "新增失敗");
       }
 
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
+      await queryClient.invalidateQueries({ queryKey: ["changelog"] });
       addToast("改版紀錄新增成功", "success");
       setIsAddingTop(false);
       setAddingForDate(null);
@@ -315,7 +339,7 @@ export function ChangelogModal({
       if (!res.ok) {
         throw new Error(result.error || `${actionText}失敗`);
       }
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
+      await queryClient.invalidateQueries({ queryKey: ["changelog"] });
       addToast(
         currentHidden ? "已成功取消隱藏，恢復公開顯示" : "已成功將改版項目設為隱藏",
         "success"
@@ -346,7 +370,7 @@ export function ChangelogModal({
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "重設失敗");
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
+      await queryClient.invalidateQueries({ queryKey: ["changelog"] });
       addToast("已成功還原為系統初始改版紀錄", "success");
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : "重設失敗", "error");
@@ -760,8 +784,13 @@ export function ChangelogModal({
                         </div>
                       )}
 
-                      {/* 當日所有改版項目逐條列出（同日多筆時以分隔） */}
+                      {/* 當日所有改版項目逐條列出 */}
                       {group.entries.map((item, itemIdx) => {
+                        // 雙層保險：若非管理者身分且此項目為隱藏，絕對不渲染在 DOM 中
+                        if (!isAdmin && item.hidden === true) {
+                          return null;
+                        }
+
                         const isCurrentEditing = editingId === item.id;
                         const categoryConfig =
                           CHANGELOG_CATEGORY_CONFIG[item.category] ||
