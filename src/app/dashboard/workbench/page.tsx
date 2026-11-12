@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Layers,
+  Trash2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PROJECT_STAGE_LABELS, DEFAULT_PROJECT_COLUMNS } from "@/lib/constants";
@@ -725,8 +726,9 @@ export default function SalesWorkbenchPage() {
                                       onClick={() => setProjectToAddPhase(p)}
                                       className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
                                       title="新增分期（各期具備獨立 28 里程碑）"
+                                      aria-label="新增分期"
                                     >
-                                      ＋ 期數
+                                      +
                                     </button>
                                   )}
                                   <button
@@ -741,15 +743,17 @@ export default function SalesWorkbenchPage() {
                                     prefetch={true}
                                     className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
                                   >
-                                    案件細節
+                                    細節
                                   </Link>
                                   {isAdmin && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteProject(p)}
-                                      className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                      className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                      title="刪除"
+                                      aria-label="刪除案件"
                                     >
-                                      刪除
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   )}
                                 </div>
@@ -916,7 +920,7 @@ export default function SalesWorkbenchPage() {
                                           prefetch={true}
                                           className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
                                         >
-                                          時程細節
+                                          細節
                                         </Link>
                                         {canDeletePhase && (
                                           <button
@@ -924,8 +928,9 @@ export default function SalesWorkbenchPage() {
                                             onClick={() => handleDeleteProject(phase)}
                                             className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
                                             title="刪除此分期"
+                                            aria-label="刪除此分期"
                                           >
-                                            刪除
+                                            <Trash2 className="h-3.5 w-3.5" />
                                           </button>
                                         )}
                                       </div>

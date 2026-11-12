@@ -922,7 +922,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">客戶類型：</span><span className="font-semibold text-slate-700">{CUSTOMER_TYPE_LABELS[project.customerType] || project.customerType}</span></div>
             <div><span className="text-slate-400">客戶折數：</span><span className="font-semibold text-slate-700">{project.defaultDiscount === 1 ? "牌價" : `${(project.defaultDiscount * 10).toFixed(1)} 折`}</span></div>
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
-            <div><span className="text-slate-400">預定進場日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
+            <div><span className="text-slate-400">預定進場：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
             <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatNTD(project.quoteAmount) : project.totalAmount != null ? formatNTD(project.totalAmount) : "未填"}</span></div>
             <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatNTD(project.cost) : "未填"}</span></div>
@@ -1796,7 +1796,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">預定進場日</label>
+                  <label className="block font-semibold text-slate-700 mb-1">預定進場</label>
                   <input
                     type="date"
                     value={projectEditForm.expectedDate}

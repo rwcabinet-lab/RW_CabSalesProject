@@ -490,9 +490,9 @@ export function GanttChart({ projects, tasks }: GanttProps) {
             <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
             逾期／已到期
           </span>
-          <span className="flex items-center gap-1.5" title="案場預定進場日">
+          <span className="flex items-center gap-1.5" title="案場預定進場">
             <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
-            預定進場日
+            預定進場
           </span>
           <span className="flex items-center gap-1.5" title="貫穿時間軸之今日日期垂直基準線">
             <span className="h-3 w-0.5 rounded bg-sky-400" />

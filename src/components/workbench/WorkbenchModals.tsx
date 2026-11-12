@@ -585,7 +585,7 @@ export function WorkbenchAddPhaseModal({
           </label>
 
           <label className="font-semibold text-slate-700">
-            預定進場日（同步 6-1）
+            預定進場（同步 6-1）
             <input
               type="date"
               value={expectedDate}

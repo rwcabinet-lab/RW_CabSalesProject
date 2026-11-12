@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useManagerStore } from "@/stores/useManagerStore";
 import { useViewsStore } from "@/stores/useViewsStore";
+import { DEFAULT_PROJECT_COLUMNS, normalizeProjectColumns } from "@/lib/constants";
 import type { WorkbenchProjectDTO, ManagerProjectOverviewDTO } from "@/types/dto";
 
 describe("搜尋與篩選條件功能測試", () => {
@@ -397,6 +398,22 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(useViewsStore.getState().typeFilter).toBe("");
       expect(useViewsStore.getState().stageFilter).toBe("");
       expect(useViewsStore.getState().statusFilter).toBe("");
+    });
+  });
+
+  describe("案件清單欄位定義與規範", () => {
+    it("預設進場日期欄位標籤應統一為「預定進場」", () => {
+      const expectedDateCol = DEFAULT_PROJECT_COLUMNS.find((c) => c.key === "expectedDate");
+      expect(expectedDateCol).toBeDefined();
+      expect(expectedDateCol?.label).toBe("預定進場");
+
+      // 測試 normalizeProjectColumns 是否亦強制更新為「預定進場」
+      const savedWithOldLabel = [
+        { key: "expectedDate", label: "預定進場日", visible: true, order: 6 },
+      ];
+      const normalized = normalizeProjectColumns(savedWithOldLabel);
+      const normalizedExpectedDate = normalized.find((c) => c.key === "expectedDate");
+      expect(normalizedExpectedDate?.label).toBe("預定進場");
     });
   });
 });
