@@ -8,6 +8,7 @@ export interface ChangelogEntry {
   details: string[];
   updatedAt?: string;
   updatedBy?: string;
+  hidden?: boolean;
 }
 
 export const CHANGELOG_CATEGORY_CONFIG = {

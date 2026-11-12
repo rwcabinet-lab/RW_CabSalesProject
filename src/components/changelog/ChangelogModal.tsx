@@ -7,7 +7,8 @@ import {
   X,
   Plus,
   Edit2,
-  Trash2,
+  Eye,
+  EyeOff,
   Calendar,
   Search,
   AlertTriangle,
@@ -68,7 +69,7 @@ export function ChangelogModal({
   const [addingForDate, setAddingForDate] = useState<string | null>(null);
   const [addForm, setAddForm] = useState<FormFields>(INITIAL_FORM);
   const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const changelogs: ChangelogEntry[] = data?.changelogs || DEFAULT_CHANGELOG;
 
@@ -136,7 +137,9 @@ export function ChangelogModal({
     }));
   }, [filteredChangelogs]);
 
-  const latestDate = groupedChangelogs[0]?.date;
+  const hiddenCount = useMemo(() => {
+    return filteredChangelogs.filter((item) => item.hidden).length;
+  }, [filteredChangelogs]);
 
   // 開啟頂部新增模式（自訂或預設今日日期）
   const handleStartAddTop = () => {
@@ -286,27 +289,41 @@ export function ChangelogModal({
     }
   };
 
-  // 刪除改版紀錄
-  const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`確定要刪除改版項目【${title}】嗎？此操作無法還原。`)) {
+  // 切換改版紀錄之隱藏/顯示狀態（將原有刪除改為隱藏機制）
+  const handleToggleHide = async (
+    id: string,
+    title: string,
+    currentHidden: boolean
+  ) => {
+    const actionText = currentHidden ? "取消隱藏（恢復公開顯示）" : "隱藏";
+    if (
+      !window.confirm(
+        `確定要將改版項目【${title}】${actionText}嗎？`
+      )
+    ) {
       return;
     }
 
-    setDeletingId(id);
+    setTogglingId(id);
     try {
-      const res = await fetch(`/api/changelog?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
+      const res = await fetch("/api/changelog", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, hidden: !currentHidden }),
       });
       const result = await res.json();
       if (!res.ok) {
-        throw new Error(result.error || "刪除失敗");
+        throw new Error(result.error || `${actionText}失敗`);
       }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.changelog });
-      addToast("已成功刪除改版項目", "success");
+      addToast(
+        currentHidden ? "已成功取消隱藏，恢復公開顯示" : "已成功將改版項目設為隱藏",
+        "success"
+      );
     } catch (err: unknown) {
-      addToast(err instanceof Error ? err.message : "刪除失敗", "error");
+      addToast(err instanceof Error ? err.message : `${actionText}失敗`, "error");
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
     }
   };
 
@@ -428,7 +445,13 @@ export function ChangelogModal({
             <span className="font-semibold text-slate-800">
               {filteredChangelogs.length}
             </span>{" "}
-            項更新（涵蓋{" "}
+            項更新
+            {isAdmin && hiddenCount > 0 && (
+              <span className="ml-1 text-amber-700 font-medium">
+                （含 {hiddenCount} 項已隱藏）
+              </span>
+            )}
+            （涵蓋{" "}
             <span className="font-semibold text-slate-800">
               {groupedChangelogs.length}
             </span>{" "}
@@ -737,12 +760,13 @@ export function ChangelogModal({
                         </div>
                       )}
 
-                      {/* 當日所有改版項目逐條列出（同日多筆時以虛線分隔） */}
+                      {/* 當日所有改版項目逐條列出（同日多筆時以分隔） */}
                       {group.entries.map((item, itemIdx) => {
                         const isCurrentEditing = editingId === item.id;
                         const categoryConfig =
                           CHANGELOG_CATEGORY_CONFIG[item.category] ||
                           CHANGELOG_CATEGORY_CONFIG.FEAT;
+                        const isItemHidden = item.hidden === true;
 
                         if (isCurrentEditing) {
                           return (
@@ -870,9 +894,11 @@ export function ChangelogModal({
                         return (
                           <div
                             key={item.id}
-                            className={`${
-                              itemIdx > 0
-                                ? "pt-5 border-t border-slate-100"
+                            className={`transition-all ${
+                              itemIdx > 0 ? "pt-5 border-t border-slate-100" : ""
+                            } ${
+                              isItemHidden
+                                ? "rounded-lg p-3 sm:p-3.5 bg-slate-50/80 border border-dashed border-slate-300 opacity-75"
                                 : ""
                             }`}
                           >
@@ -884,13 +910,25 @@ export function ChangelogModal({
                                 >
                                   {categoryConfig.label}
                                 </span>
-                                <h4 className="text-sm sm:text-base font-bold text-slate-800">
+                                {isItemHidden && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold">
+                                    <EyeOff className="w-3 h-3 text-slate-500" />
+                                    已隱藏
+                                  </span>
+                                )}
+                                <h4
+                                  className={`text-sm sm:text-base font-bold ${
+                                    isItemHidden
+                                      ? "text-slate-500 line-through decoration-slate-400"
+                                      : "text-slate-800"
+                                  }`}
+                                >
                                   {item.title}
                                 </h4>
                               </div>
 
                               {isAdmin && (
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-1.5 shrink-0">
                                   <button
                                     type="button"
                                     onClick={() => handleStartEdit(item)}
@@ -900,20 +938,43 @@ export function ChangelogModal({
                                     <Edit2 className="w-3.5 h-3.5" />
                                     編輯
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDelete(item.id, item.title)}
-                                    disabled={deletingId === item.id}
-                                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition disabled:opacity-50"
-                                    title="刪除此項目"
-                                  >
-                                    {deletingId === item.id ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    )}
-                                    刪除
-                                  </button>
+
+                                  {/* 將原有刪除改為隱藏 / 取消隱藏 */}
+                                  {isItemHidden ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleToggleHide(item.id, item.title, true)
+                                      }
+                                      disabled={togglingId === item.id}
+                                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50"
+                                      title="取消隱藏（恢復公開顯示）"
+                                    >
+                                      {togglingId === item.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                      )}
+                                      取消隱藏
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleToggleHide(item.id, item.title, false)
+                                      }
+                                      disabled={togglingId === item.id}
+                                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition disabled:opacity-50"
+                                      title="隱藏此項目（僅管理者可見）"
+                                    >
+                                      {togglingId === item.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                                      )}
+                                      隱藏
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>

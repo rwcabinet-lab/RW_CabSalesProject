@@ -36,8 +36,14 @@ export async function GET(req: NextRequest) {
       await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, DEFAULT_CHANGELOG);
     }
 
+    // 非管理者僅能檢視未被隱藏之公開改版紀錄；管理者可取得全量紀錄（包含已標記隱藏項目）
+    if (user.role !== "ADMIN") {
+      changelogs = changelogs.filter((item) => !item.hidden);
+    }
+
     const sorted = sortChangelogs(changelogs);
-    const latestVersion = sorted[0]?.version || "v1.0.0";
+    const latestVersion =
+      sorted.find((item) => !item.hidden)?.version || sorted[0]?.version || "v1.0.0";
 
     return NextResponse.json(
       { success: true, changelogs: sorted, latestVersion },
@@ -71,7 +77,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { version, date, title, category, details } = body;
+    const { version, date, title, category, details, hidden } = body;
     if (!date || !title) {
       return NextResponse.json(
         { error: "日期與改版標題為必填項目" },
@@ -101,6 +107,7 @@ export async function POST(req: NextRequest) {
       details: safeDetails,
       updatedAt: new Date().toISOString(),
       updatedBy: user.name || "管理員",
+      hidden: Boolean(hidden),
     };
 
     const updatedList = sortChangelogs([newEntry, ...currentList]);
@@ -144,6 +151,7 @@ export async function PUT(req: NextRequest) {
           : [],
         updatedAt: new Date().toISOString(),
         updatedBy: user.name || "管理員",
+        hidden: item.hidden === true,
       }));
       const sorted = sortChangelogs(sanitized);
       await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, sorted);
@@ -155,7 +163,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // 單筆編輯
-    const { id, version, date, title, category, details } = body;
+    const { id, version, date, title, category, details, hidden } = body;
     if (!id || !date || !title) {
       return NextResponse.json(
         { error: "缺少必要參數（id、date、title）" },
@@ -189,6 +197,7 @@ export async function PUT(req: NextRequest) {
           details: safeDetails,
           updatedAt: new Date().toISOString(),
           updatedBy: user.name || "管理員",
+          hidden: hidden !== undefined ? Boolean(hidden) : (item.hidden ?? false),
         };
       }
       return item;
@@ -207,6 +216,7 @@ export async function PUT(req: NextRequest) {
         details: safeDetails,
         updatedAt: new Date().toISOString(),
         updatedBy: user.name || "管理員",
+        hidden: Boolean(hidden),
       };
       updated.unshift(newEntry);
     }
@@ -224,12 +234,73 @@ export async function PUT(req: NextRequest) {
   }
 }
 
+/**
+ * PATCH: 切換或設定改版紀錄的隱藏狀態（軟刪除/恢復顯示）
+ */
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getUserFromRequest(req);
+    if (!user || user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "權限不足：僅系統管理者身分可隱藏或顯示改版資訊" },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { id, hidden } = body;
+    if (!id) {
+      return NextResponse.json({ error: "缺少 id 參數" }, { status: 400 });
+    }
+
+    const currentList = await DataService.getAppConfig<ChangelogEntry[]>(
+      CHANGELOG_CONFIG_KEY,
+      DEFAULT_CHANGELOG
+    );
+
+    let found = false;
+    let targetHiddenState = false;
+    const updated = currentList.map((item) => {
+      if (item.id === id) {
+        found = true;
+        targetHiddenState = hidden !== undefined ? Boolean(hidden) : !item.hidden;
+        return {
+          ...item,
+          hidden: targetHiddenState,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user.name || "管理員",
+        };
+      }
+      return item;
+    });
+
+    if (!found) {
+      return NextResponse.json({ error: "找不到欲操作之改版紀錄" }, { status: 404 });
+    }
+
+    const sorted = sortChangelogs(updated);
+    await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, sorted);
+
+    return NextResponse.json({
+      success: true,
+      changelogs: sorted,
+      hidden: targetHiddenState,
+      message: targetHiddenState ? "改版紀錄已設為隱藏" : "改版紀錄已恢復顯示",
+    });
+  } catch (err) {
+    return handleApiError(err, "變更改版資訊顯示狀態失敗");
+  }
+}
+
+/**
+ * DELETE: 軟刪除（刪除改為隱藏）。將目標項目標記為 hidden = true
+ */
 export async function DELETE(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req);
     if (!user || user.role !== "ADMIN") {
       return NextResponse.json(
-        { error: "權限不足：僅系統管理者身分可刪除改版資訊內容" },
+        { error: "權限不足：僅系統管理者身分可隱藏改版資訊內容" },
         { status: 403 }
       );
     }
@@ -244,21 +315,35 @@ export async function DELETE(req: NextRequest) {
       DEFAULT_CHANGELOG
     );
 
-    const filtered = currentList.filter((item) => item.id !== id);
-    if (filtered.length === currentList.length) {
-      return NextResponse.json({ error: "找不到欲刪除之紀錄" }, { status: 404 });
+    let found = false;
+    const updated = currentList.map((item) => {
+      if (item.id === id) {
+        found = true;
+        return {
+          ...item,
+          hidden: true,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user.name || "管理員",
+        };
+      }
+      return item;
+    });
+
+    if (!found) {
+      return NextResponse.json({ error: "找不到欲隱藏之紀錄" }, { status: 404 });
     }
 
-    const sorted = sortChangelogs(filtered);
+    const sorted = sortChangelogs(updated);
     await DataService.setAppConfig(CHANGELOG_CONFIG_KEY, sorted);
 
     return NextResponse.json({
       success: true,
       changelogs: sorted,
-      latestVersion: sorted[0]?.version || "v1.0.0",
-      message: "改版紀錄已刪除",
+      latestVersion:
+        sorted.find((item) => !item.hidden)?.version || sorted[0]?.version || "v1.0.0",
+      message: "改版紀錄已設為隱藏",
     });
   } catch (err) {
-    return handleApiError(err, "刪除改版資訊失敗");
+    return handleApiError(err, "隱藏改版資訊失敗");
   }
 }
