@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
     const stageLabels: Record<string, string> = {
       DEVELOP:     "案件開發",
       REQUIREMENT: "現況及需求確認",
-      PROPOSAL:    "設計提案/報價/簽約",
+      PROPOSAL:    "提案/報價/簽約",
       PRE_PROD:    "生產前確認/拆單",
       PROD_SHIP:   "生產及派送",
       INSTALL:     "安裝及驗收",
@@ -254,6 +254,7 @@ export async function GET(req: NextRequest) {
         currentStageLabel: p.currentStage === "LOST" ? "流標" : isClosed ? "已結案" : stageLabels[p.currentStage] || p.currentStage,
         salesRepId: p.salesRepId || null,
         salesRepName: p.salesRepName || p.customerSalesRepName,
+        salesAssistantId: p.salesAssistantId || null,
         salesAssistantName: p.currentStage === "LOST" ? null : activeMilestone?.assignedToName || null,
         isDelayed: p.currentStage === "LOST" ? false : isDelayed,
         isClosed,
@@ -306,9 +307,9 @@ export async function GET(req: NextRequest) {
         childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
 
         if (childPhases.length > 0) {
-          const totalQuote = childPhases.reduce((sum, c) => sum + (c.quoteAmount || 0), 0);
-          const totalCost = childPhases.reduce((sum, c) => sum + (c.cost || 0), 0);
-          const totalUnits = childPhases.reduce((sum, c) => sum + (c.unitCount || 0), 0);
+          const totalQuote = childPhases.reduce((sum, c) => sum + (Number(c.quoteAmount) || 0), 0);
+          const totalCost = childPhases.reduce((sum, c) => sum + (Number(c.cost) || 0), 0);
+          const totalUnits = childPhases.reduce((sum, c) => sum + (Number(c.unitCount) || 0), 0);
 
           let rolledColor: "RED" | "YELLOW" | "GREEN" | "GRAY" = "GREEN";
           let rolledLabel = "正常";
@@ -332,13 +333,13 @@ export async function GET(req: NextRequest) {
 
           return {
             ...parent,
-            quoteAmount: totalQuote || parent.quoteAmount,
-            totalAmount: totalQuote || parent.quoteAmount || null,
-            cost: totalCost || parent.cost,
-            unitCount: totalUnits || parent.unitCount,
+            quoteAmount: totalQuote,
+            totalAmount: totalQuote || null,
+            cost: totalCost,
+            unitCount: totalUnits,
             isDelayed: isAnyDelayed,
             isClosed: isAllClosed,
-            expectedDate: upcomingDates[0] || parent.expectedDate || "",
+            expectedDate: upcomingDates[0] || "",
             trafficLight: { color: rolledColor, label: rolledLabel, daysDiff: 0 },
             phases: childPhases,
           };
@@ -354,7 +355,7 @@ export async function GET(req: NextRequest) {
     const sevenStages: Array<{ stage: string; label: string; aliases: string[] }> = [
       { stage: "DEVELOP", label: "一、案件開發", aliases: ["DEVELOP", "CONTACT"] },
       { stage: "REQUIREMENT", label: "二、現況及需求確認", aliases: ["REQUIREMENT"] },
-      { stage: "PROPOSAL", label: "三、設計提案/報價/簽約", aliases: ["PROPOSAL", "DESIGN"] },
+      { stage: "PROPOSAL", label: "三、提案/報價/簽約", aliases: ["PROPOSAL", "DESIGN"] },
       { stage: "PRE_PROD", label: "四、生產前確認/拆單", aliases: ["PRE_PROD"] },
       { stage: "PROD_SHIP", label: "五、生產及派送", aliases: ["PROD_SHIP", "PRODUCTION"] },
       { stage: "INSTALL", label: "六、安裝及驗收", aliases: ["INSTALL"] },

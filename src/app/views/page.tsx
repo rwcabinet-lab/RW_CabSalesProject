@@ -27,7 +27,7 @@ const STAGE_FILTER_OPTIONS = [
   { value: "ACTIVE", label: "進行中案件" },
   { value: "DEVELOP", label: "第一階段：案件開發" },
   { value: "REQUIREMENT", label: "第二階段：現況及需求確認" },
-  { value: "PROPOSAL", label: "第三階段：設計提案/報價/簽約" },
+  { value: "PROPOSAL", label: "第三階段：提案/報價/簽約" },
   { value: "PRE_PROD", label: "第四階段：生產前確認/拆單" },
   { value: "PROD_SHIP", label: "第五階段：生產及派送" },
   { value: "INSTALL", label: "第六階段：安裝及驗收" },

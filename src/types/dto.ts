@@ -170,6 +170,7 @@ export interface WorkbenchProjectDTO {
   isClosed?: boolean;
   salesRepId?: string;
   salesRepName?: string;
+  salesAssistantId?: string | null;
   salesAssistantName?: string | null;
   totalAmount: number | null;
   unitCount?: number;
@@ -335,6 +336,7 @@ export interface ManagerProjectOverviewDTO {
   currentStageLabel: string;
   salesRepId?: string | null;
   salesRepName: string;
+  salesAssistantId?: string | null;
   salesAssistantName: string | null;
   isDelayed: boolean;
   isClosed?: boolean;

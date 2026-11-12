@@ -106,6 +106,7 @@ export async function GET(req: NextRequest) {
           isClosed,
           salesRepId: p.salesRepId,
           salesRepName: p.salesRepName,
+          salesAssistantId: p.salesAssistantId || null,
           salesAssistantName: p.salesAssistantName || null,
           unitCount: p.unitCount,
           cost: p.cost,
@@ -145,9 +146,9 @@ export async function GET(req: NextRequest) {
         childPhases.sort((a, b) => (a.phaseNumber || 0) - (b.phaseNumber || 0));
 
         if (childPhases.length > 0) {
-          const totalQuote = childPhases.reduce((sum, c) => sum + (c.quoteAmount || 0), 0);
-          const totalCost = childPhases.reduce((sum, c) => sum + (c.cost || 0), 0);
-          const totalUnits = childPhases.reduce((sum, c) => sum + (c.unitCount || 0), 0);
+          const totalQuote = childPhases.reduce((sum, c) => sum + (Number(c.quoteAmount) || 0), 0);
+          const totalCost = childPhases.reduce((sum, c) => sum + (Number(c.cost) || 0), 0);
+          const totalUnits = childPhases.reduce((sum, c) => sum + (Number(c.unitCount) || 0), 0);
 
           let rolledColor: "RED" | "YELLOW" | "GREEN" | "GRAY" = "GREEN";
           let rolledLabel = "正常";
@@ -171,13 +172,13 @@ export async function GET(req: NextRequest) {
 
           return {
             ...parent,
-            quoteAmount: totalQuote || parent.quoteAmount,
-            totalAmount: totalQuote || parent.quoteAmount || null,
-            cost: totalCost || parent.cost,
-            unitCount: totalUnits || parent.unitCount,
+            quoteAmount: totalQuote,
+            totalAmount: totalQuote || null,
+            cost: totalCost,
+            unitCount: totalUnits,
             isDelayed: isAnyDelayed,
             isClosed: isAllClosed,
-            expectedDate: upcomingDates[0] || parent.expectedDate || "",
+            expectedDate: upcomingDates[0] || "",
             trafficLight: { color: rolledColor, label: rolledLabel, daysDiff: 0 },
             phases: childPhases,
           };

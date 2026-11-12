@@ -413,7 +413,7 @@ export const ProjectService = {
     if (parent.phases.length === 0) {
       const phase1 = await prisma.project.create({
         data: {
-          projectName: `${parent.projectName} - 第 1 期`,
+          projectName: parent.projectName,
           customerId: parent.customerId,
           siteAddress: parent.siteAddress,
           siteCondition: parent.siteCondition,
@@ -439,6 +439,18 @@ export const ProjectService = {
       await prisma.salesTask.updateMany({
         where: { projectId: parent.id },
         data: { projectId: phase1.id },
+      });
+
+      // 母案轉型為彙總容器，清空履約執行欄位（由各分期動態加總彙整）
+      await prisma.project.update({
+        where: { id: parent.id },
+        data: {
+          quoteAmount: null,
+          cost: null,
+          unitCount: null,
+          estimatedBudget: null,
+          expectedDate: null,
+        },
       });
 
       const phase2Name = data.phaseName.trim() || "第 2 期";

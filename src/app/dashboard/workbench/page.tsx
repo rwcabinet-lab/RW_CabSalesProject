@@ -444,7 +444,7 @@ export default function SalesWorkbenchPage() {
               <option value="">全部案件</option>
               <option value="DEVELOP">第一階段：案件開發</option>
               <option value="REQUIREMENT">第二階段：現況及需求確認</option>
-              <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
+              <option value="PROPOSAL">第三階段：提案/報價/簽約</option>
               <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
               <option value="PROD_SHIP">第五階段：生產及派送</option>
               <option value="INSTALL">第六階段：安裝及驗收</option>
@@ -658,27 +658,31 @@ export default function SalesWorkbenchPage() {
                           case "stageProgress":
                             return (
                               <td key={col.key} className="p-3 font-bold text-slate-700">
-                                <div>{p.isClosed ? "結案" : hasPhases ? "分期進行中" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
-                                <div className="mt-1 text-[11px] font-normal">
-                                  {p.currentStage === "LOST" ? (
-                                    <span className="text-slate-400">—</span>
-                                  ) : p.isClosed ? (
-                                    <span className="text-emerald-700 font-semibold">已結案</span>
-                                  ) : hasPhases ? (
-                                    <span className="text-indigo-600 font-semibold">共 {p.phases?.length} 個獨立分期進度</span>
-                                  ) : p.activeMilestone ? (
-                                    <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
-                                      {p.activeMilestone.stageName}
-                                      {p.activeMilestone.plannedDueDate && (
-                                        <span className="text-[10px] text-blue-600 font-normal">
-                                          ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                {hasPhases ? (
+                                  <span className="text-slate-400 font-normal select-none">—</span>
+                                ) : (
+                                  <>
+                                    <div>{p.isClosed ? "結案" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
+                                    <div className="mt-1 text-[11px] font-normal">
+                                      {p.currentStage === "LOST" ? (
+                                        <span className="text-slate-400">—</span>
+                                      ) : p.isClosed ? (
+                                        <span className="text-emerald-700 font-semibold">已結案</span>
+                                      ) : p.activeMilestone ? (
+                                        <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-blue-800 font-bold">
+                                          {p.activeMilestone.stageName}
+                                          {p.activeMilestone.plannedDueDate && (
+                                            <span className="text-[10px] text-blue-600 font-normal">
+                                              ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                            </span>
+                                          )}
                                         </span>
+                                      ) : (
+                                        <span className="text-slate-400">完結</span>
                                       )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400">完結</span>
-                                  )}
-                                </div>
+                                    </div>
+                                  </>
+                                )}
                               </td>
                             );
                           case "quoteAndUnits":
@@ -715,14 +719,16 @@ export default function SalesWorkbenchPage() {
                                       項目推進
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => setProjectToAddPhase(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
-                                    title="新增分期（各期具備獨立 28 里程碑）"
-                                  >
-                                    ＋ 期數
-                                  </button>
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setProjectToAddPhase(p)}
+                                      className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+                                      title="新增分期（各期具備獨立 28 里程碑）"
+                                    >
+                                      ＋ 期數
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => openEditProject(p)}
@@ -759,6 +765,7 @@ export default function SalesWorkbenchPage() {
                         projectId={p.id}
                         projectName={p.projectName}
                         colSpan={visibleColumns.length}
+                        hasPhases={hasPhases}
                         customers={customers}
                         selectableUsers={selectableUsers}
                         onInvalidate={invalidateWorkbench}
@@ -767,8 +774,8 @@ export default function SalesWorkbenchPage() {
                     {hasPhases && isExpanded && p.phases?.map((phase, pIdx) => {
                       const isLast = pIdx === (p.phases?.length || 0) - 1;
                       return (
+                        <Fragment key={phase.id}>
                         <tr
-                          key={phase.id}
                           className={`hover:brightness-95 [&>td]:align-middle bg-slate-50/70 border-l-4 border-l-indigo-400 transition-colors ${
                             phase.currentStage === "LOST"
                               ? "opacity-75"
@@ -872,41 +879,76 @@ export default function SalesWorkbenchPage() {
                                   </td>
                                 );
                               case "actions":
-                                return (
-                                  <td key={col.key} className="p-3 text-center align-middle">
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      {phase.activeMilestone && !phase.isClosed && phase.currentStage !== "LOST" && (
+                                {
+                                  const isManagerOrAdmin =
+                                    currentUser?.role === "ADMIN" ||
+                                    currentUser?.role === "LEVEL_MANAGER" ||
+                                    currentUser?.role === "SALES_MANAGER";
+                                  const canDeletePhase =
+                                    isManagerOrAdmin ||
+                                    currentUser?.id === phase.salesRepId ||
+                                    currentUser?.id === phase.salesAssistantId ||
+                                    currentUser?.id === p.salesRepId ||
+                                    currentUser?.id === p.salesAssistantId;
+
+                                  return (
+                                    <td key={col.key} className="p-3 text-center align-middle">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        {phase.activeMilestone && !phase.isClosed && phase.currentStage !== "LOST" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setProjectToAdvance(phase)}
+                                            className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                            title={`推進當前進度：${phase.activeMilestone.stageName}`}
+                                          >
+                                            項目推進
+                                          </button>
+                                        )}
                                         <button
                                           type="button"
-                                          onClick={() => setProjectToAdvance(phase)}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
-                                          title={`推進當前進度：${phase.activeMilestone.stageName}`}
+                                          onClick={() => openEditProject(phase)}
+                                          className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
                                         >
-                                          項目推進
+                                          編輯
                                         </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditProject(phase)}
-                                        className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
-                                      >
-                                        編輯
-                                      </button>
-                                      <Link
-                                        href={`/projects/${phase.id}/milestones`}
-                                        prefetch={true}
-                                        className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
-                                      >
-                                        時程細節
-                                      </Link>
-                                    </div>
-                                  </td>
-                                );
+                                        <Link
+                                          href={`/projects/${phase.id}/milestones`}
+                                          prefetch={true}
+                                          className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                        >
+                                          時程細節
+                                        </Link>
+                                        {canDeletePhase && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteProject(phase)}
+                                            className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                            title="刪除此分期"
+                                          >
+                                            刪除
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                }
                               default:
                                 return null;
                             }
                           })}
                         </tr>
+                        {editingProjectId === phase.id && (
+                          <WorkbenchEditProjectRow
+                            projectId={phase.id}
+                            projectName={phase.projectName}
+                            colSpan={visibleColumns.length}
+                            hasPhases={false}
+                            customers={customers}
+                            selectableUsers={selectableUsers}
+                            onInvalidate={invalidateWorkbench}
+                          />
+                        )}
+                        </Fragment>
                       );
                     })}
                     </Fragment>

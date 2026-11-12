@@ -38,6 +38,10 @@ export async function POST(
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
+    if (user.role !== "ADMIN") {
+      return NextResponse.json({ error: "僅系統管理者可新增案件期數" }, { status: 403 });
+    }
+
     const body = await req.json();
     const { phaseName, expectedDate, unitCount, cost, quoteAmount, salesRepId, startStageCode } = body;
 

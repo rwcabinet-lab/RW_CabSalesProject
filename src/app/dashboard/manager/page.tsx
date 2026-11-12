@@ -615,7 +615,7 @@ export default function ManagerDashboardPage() {
               <option value="">全部階段</option>
               <option value="DEVELOP">第一階段：案件開發</option>
               <option value="REQUIREMENT">第二階段：現況及需求確認</option>
-              <option value="PROPOSAL">第三階段：設計提案/報價/簽約</option>
+              <option value="PROPOSAL">第三階段：提案/報價/簽約</option>
               <option value="PRE_PROD">第四階段：生產前確認/拆單</option>
               <option value="PROD_SHIP">第五階段：生產及派送</option>
               <option value="INSTALL">第六階段：安裝及驗收</option>
@@ -807,15 +807,21 @@ export default function ManagerDashboardPage() {
                         case "stageProgress":
                           return (
                             <td key={col.key} className="p-3 font-bold text-slate-700">
-                              <div>{p.isClosed ? "結案" : hasPhases ? "分期進行中" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
-                              <div className="mt-1 text-[10px] font-normal text-slate-500">
-                                {p.currentStage === "LOST" ? p.currentStageLabel : hasPhases ? `共 ${p.phases?.length} 個獨立分期進度` : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
-                              </div>
-                              {p.unassignedNextMilestoneName && (
-                                <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">
-                                  <AlertCircle className="h-3 w-3" />
-                                  下一項「{p.unassignedNextMilestoneName}」待指派
-                                </div>
+                              {hasPhases ? (
+                                <span className="text-slate-400 font-normal select-none">—</span>
+                              ) : (
+                                <>
+                                  <div>{p.isClosed ? "結案" : (PROJECT_STAGE_LABELS[p.currentStage] || p.currentStage)}</div>
+                                  <div className="mt-1 text-[10px] font-normal text-slate-500">
+                                    {p.currentStage === "LOST" ? p.currentStageLabel : p.activeMilestoneName || p.lastCompletedMilestoneName || "—"}
+                                  </div>
+                                  {p.unassignedNextMilestoneName && (
+                                    <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700">
+                                      <AlertCircle className="h-3 w-3" />
+                                      下一項「{p.unassignedNextMilestoneName}」待指派
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </td>
                           );
@@ -843,14 +849,16 @@ export default function ManagerDashboardPage() {
                           return (
                             <td key={col.key} className="p-3 text-center align-middle">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setProjectToAddPhase(p)}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
-                                  title="新增分期（各期具備獨立 28 里程碑）"
-                                >
-                                  ＋ 期數
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setProjectToAddPhase(p)}
+                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
+                                    title="新增分期（各期具備獨立 28 里程碑）"
+                                  >
+                                    ＋ 期數
+                                  </button>
+                                )}
                                 <Link
                                   href={`/projects/${p.id}/milestones`}
                                   prefetch={true}
@@ -973,27 +981,43 @@ export default function ManagerDashboardPage() {
                                 </td>
                               );
                             case "actions":
-                              return (
-                                <td key={col.key} className="p-3 text-center align-middle">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => setProjectToAddPhase(p)}
-                                      className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
-                                      title="為此案新增下一期分期"
-                                    >
-                                      ＋ 期數
-                                    </button>
-                                    <Link
-                                      href={`/projects/${phase.id}/milestones`}
-                                      prefetch={true}
-                                      className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
-                                    >
-                                      時程細節
-                                    </Link>
-                                  </div>
-                                </td>
-                              );
+                              {
+                                const isManagerOrAdmin =
+                                  sessionUser?.role === "ADMIN" ||
+                                  sessionUser?.role === "LEVEL_MANAGER" ||
+                                  sessionUser?.role === "SALES_MANAGER";
+                                const canDeletePhase =
+                                  isManagerOrAdmin ||
+                                  sessionUser?.id === phase.salesRepId ||
+                                  sessionUser?.id === phase.salesAssistantId ||
+                                  sessionUser?.id === p.salesRepId ||
+                                  sessionUser?.id === p.salesAssistantId;
+
+                                return (
+                                  <td key={col.key} className="p-3 text-center align-middle">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <Link
+                                        href={`/projects/${phase.id}/milestones`}
+                                        prefetch={true}
+                                        className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                                      >
+                                        時程細節
+                                      </Link>
+                                      {canDeletePhase && (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleDeleteProject(phase)}
+                                          disabled={deletingProjectId !== null}
+                                          className="inline-flex h-7 items-center justify-center gap-1 rounded bg-red-100 px-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors whitespace-nowrap"
+                                          title="刪除此分期"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />刪除
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              }
                             default:
                               return null;
                           }

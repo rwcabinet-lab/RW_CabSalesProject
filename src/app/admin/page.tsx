@@ -647,7 +647,7 @@ export default function AdminPage() {
                     case "stageProgress":
                       return (
                         <td key={col.key} className={`p-3 border-r font-bold text-slate-700 ${dragCellClass}`}>
-                          設計提案/報價/簽約
+                          提案/報價/簽約
                           <div className="mt-1 text-[10px] font-normal text-slate-500">報價單</div>
                         </td>
                       );

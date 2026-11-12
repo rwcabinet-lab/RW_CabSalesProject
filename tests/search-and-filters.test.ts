@@ -134,7 +134,7 @@ describe("搜尋與篩選條件功能測試", () => {
         customerName: "遠雄營造",
         customerType: "CONSTRUCTION",
         currentStage: "PROPOSAL",
-        currentStageLabel: "設計提案/報價/簽約",
+        currentStageLabel: "提案/報價/簽約",
         salesRepName: "陳小明",
         salesAssistantName: "林小華",
         isDelayed: false,

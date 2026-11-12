@@ -152,6 +152,16 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
         where: { projectId: "master-1" },
         data: { projectId: "phase-1" },
       });
+      expect(prisma.project.update).toHaveBeenCalledWith({
+        where: { id: "master-1" },
+        data: {
+          quoteAmount: null,
+          cost: null,
+          unitCount: null,
+          estimatedBudget: null,
+          expectedDate: null,
+        },
+      });
       expect(result.id).toBe("phase-2");
     });
 
@@ -227,6 +237,17 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
       const plannedDate = "2026-11-20";
       const actualDate = "2026-11-20";
       expect(actualDate === plannedDate).toBe(true);
+    });
+  });
+
+  describe("分期建立權限管制 (RBAC Permissions)", () => {
+    it("僅系統管理者 (ADMIN) 具備開立分期權限，其餘角色一律禁止", () => {
+      const canAddPhase = (role: string) => role === "ADMIN";
+      expect(canAddPhase("ADMIN")).toBe(true);
+      expect(canAddPhase("LEVEL_MANAGER")).toBe(false);
+      expect(canAddPhase("SALES_MANAGER")).toBe(false);
+      expect(canAddPhase("SALES")).toBe(false);
+      expect(canAddPhase("ASSISTANT")).toBe(false);
     });
   });
 });

@@ -209,6 +209,7 @@ interface WorkbenchEditProjectRowProps extends WorkbenchProjectFormsProps {
   projectId: string;
   projectName: string;
   colSpan: number;
+  hasPhases?: boolean;
 }
 
 /**
@@ -218,6 +219,7 @@ export function WorkbenchEditProjectRow({
   projectId,
   projectName,
   colSpan,
+  hasPhases,
   customers,
   selectableUsers,
   onInvalidate,
@@ -235,11 +237,19 @@ export function WorkbenchEditProjectRow({
     setSaving(true);
     try {
       const payload = {
-        ...newProjectData,
-        unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
-        cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
-        quoteAmount: newProjectData.quoteAmount ? Math.round(Number(newProjectData.quoteAmount)) : undefined,
+        projectName: newProjectData.projectName,
+        customerId: newProjectData.customerId,
+        siteAddress: newProjectData.siteAddress,
+        siteCondition: newProjectData.siteCondition,
         salesRepId: newProjectData.salesRepId || undefined,
+        ...(hasPhases
+          ? {}
+          : {
+              unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
+              cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
+              quoteAmount: newProjectData.quoteAmount ? Math.round(Number(newProjectData.quoteAmount)) : undefined,
+              expectedDate: newProjectData.expectedDate || undefined,
+            }),
       };
       const res = await fetch("/api/projects", {
         method: "PATCH",
@@ -265,11 +275,11 @@ export function WorkbenchEditProjectRow({
                       defaultDiscount: savedProject.defaultDiscount,
                       siteAddress: savedProject.siteAddress,
                       siteCondition: savedProject.siteCondition || "",
-                      expectedDate: savedProject.expectedDate ? savedProject.expectedDate.slice(0, 10) : "",
-                      unitCount: savedProject.unitCount,
-                      cost: savedProject.cost,
-                      quoteAmount: savedProject.quoteAmount,
-                      totalAmount: savedProject.quoteAmount ?? null,
+                      expectedDate: hasPhases ? p.expectedDate : savedProject.expectedDate ? savedProject.expectedDate.slice(0, 10) : "",
+                      unitCount: hasPhases ? p.unitCount : savedProject.unitCount,
+                      cost: hasPhases ? p.cost : savedProject.cost,
+                      quoteAmount: hasPhases ? p.quoteAmount : savedProject.quoteAmount,
+                      totalAmount: hasPhases ? p.totalAmount : savedProject.quoteAmount ?? null,
                       salesRepId: savedProject.salesRepId,
                       salesRepName: savedProject.salesRepName,
                       salesAssistantName: savedProject.salesAssistantName || null,
@@ -310,6 +320,11 @@ export function WorkbenchEditProjectRow({
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {hasPhases && (
+              <div className="col-span-1 sm:col-span-2 md:col-span-4 rounded bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs text-indigo-800 font-medium flex items-center gap-1.5">
+                <span>🔒 <strong>多期彙總母案</strong>：戶數、成本、報價與預定進場日由各分期自動加總彙整，此處唯讀防呆。若需修改請至下方各期獨立編輯。</span>
+              </div>
+            )}
             <label className="font-semibold text-slate-700">
               案場名稱 *
               <input
@@ -365,43 +380,47 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              戶數
+              戶數 {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
               <input
                 type="number"
+                disabled={hasPhases}
                 value={newProjectData.unitCount}
                 onChange={(e) => setNewProjectData({ unitCount: e.target.value })}
-                className="w-full border rounded p-1.5 mt-1 bg-white"
+                className={`w-full border rounded p-1.5 mt-1 ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
             </label>
             <label className="font-semibold text-slate-700">
-              成本金額（元）
+              成本金額（元） {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
               <input
                 type="number"
                 step="1"
+                disabled={hasPhases}
                 placeholder="例如：250000"
                 value={newProjectData.cost}
                 onChange={(e) => setNewProjectData({ cost: e.target.value })}
-                className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
+                className={`mt-1 w-full border rounded p-1.5 text-right tabular-nums ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
             </label>
             <label className="font-semibold text-slate-700">
-              報價（元）
+              報價（元） {hasPhases && <span className="text-slate-400 font-normal">(由分期加總)</span>}
               <input
                 type="number"
                 step="1"
+                disabled={hasPhases}
                 placeholder="例如：350000"
                 value={newProjectData.quoteAmount}
                 onChange={(e) => setNewProjectData({ quoteAmount: e.target.value })}
-                className="mt-1 w-full border rounded p-1.5 text-right tabular-nums bg-white"
+                className={`mt-1 w-full border rounded p-1.5 text-right tabular-nums ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
             </label>
             <label className="font-semibold text-slate-700">
-              預定進場日
+              預定進場日 {hasPhases && <span className="text-slate-400 font-normal">(各期獨立)</span>}
               <input
                 type="date"
+                disabled={hasPhases}
                 value={newProjectData.expectedDate}
                 onChange={(e) => setNewProjectData({ expectedDate: e.target.value })}
-                className="w-full border rounded p-1.5 mt-1 bg-white"
+                className={`w-full border rounded p-1.5 mt-1 ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
             </label>
             <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">

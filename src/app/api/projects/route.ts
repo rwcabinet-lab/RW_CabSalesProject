@@ -116,13 +116,35 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-    if (user.role !== "ADMIN") {
-      return NextResponse.json({ error: "僅管理員可刪除案件" }, { status: 403 });
-    }
 
     const body = await req.json();
     if (typeof body.id !== "string" || !body.id) {
       return NextResponse.json({ error: "缺少案件識別碼" }, { status: 400 });
+    }
+
+    const targetProject = await prisma.project.findUnique({
+      where: { id: body.id },
+      include: { parent: true },
+    });
+    if (!targetProject) return NextResponse.json({ error: "找不到案件" }, { status: 404 });
+
+    const isSubPhase = Boolean(targetProject.parentId);
+    const isOwner =
+      targetProject.salesRepId === user.id ||
+      targetProject.salesAssistantId === user.id ||
+      targetProject.parent?.salesRepId === user.id ||
+      targetProject.parent?.salesAssistantId === user.id;
+    const isManagerOrAdmin =
+      user.role === "ADMIN" ||
+      user.role === "LEVEL_MANAGER" ||
+      user.role === "SALES_MANAGER";
+
+    if (!isSubPhase && user.role !== "ADMIN") {
+      return NextResponse.json({ error: "僅管理員可刪除案件" }, { status: 403 });
+    }
+
+    if (isSubPhase && !isManagerOrAdmin && !isOwner) {
+      return NextResponse.json({ error: "僅所屬業務、業務助理或主管可刪除此分期" }, { status: 403 });
     }
 
     const deleted = await DataService.deleteProject(body.id);

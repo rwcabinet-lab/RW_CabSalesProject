@@ -133,7 +133,7 @@ export const MILESTONE_DEFAULT_DAYS: Record<MilestoneStageCode, number> = {
 export const PHASE_LABELS: Record<MilestonePhase, string> = {
   DEVELOP:     "第一階段：案件開發",
   REQUIREMENT: "第二階段：現況及需求確認",
-  PROPOSAL:    "第三階段：設計提案/報價/簽約",
+  PROPOSAL:    "第三階段：提案/報價/簽約",
   PRE_PROD:    "第四階段：生產前確認/拆單",
   PROD_SHIP:   "第五階段：生產及派送",
   INSTALL:     "第六階段：安裝及驗收",
@@ -148,7 +148,7 @@ export const PHASE_LABELS: Record<MilestonePhase, string> = {
 export const PROJECT_STAGE_LABELS: Record<string, string> = {
   DEVELOP: "案件開發",
   REQUIREMENT: "現況及需求確認",
-  PROPOSAL: "設計提案/報價/簽約",
+  PROPOSAL: "提案/報價/簽約",
   PRE_PROD: "生產前確認/拆單",
   PROD_SHIP: "生產及派送",
   INSTALL: "安裝及驗收",
