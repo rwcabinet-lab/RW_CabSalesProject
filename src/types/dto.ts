@@ -383,6 +383,10 @@ export interface ManagedUserDTO {
   email: string;
   role: any;
   lastLoginAt?: string | null;
+  lastActiveAt?: string | null;
+  activeDays7d?: number;
+  activeDays30d?: number;
+  activeHits30d?: number;
 }
 
 export interface LoginRecordDTO {

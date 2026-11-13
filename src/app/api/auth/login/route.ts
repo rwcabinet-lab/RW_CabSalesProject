@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { getRoleLandingPath } from "@/lib/page-access";
 import { DataService } from "@/lib/data-service";
+import { recordUserActivityThrottled } from "@/lib/activity-tracker";
 import { SESSION_COOKIE_NAME, signSessionUserId } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
 
     // 4. 登入成功：清除該帳號累積之失敗計數並記錄日誌
     recordLoginSuccess(employeeNo);
+    recordUserActivityThrottled(user.id);
 
     void DataService.recordLoginLog({
       userId: user.id,

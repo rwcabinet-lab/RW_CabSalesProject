@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getUserFromRequest, invalidateUserAccessProfile } from "@/lib/access-control";
+import { computeActivitySummary, getAllUserActivityRecords } from "@/lib/activity-tracker";
 import { invalidateLoginUsersCache } from "@/lib/data-service";
 import { ConfigService } from "@/lib/services";
 import { ROLE_OPTIONS } from "@/lib/page-access";
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   if (auth.response) return auth.response;
 
   try {
-    const [users, records] = await Promise.all([
+    const [users, records, activityMap] = await Promise.all([
       prisma.user.findMany({
         where: { NOT: { email: { startsWith: "preview-" } } },
         select: { id: true, name: true, email: true, role: true },
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
         loginAt: string;
         status?: string;
       }>>("login_records", []).catch(() => []),
+      getAllUserActivityRecords().catch(() => new Map()),
     ]);
 
     // 依照登入時間由新到舊排序所有紀錄
@@ -61,9 +63,15 @@ export async function GET(request: NextRequest) {
           r.status !== "FAILED" &&
           (r.userId === u.id || (uEmailLower && r.employeeNo?.toLowerCase() === uEmailLower))
       );
+      const lastLoginAt = latestSuccess?.loginAt || null;
+      const activity = computeActivitySummary(activityMap.get(u.id), lastLoginAt);
       return {
         ...u,
-        lastLoginAt: latestSuccess?.loginAt || null,
+        lastLoginAt,
+        lastActiveAt: activity.lastActiveAt,
+        activeDays7d: activity.activeDays7d,
+        activeDays30d: activity.activeDays30d,
+        activeHits30d: activity.activeHits30d,
       };
     });
 

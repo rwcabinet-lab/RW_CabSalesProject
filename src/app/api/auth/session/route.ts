@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
+import { recordUserActivityThrottled } from "@/lib/activity-tracker";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
 
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
     if (!profile || profile.email.startsWith("preview-")) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
+
+    recordUserActivityThrottled(profile.id || userId);
 
     return NextResponse.json(
       {

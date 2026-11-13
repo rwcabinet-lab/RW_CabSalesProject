@@ -36,7 +36,17 @@ import {
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
 
-type ManagedUser = { id: string; name: string; email: string; role: AppRole; lastLoginAt?: string | null };
+type ManagedUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: AppRole;
+  lastLoginAt?: string | null;
+  lastActiveAt?: string | null;
+  activeDays7d?: number;
+  activeDays30d?: number;
+  activeHits30d?: number;
+};
 type RolePermission = { role: AppRole; label: string; pages: PageAccessKey[] };
 
 function roleLabel(role: string) {
@@ -56,6 +66,31 @@ function formatLoginDateTime(isoStr?: string | null): string {
     second: "2-digit",
     hour12: false,
   });
+}
+
+function isRecentlyActive(isoStr?: string | null): boolean {
+  if (!isoStr) return false;
+  const ms = new Date(isoStr).getTime();
+  if (Number.isNaN(ms)) return false;
+  return Date.now() - ms <= 10 * 60 * 1000;
+}
+
+function renderUsageFrequencyBadge(days7d = 0, days30d = 0, hits30d = 0) {
+  const toneClass =
+    days7d >= 4
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : days7d >= 1
+      ? "bg-sky-50 text-sky-700 border-sky-200"
+      : "bg-slate-100 text-slate-500 border-slate-200";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${toneClass}`}
+      title={`近 30 天累計活躍時段：${hits30d} 次（保留最近 30 天）`}
+    >
+      近7天 {days7d} 天 · 近30天 {days30d} 天
+    </span>
+  );
 }
 
 function parseUserAgent(ua?: string) {
@@ -937,13 +972,14 @@ export default function AdminPage() {
 
             {/* 帳號列表與列內編輯 */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
+              <table className="w-full min-w-[780px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs text-slate-500">
                   <tr>
                     <th className="px-3 py-2 font-semibold">姓名</th>
                     <th className="px-3 py-2 font-semibold">員工編號</th>
                     <th className="px-3 py-2 font-semibold">層級</th>
-                    <th className="px-3 py-2 font-semibold">最後上線時間</th>
+                    <th className="px-3 py-2 font-semibold">最後在線時間</th>
+                    <th className="px-3 py-2 font-semibold">使用頻率（近 30 天）</th>
                     <th className="px-3 py-2 text-right font-semibold">操作</th>
                   </tr>
                 </thead>
@@ -999,8 +1035,11 @@ export default function AdminPage() {
                               ))}
                             </select>
                           </td>
-                          <td className="px-3 py-2.5 text-xs text-slate-500 font-mono">
-                            {formatLoginDateTime(user.lastLoginAt)}
+                          <td className="px-3 py-2.5 text-xs text-slate-500 font-mono whitespace-nowrap">
+                            {formatLoginDateTime(user.lastActiveAt ?? user.lastLoginAt)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {renderUsageFrequencyBadge(user.activeDays7d, user.activeDays30d, user.activeHits30d)}
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -1039,8 +1078,22 @@ export default function AdminPage() {
                             {roleLabel(user.role)}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
-                          {formatLoginDateTime(user.lastLoginAt)}
+                        <td
+                          className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap"
+                          title={`最後登入時間：${formatLoginDateTime(user.lastLoginAt)}`}
+                        >
+                          <div className="inline-flex items-center gap-1.5">
+                            {isRecentlyActive(user.lastActiveAt) && (
+                              <span
+                                className="inline-block h-2 w-2 rounded-full bg-emerald-500"
+                                title="10 分鐘內在線中"
+                              />
+                            )}
+                            <span>{formatLoginDateTime(user.lastActiveAt ?? user.lastLoginAt)}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {renderUsageFrequencyBadge(user.activeDays7d, user.activeDays30d, user.activeHits30d)}
                         </td>
                         <td className="px-3 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">

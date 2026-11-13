@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recordUserActivityThrottled } from "@/lib/activity-tracker";
 import { AppRole, DEFAULT_ROLE_PAGES, getPageAccessKey, PageAccessKey } from "@/lib/page-access";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
@@ -108,7 +109,11 @@ export async function getUserByIdCached(userId: string) {
 export async function getUserFromRequest(request: NextRequest) {
   const userId = await getVerifiedUserIdFromRequest(request);
   if (!userId) return null;
-  return getUserByIdCached(userId);
+  const user = await getUserByIdCached(userId);
+  if (user) {
+    recordUserActivityThrottled(user.id);
+  }
+  return user;
 }
 
 export async function getRolePages(role: Role | AppRole): Promise<PageAccessKey[]> {
