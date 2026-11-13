@@ -7,6 +7,37 @@ import {
 } from "../constants";
 import { appConfigCache, APP_CONFIG_TTL_MS } from "./shared";
 
+export const LOGIN_LOG_RETENTION_DAYS = 30;
+const LOGIN_LOG_MAX_RECORDS = 500;
+
+export interface LoginLogRecord {
+  id: string;
+  userId: string;
+  employeeNo: string;
+  userName: string;
+  role: string;
+  loginAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  status: "SUCCESS" | "FAILED";
+  failureReason?: string;
+}
+
+/**
+ * 過濾並僅保留最近 N 天（預設 30 天）內的登入紀錄
+ */
+export function pruneLoginLogs<T extends { loginAt: string }>(
+  records: T[],
+  retentionDays: number = LOGIN_LOG_RETENTION_DAYS,
+  now: Date = new Date(),
+): T[] {
+  const cutoffMs = now.getTime() - Math.max(1, retentionDays) * 24 * 60 * 60 * 1000;
+  return records.filter((r) => {
+    const ms = new Date(r.loginAt).getTime();
+    return !Number.isNaN(ms) && ms >= cutoffMs;
+  });
+}
+
 export const ConfigService = {
   async getAppConfig<T = unknown>(key: string, defaultValue?: T): Promise<T> {
     const cached = appConfigCache.get(key);
@@ -57,26 +88,15 @@ export const ConfigService = {
     failureReason?: string;
   }) {
     try {
-      const records = await ConfigService.getAppConfig<Array<{
-        id: string;
-        userId: string;
-        employeeNo: string;
-        userName: string;
-        role: string;
-        loginAt: string;
-        ipAddress?: string;
-        userAgent?: string;
-        status: "SUCCESS" | "FAILED";
-        failureReason?: string;
-      }>>("login_records", []);
+      const records = await ConfigService.getAppConfig<LoginLogRecord[]>("login_records", []);
 
-      const newRecord = {
+      const newRecord: LoginLogRecord = {
         id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         ...log,
       };
 
-      // 保留最新 500 筆紀錄，避免資料無限增長
-      const updated = [newRecord, ...records].slice(0, 500);
+      // 僅保留最近 30 天且上限 500 筆紀錄，避免資料無限增長
+      const updated = pruneLoginLogs([newRecord, ...records]).slice(0, LOGIN_LOG_MAX_RECORDS);
       await ConfigService.setAppConfig("login_records", updated);
     } catch (error) {
       console.error("Failed to record login log:", error);
@@ -85,18 +105,7 @@ export const ConfigService = {
 
   async getLoginLogsByUser(targetUserId: string) {
     const [records, targetUser] = await Promise.all([
-      ConfigService.getAppConfig<Array<{
-        id: string;
-        userId: string;
-        employeeNo: string;
-        userName: string;
-        role: string;
-        loginAt: string;
-        ipAddress?: string;
-        userAgent?: string;
-        status: "SUCCESS" | "FAILED";
-        failureReason?: string;
-      }>>("login_records", []),
+      ConfigService.getAppConfig<LoginLogRecord[]>("login_records", []),
       prisma.user.findFirst({
         where: {
           OR: [{ id: targetUserId }, { email: targetUserId }],
@@ -108,7 +117,7 @@ export const ConfigService = {
     const targetId = targetUser?.id || targetUserId;
     const targetEmployeeNo = targetUser?.email;
 
-    return records
+    return pruneLoginLogs(records)
       .filter((r) => {
         if (r.userId === targetId) return true;
         if (targetEmployeeNo && r.employeeNo?.toLowerCase() === targetEmployeeNo.toLowerCase()) return true;

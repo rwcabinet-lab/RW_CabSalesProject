@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { pruneLoginLogs } from "../src/lib/services/config-service";
 
 describe("Employee ID & Password Login Logic (員工編號與密碼登入機制)", () => {
   it("驗證大成與正道五碼工號格式 (數字或英數)", () => {
@@ -138,6 +139,18 @@ describe("Employee ID & Password Login Logic (員工編號與密碼登入機制)
       const boundedLogs = manyLogs.slice(0, maxRecords);
       expect(boundedLogs.length).toBe(500);
       expect(boundedLogs[0].id).toBe("log_0");
+    });
+
+    it("登入紀錄僅保留最近 30 天內紀錄，自動清理超過 30 天之舊紀錄", () => {
+      const now = new Date("2026-11-13T10:00:00.000Z");
+      const sampleLogs: MockLog[] = [
+        { id: "recent", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-11-12T10:00:00.000Z" },
+        { id: "boundary", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-10-14T10:00:00.000Z" }, // 剛好第 30 天
+        { id: "expired", userId: "u1", employeeNo: "03328", userName: "張欽哲", status: "SUCCESS", loginAt: "2026-10-14T09:59:59.000Z" }, // 超過 30 天
+      ];
+
+      const kept = pruneLoginLogs(sampleLogs, 30, now);
+      expect(kept.map((l) => l.id)).toEqual(["recent", "boundary"]);
     });
 
     it("登入紀錄確保由新到舊排序，且使用者最後上線時間與最新登入成功紀錄完全相符", () => {

@@ -1331,7 +1331,7 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between shrink-0 text-xs text-slate-500">
-              <span>共 {loginLogsModal.logs.length} 筆登入歷史紀錄</span>
+              <span>共 {loginLogsModal.logs.length} 筆登入歷史紀錄（保留最近 30 天）</span>
               <button
                 type="button"
                 onClick={() => setLoginLogsModal({ open: false, user: null, loading: false, logs: [], error: "" })}
