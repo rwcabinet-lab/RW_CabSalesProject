@@ -6,8 +6,8 @@ import { ToastContainer } from "@/components/ui/ToastContainer";
 import { SectionHelpModal } from "@/components/common/SectionHelpModal";
 
 export const metadata: Metadata = {
-  title: "正道工業系統櫃事業部 - 業務時程追蹤系統",
-  description: "正道工業系統櫃事業部 業務時程追蹤系統 (Next.js + Prisma)",
+  title: "正道工業系統櫃事業部 - 業務時程追蹤平台",
+  description: "正道工業系統櫃事業部 業務時程追蹤平台 (Next.js + Prisma)",
 };
 
 export default function RootLayout({

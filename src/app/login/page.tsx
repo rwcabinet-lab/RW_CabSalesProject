@@ -48,7 +48,7 @@ export default function LoginPage() {
             <img src="/logo.png" alt="正道工業系統櫃事業部" className="h-full w-full object-contain" />
           </div>
           <p className="text-xs font-semibold text-blue-300 tracking-wider">正道工業系統櫃事業部</p>
-          <h1 className="mt-1 text-2xl font-bold">業務時程追蹤系統</h1>
+          <h1 className="mt-1 text-2xl font-bold">業務時程追蹤平台</h1>
           <p className="mt-2 text-sm text-slate-300">登入以繼續使用工作台</p>
         </div>
 

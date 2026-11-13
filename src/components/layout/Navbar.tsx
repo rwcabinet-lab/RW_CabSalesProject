@@ -61,7 +61,7 @@ export function Navbar() {
                 正道工業系統櫃事業部
               </span>
               <span className="text-[11px] text-blue-700 font-semibold tracking-wide leading-none mt-0.5">
-                業務時程追蹤系統
+                業務時程追蹤平台
               </span>
             </div>
           </Link>

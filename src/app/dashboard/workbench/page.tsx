@@ -361,7 +361,7 @@ export default function SalesWorkbenchPage() {
                               prefetch={true}
                               className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-xs font-semibold hover:bg-blue-100 hover:text-blue-700 shadow-sm transition-colors"
                             >
-                              案件細節
+                              細節
                             </Link>
                           )}
                         </div>

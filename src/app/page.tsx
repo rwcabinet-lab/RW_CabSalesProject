@@ -50,19 +50,11 @@ export default async function HomePage() {
             <Sparkles className="w-3.5 h-3.5" /> 系統櫃工廠前段業務數位化賦能
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            系統櫃工廠業務報價與時程追蹤系統
+            業務時程追蹤平台
           </h1>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
             整合「全域報價與戶數資料管理」、「B2B/B2C 折率自動核算」、「7 大標準階段時程警示」與「主管全局監控」，徹底告別傳統紙本手稿與 Excel 錯漏。
           </p>
-          <div className="pt-2 flex flex-wrap gap-3">
-            <Link
-              href="/customers"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-semibold border border-white/20 transition"
-            >
-              <Users className="w-4 h-4" /> 客戶主檔 (B2B/B2C)
-            </Link>
-          </div>
         </div>
       </div>
 
