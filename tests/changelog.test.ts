@@ -356,7 +356,7 @@ describe("改版資訊功能測試 (Changelog Feature Tests)", () => {
         method: "POST",
         body: JSON.stringify({
           version: "v2.0.0",
-          date: "2026-11-12",
+          date: "2026-12-01",
           title: "全站次世代架構升級",
           category: "FEAT",
           details: ["第一項更新", "第二項更新"],
@@ -410,7 +410,9 @@ describe("改版資訊功能測試 (Changelog Feature Tests)", () => {
         if (!map.has(d)) map.set(d, []);
         map.get(d)!.push(item);
       }
-      // 驗證 2026-11-11 與 2026-11-10 均有多筆更新彙整在同一天
+      // 驗證 2026-11-16、2026-11-13、2026-11-11 與 2026-11-10 均有多筆更新彙整在同一天
+      expect(map.get("2026-11-16")?.length).toBeGreaterThanOrEqual(5);
+      expect(map.get("2026-11-13")?.length).toBeGreaterThanOrEqual(2);
       expect(map.get("2026-11-11")?.length).toBeGreaterThanOrEqual(3);
       expect(map.get("2026-11-10")?.length).toBeGreaterThanOrEqual(2);
     });
