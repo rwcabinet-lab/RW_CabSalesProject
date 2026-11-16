@@ -555,8 +555,8 @@ export default function ManagerDashboardPage() {
                     <span className={isAlert ? "font-bold text-red-600" : status.isPaused ? "text-slate-400 italic" : ""}>
                       預定完成：{status.isPaused ? "需追蹤" : status.dueDateStr || "未設定"}
                     </span>
-                    <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-100 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700">查看案件</Link>
-                    <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-100 px-3 py-1.5 font-bold text-red-700 hover:bg-red-200">刪除</button>
+                    <Link href={`/projects/${task.projectId}/milestones`} prefetch={true} className="rounded bg-slate-50 border border-slate-300 px-3 py-1.5 font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors">查看案件</Link>
+                    <button type="button" onClick={() => handleDeleteAssignedTask(task)} className="rounded bg-red-50 border border-red-200 px-3 py-1.5 font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors">刪除</button>
                   </div>
                 </article>
               );
@@ -874,14 +874,14 @@ export default function ManagerDashboardPage() {
                                 <Link
                                   href={`/projects/${p.id}/milestones`}
                                   prefetch={true}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                                  className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors whitespace-nowrap"
                                 >
                                   細節
                                 </Link>
                                 <button
                                   type="button"
                                   onClick={() => setProjectToAddPhase(p)}
-                                  className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs whitespace-nowrap"
+                                  className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs whitespace-nowrap"
                                   title="新增分期（各期具備獨立 28 里程碑）"
                                   aria-label="新增分期"
                                 >
@@ -892,7 +892,7 @@ export default function ManagerDashboardPage() {
                                     type="button"
                                     onClick={() => void handleDeleteProject(p)}
                                     disabled={deletingProjectId !== null}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors whitespace-nowrap"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-red-50 border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors whitespace-nowrap"
                                     title="刪除"
                                     aria-label="刪除案件"
                                   >
@@ -919,7 +919,7 @@ export default function ManagerDashboardPage() {
                             priority: "MEDIUM",
                             dueDate: todayDate(),
                           })}
-                          className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
+                          className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
                         >
                           指派任務
                         </button>
@@ -1046,7 +1046,7 @@ export default function ManagerDashboardPage() {
                                       <Link
                                         href={`/projects/${phase.id}/milestones`}
                                         prefetch={true}
-                                        className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                                        className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors whitespace-nowrap"
                                       >
                                         細節
                                       </Link>
@@ -1055,7 +1055,7 @@ export default function ManagerDashboardPage() {
                                           type="button"
                                           onClick={() => void handleDeleteProject(phase)}
                                           disabled={deletingProjectId !== null}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors whitespace-nowrap"
+                                          className="inline-flex h-7 items-center justify-center rounded bg-red-50 border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors whitespace-nowrap"
                                           title="刪除此分期"
                                           aria-label="刪除此分期"
                                         >
@@ -1083,7 +1083,7 @@ export default function ManagerDashboardPage() {
                                 priority: "MEDIUM",
                                 dueDate: todayDate(),
                               })}
-                              className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
+                              className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors whitespace-nowrap"
                             >
                               指派任務
                             </button>

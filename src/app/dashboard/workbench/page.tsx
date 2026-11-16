@@ -350,7 +350,7 @@ export default function SalesWorkbenchPage() {
                               onClick={() => {
                                 setTaskToComplete(task);
                               }}
-                              className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition-colors"
+                              className="flex items-center gap-1 rounded border border-emerald-700 bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition-colors"
                             >
                               <CheckCircle2 className="h-4 w-4" /> 完成
                             </button>
@@ -359,7 +359,7 @@ export default function SalesWorkbenchPage() {
                             <Link
                               href={`/projects/${task.projectId}/milestones`}
                               prefetch={true}
-                              className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-xs font-semibold hover:bg-blue-100 hover:text-blue-700 shadow-sm transition-colors"
+                              className="rounded border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors"
                             >
                               細節
                             </Link>
@@ -717,7 +717,7 @@ export default function SalesWorkbenchPage() {
                                     <button
                                       type="button"
                                       onClick={() => setProjectToAdvance(p)}
-                                      className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                      className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
                                       title={`推進當前進度：${p.activeMilestone.stageName}`}
                                     >
                                       項目推進
@@ -726,21 +726,21 @@ export default function SalesWorkbenchPage() {
                                   <Link
                                     href={`/projects/${p.id}/milestones`}
                                     prefetch={true}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors"
                                   >
                                     細節
                                   </Link>
                                   <button
                                     type="button"
                                     onClick={() => openEditProject(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors"
                                   >
                                     編輯
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setProjectToAddPhase(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs"
                                     title="新增分期（各期具備獨立 28 里程碑）"
                                     aria-label="新增分期"
                                   >
@@ -750,7 +750,7 @@ export default function SalesWorkbenchPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteProject(p)}
-                                      className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                      className="inline-flex h-7 items-center justify-center rounded bg-red-50 border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors"
                                       title="刪除"
                                       aria-label="刪除案件"
                                     >
@@ -903,7 +903,7 @@ export default function SalesWorkbenchPage() {
                                           <button
                                             type="button"
                                             onClick={() => setProjectToAdvance(phase)}
-                                            className="inline-flex h-7 items-center justify-center rounded bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                            className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
                                             title={`推進當前進度：${phase.activeMilestone.stageName}`}
                                           >
                                             項目推進
@@ -912,14 +912,14 @@ export default function SalesWorkbenchPage() {
                                         <button
                                           type="button"
                                           onClick={() => openEditProject(phase)}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-amber-100 px-2 text-xs font-bold text-amber-800 hover:bg-amber-200 transition-colors"
+                                          className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors"
                                         >
                                           編輯
                                         </button>
                                         <Link
                                           href={`/projects/${phase.id}/milestones`}
                                           prefetch={true}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-slate-100 px-2 text-xs font-bold text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                                          className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors"
                                         >
                                           細節
                                         </Link>
@@ -927,7 +927,7 @@ export default function SalesWorkbenchPage() {
                                           <button
                                             type="button"
                                             onClick={() => handleDeleteProject(phase)}
-                                            className="inline-flex h-7 items-center justify-center rounded bg-red-100 px-2 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors"
+                                            className="inline-flex h-7 items-center justify-center rounded bg-red-50 border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors"
                                             title="刪除此分期"
                                             aria-label="刪除此分期"
                                           >
