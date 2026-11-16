@@ -16,6 +16,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { ChangelogModal } from "@/components/changelog/ChangelogModal";
+import {
+  JUST_LOGGED_IN_STORAGE_KEY,
+  LoginAnnouncementModal,
+} from "@/components/announcement/LoginAnnouncementModal";
 import { getRoleLandingPath, type AppRole, type PageAccessKey } from "@/lib/page-access";
 
 const navItems = [
@@ -36,6 +40,11 @@ export function Navbar() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    try {
+      sessionStorage.removeItem(JUST_LOGGED_IN_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
     queryClient.setQueryData(QUERY_KEYS.session, null);
     queryClient.clear();
     router.replace("/login");
@@ -151,6 +160,9 @@ export function Navbar() {
       onClose={() => setIsChangelogOpen(false)}
       isAdmin={user?.role === "ADMIN"}
     />
+
+    {/* 全體登入公告彈窗 */}
+    <LoginAnnouncementModal isAuthenticated={Boolean(user)} />
   </>
 );
 }

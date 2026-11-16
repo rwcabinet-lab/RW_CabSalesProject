@@ -34,6 +34,7 @@ import {
   STANDARD_MILESTONE_STAGE_CODES,
 } from "@/lib/constants";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { AdminAnnouncementPanel } from "@/components/admin/AdminAnnouncementPanel";
 import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
 
 type ManagedUser = {
@@ -500,6 +501,9 @@ export default function AdminPage() {
 
       {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
+
+      {/* 0. 全體系統公告欄（登入推送通知） */}
+      <AdminAnnouncementPanel />
 
       {/* 1. 全域案件與時程設定（分頁切換：欄位順序 / 預設天數 / 起始進度） */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

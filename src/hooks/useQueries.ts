@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PageAccessKey } from "@/lib/page-access";
 import type { MilestoneStageCode } from "@/lib/constants";
 import type { ChangelogEntry } from "@/lib/changelog";
+import type { SystemAnnouncement } from "@/lib/announcement";
 import type {
   ApiResponse,
   ColumnItemDTO,
@@ -44,6 +45,7 @@ export const QUERY_KEYS = {
     ["dashboard", "manager", "status-report", String(year || "2026"), String(month || "10")] as const,
   viewsData: ["views", "data"] as const,
   changelog: ["changelog"] as const,
+  announcement: ["announcement"] as const,
 };
 
 /**
@@ -329,5 +331,32 @@ export function useChangelogQuery(role?: string) {
       return (await res.json()) as ChangelogResponseDTO;
     },
     staleTime: 0,
+  });
+}
+
+export interface AnnouncementResponseDTO {
+  success: boolean;
+  announcement: SystemAnnouncement | null;
+  acknowledgedId: string | null;
+}
+
+/**
+ * 取得目前啟用中的全體登入公告與當前使用者已讀狀態
+ */
+export function useAnnouncementQuery(enabled = true) {
+  return useQuery({
+    queryKey: QUERY_KEYS.announcement,
+    queryFn: async (): Promise<AnnouncementResponseDTO> => {
+      const res = await fetch("/api/announcement", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) {
+        throw new Error("無法讀取系統公告");
+      }
+      return (await res.json()) as AnnouncementResponseDTO;
+    },
+    enabled,
+    staleTime: 30 * 1000,
   });
 }

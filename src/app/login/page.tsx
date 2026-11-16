@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { KeyRound, LogIn, Loader2, User } from "lucide-react";
 import type { ApiResponse } from "@/types/dto";
+import { JUST_LOGGED_IN_STORAGE_KEY } from "@/components/announcement/LoginAnnouncementModal";
 
 export default function LoginPage() {
   const [employeeNo, setEmployeeNo] = useState("");
@@ -32,6 +33,11 @@ export default function LoginPage() {
       });
       const data = (await response.json()) as ApiResponse<{ redirectTo?: string }>;
       if (!response.ok) throw new Error(data.error || "登入失敗，請確認員工編號與密碼");
+      try {
+        sessionStorage.setItem(JUST_LOGGED_IN_STORAGE_KEY, "1");
+      } catch {
+        // ignore storage errors
+      }
       setRedirecting(true);
       window.location.href = data.redirectTo || "/dashboard/workbench";
     } catch (loginError) {

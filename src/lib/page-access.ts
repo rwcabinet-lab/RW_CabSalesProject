@@ -96,6 +96,21 @@ export function getPageAccessKey(pathname: string, method?: string): PageAccessK
 }
 
 /**
+ * 所有已登入使用者皆可存取之基礎系統路徑（實際資料與異動權限由各 API 路由再行檢核）
+ */
+export function isAlwaysAllowedAuthenticatedPath(routePath: string): boolean {
+  return (
+    routePath === "/" ||
+    routePath === "/settings" ||
+    routePath.startsWith("/settings/") ||
+    routePath === "/api/changelog" ||
+    routePath.startsWith("/api/changelog/") ||
+    routePath === "/api/announcement" ||
+    routePath.startsWith("/api/announcement/")
+  );
+}
+
+/**
  * 於 Middleware / Edge 環境中進行無資料庫往返的高效能角色權限校驗
  */
 export function canRoleAccessPath(
@@ -106,8 +121,7 @@ export function canRoleAccessPath(
   const url = new URL(pathname, "http://localhost");
   const routePath = url.pathname;
 
-  if (routePath === "/") return true;
-  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
+  if (isAlwaysAllowedAuthenticatedPath(routePath)) return true;
   if (routePath === "/forbidden") return true;
   if (routePath === "/login") return true;
   if (routePath.startsWith("/api/auth/")) return true;

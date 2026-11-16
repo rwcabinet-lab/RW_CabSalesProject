@@ -6,6 +6,7 @@ import {
   AppRole,
   DEFAULT_ROLE_PAGES,
   getPageAccessKey,
+  isAlwaysAllowedAuthenticatedPath,
   PageAccessKey,
   VALID_PAGE_ACCESS_KEYS,
 } from "@/lib/page-access";
@@ -150,8 +151,7 @@ export async function canAccessPath(
   method?: string,
 ): Promise<boolean> {
   const routePath = new URL(pathname, "http://localhost").pathname;
-  if (routePath === "/") return true;
-  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
+  if (isAlwaysAllowedAuthenticatedPath(routePath)) return true;
   const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return role === "ADMIN";
   const pages = await getRolePages(role);
@@ -170,8 +170,7 @@ export async function canUserAccessPath(
   if (!profile || profile.email.startsWith("preview-")) return false;
 
   const routePath = new URL(pathname, "http://localhost").pathname;
-  if (routePath === "/") return true;
-  if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
+  if (isAlwaysAllowedAuthenticatedPath(routePath)) return true;
   if (routePath === "/api/tasks" || routePath.startsWith("/api/tasks/") || routePath === "/api/schedule" || routePath.startsWith("/api/schedule/")) {
     return profile.pages.includes("workbench") || profile.pages.includes("projects") || profile.pages.includes("manager");
   }
