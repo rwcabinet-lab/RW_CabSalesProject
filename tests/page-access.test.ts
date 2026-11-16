@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import {
   getRoleLandingPath,
   canRoleAccessPath,
@@ -6,6 +7,10 @@ import {
   DEFAULT_ROLE_PAGES,
   PAGE_ACCESS_OPTIONS,
 } from "@/lib/page-access";
+import { POST as createCustomerPost } from "@/app/api/customers/route";
+import * as accessControl from "@/lib/access-control";
+import { DataService } from "@/lib/data-service";
+import { prisma } from "@/lib/prisma";
 
 describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", () => {
   it("已取消獨立首頁設定：PAGE_ACCESS_OPTIONS 與預設權限不再包含 home", () => {
@@ -76,6 +81,91 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(canRoleAccessPath("SALES", "/dashboard/workbench")).toBe(true);
       expect(canRoleAccessPath("SALES", "/views")).toBe(true);
       expect(canRoleAccessPath("SALES", "/customers")).toBe(true);
+    });
+
+    it("除工務人員 (SITE_ENGINEER) 外，其餘所有角色皆可存取 /customers 與建立客戶 API", () => {
+      const allowedRoles = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER", "SALES", "ASSISTANT"] as const;
+      for (const role of allowedRoles) {
+        expect(DEFAULT_ROLE_PAGES[role]).toContain("customers");
+        expect(canRoleAccessPath(role, "/customers")).toBe(true);
+        expect(canRoleAccessPath(role, "/api/customers", "POST")).toBe(true);
+      }
+
+      expect(DEFAULT_ROLE_PAGES.SITE_ENGINEER).not.toContain("customers");
+      expect(canRoleAccessPath("SITE_ENGINEER", "/customers")).toBe(false);
+      expect(canRoleAccessPath("SITE_ENGINEER", "/api/customers", "POST")).toBe(false);
+    });
+  });
+
+  describe("POST /api/customers 建立客戶主檔授權檢查", () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("未登入應回傳 401", async () => {
+      vi.spyOn(accessControl, "getUserFromRequest").mockResolvedValue(null);
+      const req = new NextRequest("http://localhost:3000/api/customers", {
+        method: "POST",
+        body: JSON.stringify({ name: "測試客戶", phone: "0912345678", customerType: "INDIVIDUAL" }),
+      });
+      const res = await createCustomerPost(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("工務人員 (SITE_ENGINEER) 即使資料庫權限誤開仍應回傳 403 拒絕建立", async () => {
+      vi.spyOn(accessControl, "getUserFromRequest").mockResolvedValue({
+        id: "u-eng",
+        name: "工務人員",
+        role: "SITE_ENGINEER",
+        email: "E0001",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      vi.spyOn(accessControl, "canUserAccessPath").mockResolvedValue(true);
+
+      const req = new NextRequest("http://localhost:3000/api/customers", {
+        method: "POST",
+        body: JSON.stringify({ name: "測試客戶", phone: "0912345678", customerType: "INDIVIDUAL" }),
+      });
+      const res = await createCustomerPost(req);
+      expect(res.status).toBe(403);
+    });
+
+    it("業務助理 (ASSISTANT) 具備權限且可成功建立客戶主檔回傳 201", async () => {
+      vi.spyOn(accessControl, "getUserFromRequest").mockResolvedValue({
+        id: "u-asst",
+        name: "業務助理",
+        role: "ASSISTANT",
+        email: "A0001",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      vi.spyOn(accessControl, "canUserAccessPath").mockResolvedValue(true);
+      vi.spyOn(prisma.customer, "findFirst").mockResolvedValue(null);
+      vi.spyOn(DataService, "addCustomer").mockResolvedValue({
+        id: "cust-new",
+        customerType: "INDIVIDUAL",
+        name: "測試新客戶",
+        phone: "0912345678",
+        defaultDiscount: 1.0,
+        paymentTerms: "DEPOSIT_BALANCE",
+        salesRepId: "u-sales",
+        salesRepName: "業務人員",
+      });
+
+      const req = new NextRequest("http://localhost:3000/api/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "測試新客戶",
+          phone: "0912345678",
+          customerType: "INDIVIDUAL",
+          salesRepId: "u-sales",
+        }),
+      });
+      const res = await createCustomerPost(req);
+      expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.id).toBe("cust-new");
     });
   });
 

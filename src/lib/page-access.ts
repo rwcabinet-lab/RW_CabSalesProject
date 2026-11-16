@@ -36,7 +36,7 @@ export const DEFAULT_ROLE_PAGES: Record<AppRole, PageAccessKey[]> = {
   LEVEL_MANAGER: ["workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
   SALES_MANAGER: ["workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
   SALES: ["workbench", "views", "customers", "projects"],
-  ASSISTANT: ["workbench", "views", "projects"],
+  ASSISTANT: ["workbench", "views", "customers", "projects"],
   SITE_ENGINEER: ["workbench", "views", "projects"],
 };
 

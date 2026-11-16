@@ -24,6 +24,13 @@ export default function CustomersPage() {
     );
   }, [users]);
 
+  const defaultSalesRepId = useMemo(() => {
+    if (sessionUser?.id && salesReps.some((rep) => rep.id === sessionUser.id)) {
+      return sessionUser.id;
+    }
+    return salesReps[0]?.id || "";
+  }, [salesReps, sessionUser?.id]);
+
   const [showModal, setShowModal] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
@@ -99,7 +106,7 @@ export default function CustomersPage() {
           address: "",
           defaultDiscount: "0.85",
           paymentTerms: "MONTHLY_30",
-          salesRepId: salesReps[0]?.id || "",
+          salesRepId: defaultSalesRepId,
         });
         setEditingCustomerId(null);
         toast.success(editingCustomerId ? "客戶資料已成功更新" : "客戶已成功新增");
@@ -118,7 +125,7 @@ export default function CustomersPage() {
 
   const openAddModal = () => {
     setEditingCustomerId(null);
-    setFormData({ name: "", customerType: "LONGMEI_STORE", taxId: "", phone: "", address: "", defaultDiscount: "0.85", paymentTerms: "MONTHLY_30", salesRepId: salesReps[0]?.id || "" });
+    setFormData({ name: "", customerType: "LONGMEI_STORE", taxId: "", phone: "", address: "", defaultDiscount: "0.85", paymentTerms: "MONTHLY_30", salesRepId: defaultSalesRepId });
     setSubmitError("");
     setShowModal(true);
   };

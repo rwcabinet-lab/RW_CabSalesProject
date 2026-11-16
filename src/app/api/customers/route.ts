@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { getUserFromRequest } from "@/lib/access-control";
+import { canUserAccessPath, getUserFromRequest } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/errors";
 
@@ -31,6 +31,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
+    const canCreate =
+      user.role !== "SITE_ENGINEER" &&
+      (await canUserAccessPath(user.id, "/api/customers", "POST"));
+    if (!canCreate) {
+      return NextResponse.json({ error: "目前權限無法建立客戶主檔" }, { status: 403 });
+    }
+
     const sessionUserId = user.id;
 
     const body = await req.json();
