@@ -392,7 +392,7 @@ export default function VisualViewsPage() {
 
           <div className="text-[11px] text-slate-500">
             {activeTab === "gantt" && "💡 甘特圖僅顯示符合條件之案場時程軸"}
-            {activeTab === "calendar" && "💡 行事曆僅呈現符合條件之案場待辦與里程碑"}
+            {activeTab === "calendar" && "💡 行事曆僅呈現進行中之案場進度與獨立待辦"}
           </div>
         </div>
       </div>

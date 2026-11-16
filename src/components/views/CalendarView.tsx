@@ -10,28 +10,16 @@ import {
   MapPin,
   User,
 } from "lucide-react";
-import type { CalendarStaffDTO, MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
+import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS, MILESTONE_STAGE_HINTS } from "@/lib/constants";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { buildCalendarEventsByDate, toDateKey, type CalendarEvent } from "./calendar-events";
 
 interface CalendarProps {
   projects: ProjectWithMilestonesDTO[];
   tasks: TaskDTO[];
   staff: CalendarStaffDTO[];
-}
-
-type CalendarEvent =
-  | { type: "MILESTONE"; project: ProjectWithMilestonesDTO; milestone: MilestoneDTO }
-  | { type: "TASK"; task: TaskDTO };
-
-function toDateKey(value?: string | null): string | null {
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function keyFromDate(date: Date): string {
@@ -96,45 +84,10 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
   const leadingBlanks = firstDay.getDay();
   const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
   const todayKey = getTaiwanDateString();
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    const addEvent = (dateKey: string | null, event: CalendarEvent) => {
-      if (!dateKey) return;
-      const events = map.get(dateKey) || [];
-      events.push(event);
-      map.set(dateKey, events);
-    };
-
-    const allConcreteProjects: ProjectWithMilestonesDTO[] = [];
-    for (const project of projects) {
-      if (project.phases && project.phases.length > 0) {
-        allConcreteProjects.push(...project.phases);
-      } else {
-        allConcreteProjects.push(project);
-      }
-    }
-
-    for (const project of allConcreteProjects) {
-      const sortedMilestones = [...project.milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-      const pausedM = sortedMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
-      const pausedOrder = pausedM ? pausedM.stageOrder : null;
-
-      for (const milestone of project.milestones) {
-        const isSubsequent = Boolean(
-          milestone.isSubsequentToPaused ??
-          (pausedOrder !== null && milestone.stageOrder > pausedOrder && milestone.status !== "COMPLETED")
-        );
-        if (isSubsequent) continue;
-        if (milestone.assignedToId && hiddenStaffIds.has(milestone.assignedToId)) continue;
-        addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });
-      }
-    }
-    for (const task of tasks) {
-      if (hiddenStaffIds.has(task.assignedToId)) continue;
-      addEvent(toDateKey(task.dueDatetime), { type: "TASK", task });
-    }
-    return map;
-  }, [projects, tasks, hiddenStaffIds]);
+  const eventsByDate = useMemo(
+    () => buildCalendarEventsByDate({ projects, tasks, hiddenStaffIds }),
+    [projects, tasks, hiddenStaffIds]
+  );
 
   const changeMonth = (offset: number) => {
     const date = new Date(month.year, month.month + offset, 1);
