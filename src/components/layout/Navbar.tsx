@@ -16,6 +16,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { ChangelogModal } from "@/components/changelog/ChangelogModal";
+import { getRoleLandingPath, type AppRole, type PageAccessKey } from "@/lib/page-access";
 
 const navItems = [
   { key: "workbench", href: "/dashboard/workbench", label: "案場筆記", icon: LayoutDashboard },
@@ -42,6 +43,9 @@ export function Navbar() {
   };
 
   const roleLabel = user?.role === "ADMIN" ? "管理員" : user?.role === "LEVEL_MANAGER" ? "理級主管" : user?.role === "SALES_MANAGER" ? "業務主管" : user?.role === "ASSISTANT" ? "業務助理" : user?.role === "SITE_ENGINEER" ? "工務人員" : user ? "業務專員" : "未登入";
+  const homeHref = user
+    ? getRoleLandingPath(user.role as AppRole, user.accessiblePages as PageAccessKey[])
+    : "/";
 
   if (pathname === "/login") return null;
 
@@ -50,7 +54,7 @@ export function Navbar() {
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur shadow-sm no-print">
       <div className="max-w-7xl mx-auto flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center space-x-3">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href={homeHref} className="flex items-center gap-2.5">
             <img
               src="/logo.png"
               alt="正道工業系統櫃事業部"

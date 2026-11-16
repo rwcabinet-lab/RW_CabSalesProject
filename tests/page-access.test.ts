@@ -4,16 +4,20 @@ import {
   canRoleAccessPath,
   getPageAccessKey,
   DEFAULT_ROLE_PAGES,
+  PAGE_ACCESS_OPTIONS,
 } from "@/lib/page-access";
 
 describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", () => {
-  describe("getRoleLandingPath (角色著陸頁預設優先權)", () => {
-    it("ADMIN 優先著陸於 /dashboard/workbench", () => {
-      const path = getRoleLandingPath("ADMIN", DEFAULT_ROLE_PAGES.ADMIN);
-      expect(path).toBe("/dashboard/workbench");
-    });
+  it("已取消獨立首頁設定：PAGE_ACCESS_OPTIONS 與預設權限不再包含 home", () => {
+    expect(PAGE_ACCESS_OPTIONS.some((item) => (item.key as string) === "home")).toBe(false);
+    for (const pages of Object.values(DEFAULT_ROLE_PAGES)) {
+      expect(pages as string[]).not.toContain("home");
+    }
+  });
 
-    it("LEVEL_MANAGER / SALES_MANAGER 優先著陸於 /dashboard/manager", () => {
+  describe("getRoleLandingPath (角色著陸頁預設優先權)", () => {
+    it("具備 [主管總控] 權限者（ADMIN / LEVEL_MANAGER / SALES_MANAGER）預設首頁為 /dashboard/manager", () => {
+      expect(getRoleLandingPath("ADMIN", DEFAULT_ROLE_PAGES.ADMIN)).toBe("/dashboard/manager");
       expect(
         getRoleLandingPath("LEVEL_MANAGER", DEFAULT_ROLE_PAGES.LEVEL_MANAGER)
       ).toBe("/dashboard/manager");
@@ -22,7 +26,7 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       ).toBe("/dashboard/manager");
     });
 
-    it("SALES / ASSISTANT / SITE_ENGINEER 優先著陸於 /dashboard/workbench", () => {
+    it("沒有 [主管總控] 權限者（SALES / ASSISTANT / SITE_ENGINEER）預設首頁為 /dashboard/workbench", () => {
       expect(getRoleLandingPath("SALES", DEFAULT_ROLE_PAGES.SALES)).toBe(
         "/dashboard/workbench"
       );
@@ -32,6 +36,11 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(
         getRoleLandingPath("SITE_ENGINEER", DEFAULT_ROLE_PAGES.SITE_ENGINEER)
       ).toBe("/dashboard/workbench");
+    });
+
+    it("動態調整權限時：有 manager 優先進主管總控，移除 manager 則退回案場筆記", () => {
+      expect(getRoleLandingPath("SALES", ["workbench", "manager"])).toBe("/dashboard/manager");
+      expect(getRoleLandingPath("SALES_MANAGER", ["workbench", "views"])).toBe("/dashboard/workbench");
     });
   });
 
@@ -54,7 +63,9 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(canRoleAccessPath("ADMIN", "/api/auth/users")).toBe(true);
     });
 
-    it("公開路徑一律放行 (/login, /forbidden, /settings)", () => {
+    it("根路徑 / 與公開路徑一律放行 (/ , /login, /forbidden, /settings)", () => {
+      expect(canRoleAccessPath("SALES", "/")).toBe(true);
+      expect(canRoleAccessPath("LEVEL_MANAGER", "/")).toBe(true);
       expect(canRoleAccessPath("SALES", "/login")).toBe(true);
       expect(canRoleAccessPath("SITE_ENGINEER", "/forbidden")).toBe(true);
       expect(canRoleAccessPath("ASSISTANT", "/settings")).toBe(true);
@@ -75,7 +86,6 @@ describe("RBAC Page Access & Landing Rules (角色權限與著陸頁規則)", ()
       expect(getPageAccessKey("/views")).toBe("views");
       expect(getPageAccessKey("/customers")).toBe("customers");
       expect(getPageAccessKey("/admin")).toBe("admin");
-      expect(getPageAccessKey("/")).toBe("home");
     });
   });
 });

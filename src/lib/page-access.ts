@@ -1,5 +1,4 @@
 export const PAGE_ACCESS_OPTIONS = [
-  { key: "home", label: "首頁", href: "/" },
   { key: "workbench", label: "案場筆記", href: "/dashboard/workbench" },
   { key: "manager", label: "主管總控", href: "/dashboard/manager" },
   { key: "views", label: "視覺時程", href: "/views" },
@@ -28,26 +27,35 @@ export function isAssignableRole(role?: string | null): boolean {
 export type PageAccessKey = (typeof PAGE_ACCESS_OPTIONS)[number]["key"];
 export type AppRole = (typeof ROLE_OPTIONS)[number]["value"];
 
+export const VALID_PAGE_ACCESS_KEYS = new Set<string>(
+  PAGE_ACCESS_OPTIONS.map(({ key }) => key)
+);
+
 export const DEFAULT_ROLE_PAGES: Record<AppRole, PageAccessKey[]> = {
-  ADMIN: ["home", "workbench", "manager", "views", "customers", "projects", "admin", "milestone_reorder"],
-  LEVEL_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
-  SALES_MANAGER: ["home", "workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
-  SALES: ["home", "workbench", "views", "customers", "projects"],
-  ASSISTANT: ["home", "workbench", "views", "projects"],
-  SITE_ENGINEER: ["home", "workbench", "views", "projects"],
+  ADMIN: ["workbench", "manager", "views", "customers", "projects", "admin", "milestone_reorder"],
+  LEVEL_MANAGER: ["workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
+  SALES_MANAGER: ["workbench", "manager", "views", "customers", "projects", "milestone_reorder"],
+  SALES: ["workbench", "views", "customers", "projects"],
+  ASSISTANT: ["workbench", "views", "projects"],
+  SITE_ENGINEER: ["workbench", "views", "projects"],
 };
 
 const ROLE_LANDING_PREFERENCES: Record<AppRole, PageAccessKey[]> = {
-  ADMIN: ["workbench", "manager", "views", "customers", "projects", "home", "admin"],
-  LEVEL_MANAGER: ["manager", "workbench", "views", "customers", "projects", "home"],
-  SALES_MANAGER: ["manager", "workbench", "views", "customers", "projects", "home"],
-  SALES: ["workbench", "views", "customers", "projects", "home"],
-  ASSISTANT: ["workbench", "views", "projects", "home"],
-  SITE_ENGINEER: ["workbench", "views", "projects", "home"],
+  ADMIN: ["manager", "workbench", "views", "customers", "projects", "admin"],
+  LEVEL_MANAGER: ["manager", "workbench", "views", "customers", "projects"],
+  SALES_MANAGER: ["manager", "workbench", "views", "customers", "projects"],
+  SALES: ["manager", "workbench", "views", "customers", "projects"],
+  ASSISTANT: ["manager", "workbench", "views", "projects"],
+  SITE_ENGINEER: ["manager", "workbench", "views", "projects"],
 };
 
+/**
+ * 決定角色登入後的首頁著陸路徑：
+ * 預設優先前往「主管總控」，若該角色未開通「主管總控」權限則預設前往「案場筆記」
+ */
 export function getRoleLandingPath(role: AppRole, pages: PageAccessKey[]): string {
-  const landingPage = ROLE_LANDING_PREFERENCES[role].find((page) => pages.includes(page));
+  const preferences = ROLE_LANDING_PREFERENCES[role] || ["manager", "workbench"];
+  const landingPage = preferences.find((page) => pages.includes(page));
   return PAGE_ACCESS_OPTIONS.find((page) => page.key === landingPage)?.href || "/forbidden";
 }
 
@@ -79,13 +87,12 @@ export function getPageAccessKey(pathname: string, method?: string): PageAccessK
     return "projects";
   }
 
-  if (routePath === "/" || routePath === "/api") return "home";
   if (routePath === "/admin" || routePath.startsWith("/admin/")) return "admin";
 
   const match = PAGE_PATHS.find(
     ({ prefix }) => routePath === prefix || routePath.startsWith(`${prefix}/`),
   );
-  return match?.key ?? "home";
+  return match?.key ?? "workbench";
 }
 
 /**
@@ -99,6 +106,7 @@ export function canRoleAccessPath(
   const url = new URL(pathname, "http://localhost");
   const routePath = url.pathname;
 
+  if (routePath === "/") return true;
   if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
   if (routePath === "/forbidden") return true;
   if (routePath === "/login") return true;

@@ -2,7 +2,13 @@ import { Role } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recordUserActivityThrottled } from "@/lib/activity-tracker";
-import { AppRole, DEFAULT_ROLE_PAGES, getPageAccessKey, PageAccessKey } from "@/lib/page-access";
+import {
+  AppRole,
+  DEFAULT_ROLE_PAGES,
+  getPageAccessKey,
+  PageAccessKey,
+  VALID_PAGE_ACCESS_KEYS,
+} from "@/lib/page-access";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 
 export interface UserAccessProfile {
@@ -26,6 +32,23 @@ const accessProfileCache =
 const rolePagesCache =
   globalForAccess.rolePagesCache ??
   (globalForAccess.rolePagesCache = new Map<string, { pages: PageAccessKey[]; expiresAt: number }>());
+
+function normalizeRolePages(
+  rawPages: string[] | null | undefined,
+  role: Role | AppRole,
+): PageAccessKey[] {
+  const source = rawPages ?? DEFAULT_ROLE_PAGES[role as AppRole] ?? [];
+  const filtered = source.filter((key): key is PageAccessKey =>
+    VALID_PAGE_ACCESS_KEYS.has(key)
+  );
+  if (role === "ADMIN") {
+    const adminSet = new Set<PageAccessKey>(filtered);
+    adminSet.add("admin");
+    adminSet.add("milestone_reorder");
+    return Array.from(adminSet);
+  }
+  return Array.from(new Set(filtered));
+}
 
 export function cacheUserAccessProfile(
   userId: string,
@@ -72,13 +95,7 @@ export async function loadUserAccessProfile(userId: string): Promise<UserAccessP
     return null;
   }
 
-  let pages = (user.pages as PageAccessKey[] | null) || DEFAULT_ROLE_PAGES[user.role as AppRole];
-  if (user.role === "ADMIN") {
-    const adminSet = new Set<PageAccessKey>(pages);
-    adminSet.add("admin");
-    adminSet.add("milestone_reorder");
-    pages = Array.from(adminSet);
-  }
+  const pages = normalizeRolePages(user.pages, user.role);
   const profile: UserAccessProfile = {
     id: user.id,
     name: user.name,
@@ -122,16 +139,7 @@ export async function getRolePages(role: Role | AppRole): Promise<PageAccessKey[
     return cached.pages;
   }
   const savedAccess = await prisma.rolePageAccess.findUnique({ where: { role } });
-  let pages = savedAccess
-    ? savedAccess.pages as PageAccessKey[]
-    : DEFAULT_ROLE_PAGES[role as AppRole];
-
-  if (role === "ADMIN") {
-    const adminSet = new Set<PageAccessKey>(pages);
-    adminSet.add("admin");
-    adminSet.add("milestone_reorder");
-    pages = Array.from(adminSet);
-  }
+  const pages = normalizeRolePages(savedAccess?.pages, role);
   rolePagesCache.set(role, { pages, expiresAt: Date.now() + ACCESS_PROFILE_TTL_MS });
   return pages;
 }
@@ -142,6 +150,7 @@ export async function canAccessPath(
   method?: string,
 ): Promise<boolean> {
   const routePath = new URL(pathname, "http://localhost").pathname;
+  if (routePath === "/") return true;
   if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
   const pageKey = getPageAccessKey(pathname, method);
   if (pageKey === "admin") return role === "ADMIN";
@@ -161,6 +170,7 @@ export async function canUserAccessPath(
   if (!profile || profile.email.startsWith("preview-")) return false;
 
   const routePath = new URL(pathname, "http://localhost").pathname;
+  if (routePath === "/") return true;
   if (routePath === "/settings" || routePath.startsWith("/settings/")) return true;
   if (routePath === "/api/tasks" || routePath.startsWith("/api/tasks/") || routePath === "/api/schedule" || routePath.startsWith("/api/schedule/")) {
     return profile.pages.includes("workbench") || profile.pages.includes("projects") || profile.pages.includes("manager");
