@@ -25,6 +25,7 @@ export interface SessionUserDTO {
   name: string;
   role: string;
   accessiblePages: PageAccessKey[];
+  mustChangePassword?: boolean;
 }
 
 export const QUERY_KEYS = {

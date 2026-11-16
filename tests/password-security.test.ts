@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  clearPasswordChanged,
   generateInitialPassword,
   hashPassword,
+  hasUserChangedPassword,
   isPasswordHashed,
+  markPasswordChanged,
   validateNewPassword,
   verifyPassword,
 } from "@/lib/password";
@@ -63,5 +66,22 @@ describe("Password Security & Salted Hashing (密碼雜湊與強度防護)", () 
     expect(isManagerRole("ASSISTANT")).toBe(false);
     expect(isManagerRole("SITE_ENGINEER")).toBe(false);
     expect(isManagerRole(undefined)).toBe(false);
+  });
+
+  it("追蹤帳號是否尚未自主變更密碼（建立/重設後待變更，改密後解除）", () => {
+    // 1. 尚未變更過密碼的帳號應回傳 false（即 mustChangePassword = true）
+    expect(hasUserChangedPassword("u1", "03328", {})).toBe(false);
+    expect(hasUserChangedPassword("u1", "03328", undefined)).toBe(false);
+
+    // 2. 使用者自主改密後應標記為已變更，並清除舊版 email 鍵值
+    const legacyMap = { "03328": "2026-10-01T00:00:00.000Z" };
+    const afterChange = markPasswordChanged(legacyMap, "u1", "03328", "2026-11-16T08:00:00.000Z");
+    expect(hasUserChangedPassword("u1", "03328", afterChange)).toBe(true);
+    expect(afterChange["03328"]).toBeUndefined();
+    expect(afterChange["u1"]).toBe("2026-11-16T08:00:00.000Z");
+
+    // 3. 管理員重設他人密碼後應清除改密標記，促使其登入後重新改密
+    const afterAdminReset = clearPasswordChanged(afterChange, "u1", "03328");
+    expect(hasUserChangedPassword("u1", "03328", afterAdminReset)).toBe(false);
   });
 });

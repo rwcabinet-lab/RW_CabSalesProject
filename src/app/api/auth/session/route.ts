@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadUserAccessProfile } from "@/lib/access-control";
 import { recordUserActivityThrottled } from "@/lib/activity-tracker";
+import { DataService } from "@/lib/data-service";
+import {
+  hasUserChangedPassword,
+  PASSWORD_CHANGED_CONFIG_KEY,
+  type PasswordChangedMap,
+} from "@/lib/password";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
 
@@ -18,13 +24,25 @@ export async function GET(req: NextRequest) {
 
     recordUserActivityThrottled(profile.id || userId);
 
+    const passwordChangedMap = await DataService.getAppConfig<PasswordChangedMap>(
+      PASSWORD_CHANGED_CONFIG_KEY,
+      {}
+    ).catch(() => ({} as PasswordChangedMap));
+    const resolvedUserId = profile.id || userId;
+    const mustChangePassword = !hasUserChangedPassword(
+      resolvedUserId,
+      profile.email,
+      passwordChangedMap
+    );
+
     return NextResponse.json(
       {
         user: {
-          id: profile.id || userId,
+          id: resolvedUserId,
           name: profile.name || "",
           role: profile.role,
           accessiblePages: profile.pages,
+          mustChangePassword,
         },
       },
       { headers: { "Cache-Control": "no-store" } },

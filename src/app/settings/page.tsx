@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, Lock, Palette, Check, AlertCircle, Shield, Sparkles, RefreshCw, Coins } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { User, Lock, Palette, Check, AlertCircle, AlertTriangle, Shield, Sparkles, RefreshCw, Coins } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { UserDTO } from "@/types/dto";
-import { useSessionQuery } from "@/hooks/useQueries";
+import { useSessionQuery, QUERY_KEYS, type SessionUserDTO } from "@/hooks/useQueries";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { useCurrencyStore } from "@/stores/useCurrencyStore";
 import type { CurrencyUnit } from "@/lib/currency";
@@ -62,8 +63,10 @@ const THEME_OPTIONS = [
 ];
 
 export default function SettingsPage() {
+  const queryClient = useQueryClient();
   const { data: user, isLoading: sessionLoading } = useSessionQuery();
   const loading = sessionLoading && !user;
+  const oldPasswordInputRef = useRef<HTMLInputElement>(null);
 
   // 密碼變更狀態
   const [oldPassword, setOldPassword] = useState("");
@@ -174,6 +177,14 @@ export default function SettingsPage() {
       return;
     }
 
+    if (oldPassword && newPassword === oldPassword) {
+      setPasswordStatus({
+        type: "error",
+        message: "新密碼不可與目前密碼相同",
+      });
+      return;
+    }
+
     setSavingPassword(true);
     try {
       const res = await fetch("/api/auth/password", {
@@ -185,6 +196,11 @@ export default function SettingsPage() {
       if (!res.ok) {
         throw new Error(data.error || "密碼更新失敗");
       }
+
+      queryClient.setQueryData<SessionUserDTO | null>(QUERY_KEYS.session, (prev) =>
+        prev ? { ...prev, mustChangePassword: false } : prev
+      );
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.session });
 
       setPasswordStatus({
         type: "success",
@@ -236,6 +252,43 @@ export default function SettingsPage() {
         <p className="text-xs text-slate-500 mt-1">管理個人帳號資訊、設定登入密碼及選擇系統配色風格</p>
       </div>
 
+      {/* 尚未變更密碼醒目提示 */}
+      {user?.mustChangePassword && (
+        <div
+          role="alert"
+          className="rounded-2xl border-2 border-red-300 bg-red-50/90 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-black text-red-900">您的帳號尚未變更密碼</h2>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-600 text-white">
+                  請立即設定新密碼
+                </span>
+              </div>
+              <p className="text-xs text-red-800 mt-1 leading-relaxed">
+                系統偵測到您目前仍在使用初始密碼或管理員重設之密碼，尚未自行變更個人密碼。為了確保帳號安全，請於下方「更改登入密碼」設定專屬新密碼，完成後此提示與右上角驚嘆號將自動解除。
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              document
+                .getElementById("password-settings-card")
+                ?.scrollIntoView({ behavior: "smooth", block: "center" });
+              oldPasswordInputRef.current?.focus();
+            }}
+            className="shrink-0 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition"
+          >
+            立即前往改密
+          </button>
+        </div>
+      )}
+
       {/* 個人帳號資訊卡片 */}
       <div className="bg-white rounded-2xl border p-6 shadow-sm">
         <div className="flex items-center gap-4">
@@ -257,18 +310,31 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 安全密碼設定 */}
-        <div className="bg-white rounded-2xl border p-6 shadow-sm flex flex-col justify-between">
+        <div
+          id="password-settings-card"
+          className={`bg-white rounded-2xl border p-6 shadow-sm flex flex-col justify-between transition ${
+            user?.mustChangePassword ? "border-red-300 ring-2 ring-red-100" : ""
+          }`}
+        >
           <div>
-            <div className="flex items-center gap-2 border-b pb-3 mb-4">
-              <Lock className="w-5 h-5 text-blue-600" />
-              <h3 className="font-bold text-base text-slate-800">更改登入密碼</h3>
-              <SectionHelpButton sectionId="settings-password" />
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Lock className={`w-5 h-5 ${user?.mustChangePassword ? "text-red-600" : "text-blue-600"}`} />
+                <h3 className="font-bold text-base text-slate-800">更改登入密碼</h3>
+                <SectionHelpButton sectionId="settings-password" />
+              </div>
+              {user?.mustChangePassword && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700 border border-red-200">
+                  尚未變更密碼
+                </span>
+              )}
             </div>
 
             <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">目前密碼 *</label>
                 <input
+                  ref={oldPasswordInputRef}
                   type="password"
                   required
                   placeholder="請輸入目前密碼"

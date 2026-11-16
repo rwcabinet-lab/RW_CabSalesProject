@@ -4,7 +4,15 @@ import { DataService } from "@/lib/data-service";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/password";
+import {
+  clearPasswordChanged,
+  hashPassword,
+  markPasswordChanged,
+  PASSWORD_CHANGED_CONFIG_KEY,
+  validateNewPassword,
+  verifyPassword,
+  type PasswordChangedMap,
+} from "@/lib/password";
 import {
   checkLoginRateLimit,
   recordLoginFailure,
@@ -57,6 +65,19 @@ export async function POST(req: NextRequest) {
         delete nextPasswords[targetUser.email];
       }
       await DataService.setAppConfig("user_passwords", nextPasswords);
+
+      // 管理員重設密碼後，清除該帳號的自主改密標記，促使其登入後重新變更密碼
+      const passwordChangedMap = await DataService.getAppConfig<PasswordChangedMap>(
+        PASSWORD_CHANGED_CONFIG_KEY,
+        {}
+      ).catch(() => ({} as PasswordChangedMap));
+      const nextChangedMap = clearPasswordChanged(
+        passwordChangedMap,
+        targetUser.id,
+        targetUser.email
+      );
+      await DataService.setAppConfig(PASSWORD_CHANGED_CONFIG_KEY, nextChangedMap);
+
       return NextResponse.json({ success: true, message: "密碼重設成功，下次登入即生效！" });
     }
 
@@ -86,6 +107,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "目前密碼不正確" }, { status: 400 });
     }
 
+    if (typeof oldPassword === "string" && newPassword === oldPassword) {
+      return NextResponse.json({ error: "新密碼不可與目前密碼相同" }, { status: 400 });
+    }
+
     recordLoginSuccess(rateKey);
     const nextPasswords = { ...passwords, [sessionUserId]: hashPassword(newPassword) };
     if (currentProfile.email !== sessionUserId && currentProfile.email in nextPasswords) {
@@ -93,8 +118,20 @@ export async function POST(req: NextRequest) {
     }
     await DataService.setAppConfig("user_passwords", nextPasswords);
 
+    const passwordChangedMap = await DataService.getAppConfig<PasswordChangedMap>(
+      PASSWORD_CHANGED_CONFIG_KEY,
+      {}
+    ).catch(() => ({} as PasswordChangedMap));
+    const nextChangedMap = markPasswordChanged(
+      passwordChangedMap,
+      sessionUserId,
+      currentProfile.email
+    );
+    await DataService.setAppConfig(PASSWORD_CHANGED_CONFIG_KEY, nextChangedMap);
+
     return NextResponse.json({
       success: true,
+      mustChangePassword: false,
       message: "密碼已成功更新！下次登入請使用新密碼。",
     });
   } catch (error) {

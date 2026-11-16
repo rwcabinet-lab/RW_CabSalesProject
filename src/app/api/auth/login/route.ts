@@ -12,7 +12,13 @@ import {
   recordLoginFailure,
   recordLoginSuccess,
 } from "@/lib/rate-limiter";
-import { hashPassword, verifyPassword } from "@/lib/password";
+import {
+  hashPassword,
+  hasUserChangedPassword,
+  PASSWORD_CHANGED_CONFIG_KEY,
+  verifyPassword,
+  type PasswordChangedMap,
+} from "@/lib/password";
 
 export async function POST(req: NextRequest) {
   try {
@@ -122,8 +128,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "找不到此使用者權限設定" }, { status: 404 });
     }
 
+    const passwordChangedMap = await DataService.getAppConfig<PasswordChangedMap>(
+      PASSWORD_CHANGED_CONFIG_KEY,
+      {}
+    ).catch(() => ({} as PasswordChangedMap));
+    const resolvedUserId = profile.id || user.id;
+    const mustChangePassword = !hasUserChangedPassword(
+      resolvedUserId,
+      profile.email,
+      passwordChangedMap
+    );
+
     const response = NextResponse.json({
-      user: { id: profile.id || user.id, name: profile.name || "", role: profile.role },
+      user: {
+        id: resolvedUserId,
+        name: profile.name || "",
+        role: profile.role,
+        mustChangePassword,
+      },
       redirectTo: getRoleLandingPath(profile.role, profile.pages),
     });
 

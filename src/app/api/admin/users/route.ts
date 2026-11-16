@@ -7,7 +7,13 @@ import { invalidateLoginUsersCache } from "@/lib/data-service";
 import { ConfigService } from "@/lib/services";
 import { ROLE_OPTIONS } from "@/lib/page-access";
 import { handleApiError } from "@/lib/errors";
-import { generateInitialPassword, hashPassword } from "@/lib/password";
+import {
+  clearPasswordChanged,
+  generateInitialPassword,
+  hashPassword,
+  PASSWORD_CHANGED_CONFIG_KEY,
+  type PasswordChangedMap,
+} from "@/lib/password";
 
 const validRoles = new Set<string>(ROLE_OPTIONS.map(({ value }) => value));
 const employeeIdPattern = /^[a-zA-Z0-9]+$/;
@@ -104,6 +110,17 @@ export async function POST(request: NextRequest) {
       ...passwords,
       [user.id]: hashPassword(initialPassword),
     });
+
+    const passwordChangedMap = await ConfigService.getAppConfig<PasswordChangedMap>(
+      PASSWORD_CHANGED_CONFIG_KEY,
+      {}
+    ).catch(() => ({} as PasswordChangedMap));
+    if (user.id in passwordChangedMap || user.email in passwordChangedMap) {
+      await ConfigService.setAppConfig(
+        PASSWORD_CHANGED_CONFIG_KEY,
+        clearPasswordChanged(passwordChangedMap, user.id, user.email)
+      );
+    }
 
     invalidateLoginUsersCache();
     return NextResponse.json({ ...user, hasPassword: true, initialPassword }, { status: 201 });

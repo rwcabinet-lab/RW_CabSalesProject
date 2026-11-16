@@ -120,16 +120,36 @@ export function Navbar() {
           </div>
           <Link
             href="/settings"
-            title="帳號管理"
-            aria-label="帳號管理"
+            title={
+              user?.mustChangePassword
+                ? "帳號管理（尚未變更密碼，請點擊設定新密碼）"
+                : "帳號管理"
+            }
+            aria-label={
+              user?.mustChangePassword
+                ? "帳號管理（尚未變更密碼）"
+                : "帳號管理"
+            }
             prefetch={true}
-            className={`rounded-md p-2 transition ${
+            className={`relative rounded-md p-2 transition ${
               pathname === "/settings" || pathname.startsWith("/settings/")
                 ? "bg-blue-50 text-blue-600"
+                : user?.mustChangePassword
+                ? "bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100"
                 : "text-slate-500 hover:bg-slate-100 hover:text-blue-600"
             }`}
           >
             <UserCog className="h-4 w-4" />
+            {user?.mustChangePassword && (
+              <span
+                aria-hidden="true"
+                data-testid="password-warning-badge"
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white ring-2 ring-white shadow-sm"
+              >
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-65" />
+                <span className="relative leading-none">!</span>
+              </span>
+            )}
           </Link>
           {/* 改版資訊入口（位於帳戶管理與登出中間，只保留圖示） */}
           <button

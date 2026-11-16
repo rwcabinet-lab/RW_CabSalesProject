@@ -5,6 +5,55 @@ const SALT_BYTES = 16;
 const KEY_LENGTH = 64;
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 128;
+export const PASSWORD_CHANGED_CONFIG_KEY = "user_password_changed";
+
+export type PasswordChangedMap = Record<string, string | boolean>;
+
+/**
+ * 判斷指定使用者是否已自行變更過個人密碼
+ */
+export function hasUserChangedPassword(
+  userId: string,
+  email: string | null | undefined,
+  changedMap: PasswordChangedMap | null | undefined
+): boolean {
+  if (!changedMap) return false;
+  if (changedMap[userId]) return true;
+  if (email && changedMap[email]) return true;
+  return false;
+}
+
+/**
+ * 標記使用者已完成自主密碼變更（並清理舊版 email 鍵值）
+ */
+export function markPasswordChanged(
+  changedMap: PasswordChangedMap,
+  userId: string,
+  email?: string | null,
+  changedAt: string = new Date().toISOString()
+): PasswordChangedMap {
+  const next: PasswordChangedMap = { ...changedMap, [userId]: changedAt };
+  if (email && email !== userId && email in next) {
+    delete next[email];
+  }
+  return next;
+}
+
+/**
+ * 清除使用者的自主改密紀錄（例如管理員新增帳號或重設他人密碼後）
+ */
+export function clearPasswordChanged(
+  changedMap: PasswordChangedMap,
+  userId: string,
+  email?: string | null
+): PasswordChangedMap {
+  const next: PasswordChangedMap = { ...changedMap };
+  delete next[userId];
+  if (email && email !== userId) {
+    delete next[email];
+  }
+  return next;
+}
 
 /**
  * 檢查密碼字串是否已為 scrypt 加鹽雜湊格式 (scrypt$<saltHex>$<hashHex>)
