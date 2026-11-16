@@ -169,3 +169,69 @@ export async function canUserAccessPath(
   if (pageKey === "admin") return profile.role === "ADMIN";
   return profile.pages.includes(pageKey);
 }
+
+const MANAGER_ROLES = new Set<string>(["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"]);
+
+export function isManagerRole(role?: string | null): boolean {
+  return Boolean(role && MANAGER_ROLES.has(role));
+}
+
+/**
+ * 檢查使用者是否具備存取特定案場（含主管層級、專案業務/業助、客戶業務、子進度/待辦/分期關係人）的物件層級權限
+ */
+export async function canUserAccessProject(
+  user: { id: string; role: string },
+  projectId: string,
+): Promise<{ exists: boolean; allowed: boolean }> {
+  if (!projectId) {
+    return { exists: false, allowed: false };
+  }
+
+  if (isManagerRole(user.role)) {
+    const exists = Boolean(
+      await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } })
+    );
+    return { exists, allowed: exists };
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      salesRepId: true,
+      salesAssistantId: true,
+      customer: { select: { salesRepId: true } },
+      parent: { select: { salesRepId: true, salesAssistantId: true } },
+      milestones: { where: { assignedToId: user.id }, select: { id: true }, take: 1 },
+      tasks: { where: { assignedToId: user.id }, select: { id: true }, take: 1 },
+      phases: {
+        where: {
+          OR: [
+            { salesRepId: user.id },
+            { salesAssistantId: user.id },
+            { milestones: { some: { assignedToId: user.id } } },
+            { tasks: { some: { assignedToId: user.id } } },
+          ],
+        },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!project) {
+    return { exists: false, allowed: false };
+  }
+
+  const allowed =
+    project.salesRepId === user.id ||
+    project.salesAssistantId === user.id ||
+    project.customer.salesRepId === user.id ||
+    project.parent?.salesRepId === user.id ||
+    project.parent?.salesAssistantId === user.id ||
+    project.milestones.length > 0 ||
+    project.tasks.length > 0 ||
+    project.phases.length > 0;
+
+  return { exists: true, allowed };
+}

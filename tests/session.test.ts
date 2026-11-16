@@ -66,13 +66,54 @@ describe("Session HMAC Security & Verification (憑證簽章與安全性防護)"
     expect(session?.role).toBe("ASSISTANT");
   });
 
-  it("向下相容舊版 2 段式有效簽章 (無 expiresAt)", async () => {
-    // 手工簽章一個舊版 payload (userId___role)
-    const rawPayload = "LEGACY_USER___SALES_MANAGER";
-    // 透過內部相容性驗證機制比對
-    const token = await signSessionUserId("LEGACY_USER", "SALES_MANAGER");
-    const session = await verifySessionToken(token);
-    expect(session?.userId).toBe("LEGACY_USER");
+  it("拒絕無效期 (expiresAt) 之舊版 2 段式簽章與冒號格式 Token", async () => {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(process.env.SESSION_SECRET!),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const legacyPayload = "LEGACY_USER___ADMIN";
+    const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(legacyPayload));
+    const sigHex = Array.from(new Uint8Array(sigBuf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    expect(await verifySessionToken(`${legacyPayload}.${sigHex}`)).toBeNull();
+  });
+
+  it("拒絕以公開舊備援密鑰偽造簽發之 Token", async () => {
+    const leakedSecret = "cabinet_factory_sales_system_hmac_secret_2026";
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(leakedSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const payload = `ADMIN_MASTER___ADMIN___${Date.now() + 60_000}`;
+    const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+    const sigHex = Array.from(new Uint8Array(sigBuf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    expect(await verifySessionToken(`${payload}.${sigHex}`)).toBeNull();
+  });
+
+  it("未設定 SESSION_SECRET / AUTH_SECRET 時拒絕簽發 Token", async () => {
+    const originalSessionSecret = process.env.SESSION_SECRET;
+    const originalAuthSecret = process.env.AUTH_SECRET;
+    delete process.env.SESSION_SECRET;
+    delete process.env.AUTH_SECRET;
+    try {
+      await expect(signSessionUserId("USER_01", "SALES")).rejects.toThrow();
+    } finally {
+      process.env.SESSION_SECRET = originalSessionSecret;
+      if (originalAuthSecret !== undefined) process.env.AUTH_SECRET = originalAuthSecret;
+    }
   });
 
   it("非合法簽章格式（未簽章字串）直接拒絕", async () => {

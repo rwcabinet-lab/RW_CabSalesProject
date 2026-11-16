@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
+    env: {
+      SESSION_SECRET: "vitest-ephemeral-session-secret-key-for-unit-tests-only",
+    },
   },
   resolve: {
     alias: {

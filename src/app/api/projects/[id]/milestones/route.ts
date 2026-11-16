@@ -59,6 +59,7 @@ export async function GET(
       const isRelated =
         projectRecord.salesRepId === user.id ||
         projectRecord.salesAssistantId === user.id ||
+        projectRecord.customerSalesRepId === user.id ||
         combined.milestones.some((m) => m.assignedToId === user.id);
       if (!isRelated) {
         return NextResponse.json({ error: "您無權存取此案場時程" }, { status: 403 });
@@ -128,6 +129,15 @@ export async function PUT(
     }
     const { project, milestones: initialMilestones } = combined;
     const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(user.role);
+    const isProjectRelated =
+      isManager ||
+      project.salesRepId === user.id ||
+      project.salesAssistantId === user.id ||
+      project.customerSalesRepId === user.id ||
+      initialMilestones.some((m) => m.assignedToId === user.id);
+    if (!isProjectRelated) {
+      return NextResponse.json({ error: "您無權操作此案場里程碑" }, { status: 403 });
+    }
     const userPages = await getRolePages(user.role);
     const canManageOrReorder = isManager || userPages.includes("milestone_reorder");
 

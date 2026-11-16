@@ -12,8 +12,7 @@ import {
   recordLoginFailure,
   recordLoginSuccess,
 } from "@/lib/rate-limiter";
-
-const DEFAULT_LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "0000";
+import { hashPassword, verifyPassword } from "@/lib/password";
 
 export async function POST(req: NextRequest) {
   try {
@@ -69,11 +68,11 @@ export async function POST(req: NextRequest) {
     }
 
     const passwords = await DataService.getAppConfig<Record<string, string>>("user_passwords", {});
-    const customPassword = passwords[user.id] || passwords[user.email];
-    const expectedPassword = customPassword || DEFAULT_LOGIN_PASSWORD;
+    const storedPassword = passwords[user.id] || passwords[user.email];
+    const { valid, needsRehash } = verifyPassword(password, storedPassword);
 
-    // 3. 除非未初始化設定個人密碼，否則不得使用 0000 登入
-    if (password !== expectedPassword) {
+    // 3. 嚴格驗證加鹽雜湊密碼（不允許無密碼或預設通用密碼 "0000" 登入）
+    if (!valid) {
       recordLoginFailure(employeeNo);
 
       void DataService.recordLoginLog({
@@ -85,13 +84,22 @@ export async function POST(req: NextRequest) {
         ipAddress,
         userAgent,
         status: "FAILED",
-        failureReason: "密碼不符",
+        failureReason: storedPassword ? "密碼不符" : "帳號尚未設定初始密碼",
       });
 
       return NextResponse.json(
         { error: "員工編號或密碼不正確，兩者均符合才可登入" },
         { status: 401 }
       );
+    }
+
+    // 4. 若資料庫仍為舊版明文密碼，於登入驗證成功後透明升級為 scrypt 加鹽雜湊
+    if (needsRehash) {
+      const nextPasswords = { ...passwords, [user.id]: hashPassword(password) };
+      if (user.email !== user.id && user.email in nextPasswords) {
+        delete nextPasswords[user.email];
+      }
+      await DataService.setAppConfig("user_passwords", nextPasswords);
     }
 
     // 4. 登入成功：清除該帳號累積之失敗計數並記錄日誌

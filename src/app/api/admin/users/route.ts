@@ -7,6 +7,7 @@ import { invalidateLoginUsersCache } from "@/lib/data-service";
 import { ConfigService } from "@/lib/services";
 import { ROLE_OPTIONS } from "@/lib/page-access";
 import { handleApiError } from "@/lib/errors";
+import { generateInitialPassword, hashPassword } from "@/lib/password";
 
 const validRoles = new Set<string>(ROLE_OPTIONS.map(({ value }) => value));
 const employeeIdPattern = /^[a-zA-Z0-9]+$/;
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
   if (auth.response) return auth.response;
 
   try {
-    const [users, records, activityMap] = await Promise.all([
+    const [users, records, activityMap, passwords] = await Promise.all([
       prisma.user.findMany({
         where: { NOT: { email: { startsWith: "preview-" } } },
         select: { id: true, name: true, email: true, role: true },
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
         status?: string;
       }>>("login_records", []).catch(() => []),
       getAllUserActivityRecords().catch(() => new Map()),
+      ConfigService.getAppConfig<Record<string, string>>("user_passwords", {}).catch(() => ({} as Record<string, string>)),
     ]);
 
     // 依照登入時間由新到舊排序所有紀錄
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
       const activity = computeActivitySummary(activityMap.get(u.id), lastLoginAt);
       return {
         ...u,
+        hasPassword: Boolean(passwords[u.id] || passwords[u.email]),
         lastLoginAt,
         lastActiveAt: activity.lastActiveAt,
         activeDays7d: activity.activeDays7d,
@@ -94,8 +97,16 @@ export async function POST(request: NextRequest) {
       data: { name: body.name.trim(), email: body.email.trim(), role: body.role as Role },
       select: { id: true, name: true, email: true, role: true },
     });
+
+    const initialPassword = generateInitialPassword();
+    const passwords = await ConfigService.getAppConfig<Record<string, string>>("user_passwords", {});
+    await ConfigService.setAppConfig("user_passwords", {
+      ...passwords,
+      [user.id]: hashPassword(initialPassword),
+    });
+
     invalidateLoginUsersCache();
-    return NextResponse.json(user, { status: 201 });
+    return NextResponse.json({ ...user, hasPassword: true, initialPassword }, { status: 201 });
   } catch (error) {
     return handleApiError(error, "新增帳號失敗", {
       prismaMessages: { P2002: "此員工編號已被使用" },

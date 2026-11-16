@@ -5,17 +5,12 @@ export const DEFAULT_SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 天
 export const DEFAULT_SESSION_TTL_MS = DEFAULT_SESSION_MAX_AGE_SECONDS * 1000;
 
 function getSessionSecret(): string {
-  return (
-    process.env.SESSION_SECRET ||
-    process.env.AUTH_SECRET ||
-    "db9834af1d846d4df8eccdb93a5f47fda8e9c9062d911f399bc558c84cb6218c"
-  );
+  const secret = process.env.SESSION_SECRET || process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("缺少 SESSION_SECRET 或 AUTH_SECRET 環境變數，拒絕簽發或驗證 Session");
+  }
+  return secret;
 }
-
-const KNOWN_BACKUP_SECRETS = [
-  "db9834af1d846d4df8eccdb93a5f47fda8e9c9062d911f399bc558c84cb6218c",
-  "cabinet_factory_sales_system_hmac_secret_2026",
-];
 
 export interface SessionPayload {
   userId: string;
@@ -123,9 +118,7 @@ export async function verifySessionToken(
   const secrets = Array.from(
     new Set([
       getSessionSecret(),
-      process.env.SESSION_SECRET,
-      process.env.AUTH_SECRET,
-      ...KNOWN_BACKUP_SECRETS,
+      process.env.SESSION_SECRET_PREVIOUS,
     ].filter(Boolean) as string[])
   );
   let isValid = false;
@@ -151,44 +144,27 @@ export async function verifySessionToken(
     return null;
   }
 
-  // 2. 解析已簽章 Payload 資訊與時效檢查
-  if (payload.includes("___")) {
-    const parts = payload.split("___");
-    if (parts.length >= 3) {
-      const [userId, role, expiresAtStr] = parts;
-      const expiresAt = Number(expiresAtStr);
-      if (!Number.isNaN(expiresAt) && Date.now() > expiresAt) {
-        // Token 已逾期
-        return null;
-      }
-      if (userId) {
-        return {
-          userId,
-          role: role || undefined,
-          expiresAt: Number.isNaN(expiresAt) ? undefined : expiresAt,
-        };
-      }
-    } else if (parts.length === 2) {
-      // 舊版簽章相容（無 expiresAt，但仍具備有效 HMAC 簽章）
-      const [userId, role] = parts;
-      if (userId) return { userId, role: role || undefined };
-    } else if (parts.length === 1) {
-      const [userId] = parts;
-      if (userId) return { userId };
-    }
+  // 2. 強制解析並校驗含有效到期時間 (expiresAt) 之 3 段式簽章 Payload，拒絕無效期舊格式 Token
+  const parts = payload.split("___");
+  if (parts.length < 3) {
+    return null;
   }
 
-  // 舊版冒號分隔相容（具備有效 HMAC 簽章）
-  if (payload.includes(":")) {
-    const [userId, role] = payload.split(":");
-    if (userId) return { userId, role: role || undefined };
+  const [userId, role, expiresAtStr] = parts;
+  const expiresAt = Number(expiresAtStr);
+  if (!userId || !Number.isFinite(expiresAt) || expiresAt <= 0) {
+    return null;
+  }
+  if (Date.now() > expiresAt) {
+    // Token 已逾期
+    return null;
   }
 
-  if (payload) {
-    return { userId: payload };
-  }
-
-  return null;
+  return {
+    userId,
+    role: role || undefined,
+    expiresAt,
+  };
 }
 
 export async function verifySessionUserId(

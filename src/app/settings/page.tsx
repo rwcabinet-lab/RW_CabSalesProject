@@ -150,10 +150,18 @@ export default function SettingsPage() {
     e.preventDefault();
     setPasswordStatus(null);
 
-    if (!newPassword || newPassword.length < 4) {
+    if (!newPassword || newPassword.length < 8) {
       setPasswordStatus({
         type: "error",
-        message: "新密碼長度至少需 4 碼以上",
+        message: "新密碼長度至少需 8 碼以上",
+      });
+      return;
+    }
+
+    if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPasswordStatus({
+        type: "error",
+        message: "新密碼須同時包含英文字母與數字",
       });
       return;
     }
@@ -275,7 +283,7 @@ export default function SettingsPage() {
                 <input
                   type="password"
                   required
-                  placeholder="請輸入新密碼（至少 4 碼）"
+                  placeholder="請輸入新密碼（至少 8 碼，須含英文與數字）"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full border rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"

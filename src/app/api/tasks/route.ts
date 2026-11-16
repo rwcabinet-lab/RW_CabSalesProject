@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { AUDIT_STAGE_CODES } from "@/lib/constants";
-import { getUserFromRequest } from "@/lib/access-control";
-import { getVerifiedUserIdFromRequest } from "@/lib/session";
+import { canUserAccessProject, getUserFromRequest, isManagerRole } from "@/lib/access-control";
 import { handleApiError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
@@ -59,8 +58,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const sessionUserId = await getVerifiedUserIdFromRequest(req);
-    if (!sessionUserId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    const user = await getUserFromRequest(req);
+    if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();
     const { projectId, subject, taskType, dueDatetime, priority, assignedToId } = body;
@@ -80,6 +79,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "優先度設定無效" }, { status: 400 });
     }
 
+    const access = await canUserAccessProject(user, projectId);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到該案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "您無權為此案場新增待辦任務" }, { status: 403 });
+    }
+    if (!isManagerRole(user.role) && assignedToId && assignedToId !== user.id) {
+      return NextResponse.json({ error: "僅主管可將待辦任務指派給其他同仁" }, { status: 403 });
+    }
+
     const targetProject = await DataService.getProjectById(projectId, { evaluateSchedule: false });
     if (!targetProject) {
       return NextResponse.json({ error: "找不到該案場" }, { status: 404 });
@@ -95,8 +105,8 @@ export async function POST(req: NextRequest) {
       dueDatetime,
       priority: priority || "MEDIUM",
       isCompleted: false,
-      assignedToId: assignedToId || sessionUserId,
-      assignedById: sessionUserId,
+      assignedToId: assignedToId || user.id,
+      assignedById: user.id,
     });
 
     return NextResponse.json(newTask, { status: 201 });
@@ -139,6 +149,17 @@ export async function PATCH(req: NextRequest) {
     const task = await DataService.getTaskById(taskId);
     if (!task) {
       return NextResponse.json({ error: "查無此任務" }, { status: 404 });
+    }
+
+    const isDirectParticipant =
+      isManagerRole(user.role) ||
+      task.assignedToId === user.id ||
+      task.assignedById === user.id;
+    if (!isDirectParticipant) {
+      const access = await canUserAccessProject(user, task.projectId);
+      if (!access.allowed) {
+        return NextResponse.json({ error: "您無權變更此待辦任務狀態" }, { status: 403 });
+      }
     }
 
     let combined: Awaited<ReturnType<typeof DataService.getProjectWithMilestones>>;

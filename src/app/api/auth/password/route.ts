@@ -3,6 +3,13 @@ import { loadUserAccessProfile } from "@/lib/access-control";
 import { DataService } from "@/lib/data-service";
 import { getVerifiedUserIdFromRequest } from "@/lib/session";
 import { handleApiError } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/password";
+import {
+  checkLoginRateLimit,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/rate-limiter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,15 +21,16 @@ export async function POST(req: NextRequest) {
     }
 
     const currentProfile = await loadUserAccessProfile(sessionUserId);
-    if (!currentProfile) {
+    if (!currentProfile || currentProfile.email.startsWith("preview-")) {
       return NextResponse.json({ error: "找不到使用者身分" }, { status: 401 });
     }
 
-    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 4) {
-      return NextResponse.json({ error: "新密碼長度至少需 4 碼以上" }, { status: 400 });
+    const passwordValidationError = validateNewPassword(newPassword);
+    if (passwordValidationError) {
+      return NextResponse.json({ error: passwordValidationError }, { status: 400 });
     }
 
-    if (confirmPassword && newPassword !== confirmPassword) {
+    if (typeof confirmPassword !== "string" || newPassword !== confirmPassword) {
       return NextResponse.json({ error: "新密碼與確認密碼不一致" }, { status: 400 });
     }
 
@@ -33,19 +41,57 @@ export async function POST(req: NextRequest) {
       if (currentProfile.role !== "ADMIN") {
         return NextResponse.json({ error: "權限不足，僅系統管理員可重設他人密碼" }, { status: 403 });
       }
-      passwords[targetUserId] = newPassword;
-      await DataService.setAppConfig("user_passwords", passwords);
+      if (typeof targetUserId !== "string") {
+        return NextResponse.json({ error: "目標使用者識別碼無效" }, { status: 400 });
+      }
+      const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true, email: true },
+      });
+      if (!targetUser || targetUser.email.startsWith("preview-")) {
+        return NextResponse.json({ error: "找不到目標使用者" }, { status: 404 });
+      }
+
+      const nextPasswords = { ...passwords, [targetUser.id]: hashPassword(newPassword) };
+      if (targetUser.email !== targetUser.id && targetUser.email in nextPasswords) {
+        delete nextPasswords[targetUser.email];
+      }
+      await DataService.setAppConfig("user_passwords", nextPasswords);
       return NextResponse.json({ success: true, message: "密碼重設成功，下次登入即生效！" });
     }
 
-    // 個人修改自己密碼：必須驗證舊密碼
-    const currentPassword = passwords[sessionUserId] || process.env.LOGIN_PASSWORD || "0000";
-    if (!oldPassword || oldPassword !== currentPassword) {
+    // 個人修改自己密碼：防暴力嘗試舊密碼並驗證原密碼
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "127.0.0.1";
+    const rateKey = `pw:${sessionUserId}`;
+    const rateLimit = checkLoginRateLimit(ipAddress, rateKey);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.error },
+        {
+          status: 429,
+          headers: rateLimit.retryAfterSeconds
+            ? { "Retry-After": String(rateLimit.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
+
+    const currentStored = passwords[sessionUserId] || passwords[currentProfile.email];
+    const { valid } = verifyPassword(typeof oldPassword === "string" ? oldPassword : "", currentStored);
+    if (!valid) {
+      recordLoginFailure(rateKey);
       return NextResponse.json({ error: "目前密碼不正確" }, { status: 400 });
     }
 
-    passwords[sessionUserId] = newPassword;
-    await DataService.setAppConfig("user_passwords", passwords);
+    recordLoginSuccess(rateKey);
+    const nextPasswords = { ...passwords, [sessionUserId]: hashPassword(newPassword) };
+    if (currentProfile.email !== sessionUserId && currentProfile.email in nextPasswords) {
+      delete nextPasswords[currentProfile.email];
+    }
+    await DataService.setAppConfig("user_passwords", nextPasswords);
 
     return NextResponse.json({
       success: true,

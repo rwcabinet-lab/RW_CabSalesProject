@@ -41,6 +41,7 @@ type ManagedUser = {
   name: string;
   email: string;
   role: AppRole;
+  hasPassword?: boolean;
   lastLoginAt?: string | null;
   lastActiveAt?: string | null;
   activeDays7d?: number;
@@ -277,7 +278,11 @@ export default function AdminPage() {
       setNewEmployeeId("");
       setNewRole("SALES");
       await loadAdminData();
-      setNotice(`帳號「${data.name}」（員工編號：${data.email}）已新增。`);
+      setNotice(
+        data.initialPassword
+          ? `帳號「${data.name}」（員工編號：${data.email}）已新增，一次性初始密碼為：${data.initialPassword}（請轉交同仁並提醒登入後立即修改）。`
+          : `帳號「${data.name}」（員工編號：${data.email}）已新增。`
+      );
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "新增帳號失敗");
     } finally {
@@ -338,8 +343,12 @@ export default function AdminPage() {
       setPasswordNotice("兩次輸入的密碼不一致");
       return;
     }
-    if (passwordModal.newPass.length < 4) {
-      setPasswordNotice("新密碼長度至少需 4 碼以上");
+    if (passwordModal.newPass.length < 8) {
+      setPasswordNotice("新密碼長度至少需 8 碼以上");
+      return;
+    }
+    if (!/[A-Za-z]/.test(passwordModal.newPass) || !/[0-9]/.test(passwordModal.newPass)) {
+      setPasswordNotice("新密碼須同時包含英文字母與數字");
       return;
     }
     try {
@@ -1071,7 +1080,19 @@ export default function AdminPage() {
 
                     return (
                       <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-3 py-3 font-medium text-slate-800">{user.name}</td>
+                        <td className="px-3 py-3 font-medium text-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <span>{user.name}</span>
+                            {user.hasPassword === false && (
+                              <span
+                                className="rounded bg-rose-50 border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700"
+                                title="此帳號尚未設定個人密碼，請先點擊右側「改密碼」初始化"
+                              >
+                                未設密碼
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-3 text-slate-600 font-mono text-xs">{user.email}</td>
                         <td className="px-3 py-3">
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
@@ -1189,14 +1210,14 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSavePassword} className="space-y-3 text-sm">
               <p className="text-xs text-slate-500 bg-amber-50 p-2.5 rounded border border-amber-200">
-                在此可為該同仁設定專屬個人密碼（至少 4 碼以上）。
+                在此可為該同仁設定專屬個人密碼（至少 8 碼以上，須包含英文字母與數字）。
               </p>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">新密碼</label>
                 <input
                   type="password"
                   required
-                  placeholder="請輸入新密碼（至少 4 碼）"
+                  placeholder="請輸入新密碼（至少 8 碼，須含英文與數字）"
                   value={passwordModal.newPass}
                   onChange={(e) => setPasswordModal({ ...passwordModal, newPass: e.target.value })}
                   className="w-full rounded border border-slate-300 p-2 text-sm outline-none focus:border-amber-500"

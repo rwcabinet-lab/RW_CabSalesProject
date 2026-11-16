@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { getUserFromRequest } from "@/lib/access-control";
+import { canUserAccessProject, getUserFromRequest } from "@/lib/access-control";
 import { QUOTE_STAGE_CODES } from "@/lib/constants";
 import { handleApiError } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
@@ -14,9 +15,21 @@ export async function GET(
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
+    const access = await canUserAccessProject(user, params.id);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到此案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "您無權存取此案場里程碑紀錄" }, { status: 403 });
+    }
+
     const milestoneId = req.nextUrl.searchParams.get("milestoneId");
     if (!milestoneId) {
       return NextResponse.json({ error: "缺少 milestoneId" }, { status: 400 });
+    }
+    const stageCode = await DataService.getMilestoneStageCode(params.id, milestoneId);
+    if (!stageCode) {
+      return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
     }
     const records = await DataService.getMilestoneRecords(milestoneId);
     return NextResponse.json(records);
@@ -34,6 +47,15 @@ export async function POST(
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
+
+    const access = await canUserAccessProject(user, params.id);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到此案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "您無權新增此案場里程碑紀錄" }, { status: 403 });
+    }
+
     const body = await req.json();
     const { milestoneId, plannedDueDate, actualDueDate, amount, notes, assignedToId } = body;
     if (typeof milestoneId !== "string" || !milestoneId) {
@@ -83,10 +105,26 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
+
+    const access = await canUserAccessProject(user, params.id);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到此案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "您無權刪除此案場里程碑紀錄" }, { status: 403 });
+    }
+
     const body = await req.json();
     const { recordId } = body;
-    if (!recordId) {
+    if (typeof recordId !== "string" || !recordId) {
       return NextResponse.json({ error: "缺少 recordId" }, { status: 400 });
+    }
+    const ownedRecord = await prisma.milestoneRecord.findFirst({
+      where: { id: recordId, milestone: { projectId: params.id } },
+      select: { id: true },
+    });
+    if (!ownedRecord) {
+      return NextResponse.json({ error: "找不到此里程碑紀錄" }, { status: 404 });
     }
     await DataService.deleteMilestoneRecord(recordId);
     return NextResponse.json({ success: true });

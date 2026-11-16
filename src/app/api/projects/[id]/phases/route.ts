@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { getUserFromRequest } from "@/lib/access-control";
+import { canUserAccessProject, getUserFromRequest } from "@/lib/access-control";
 import { handleApiError } from "@/lib/errors";
-import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +14,14 @@ export async function GET(
     const user = await getUserFromRequest(req);
     if (!user) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
+    const access = await canUserAccessProject(user, params.id);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到母案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "您無權查看此案場分期" }, { status: 403 });
     }
 
     const phases = await DataService.getProjects({
@@ -41,6 +48,14 @@ export async function POST(
     const CAN_CREATE_ROLES = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER", "SALES", "ASSISTANT", "SITE_ENGINEER"];
     if (!CAN_CREATE_ROLES.includes(user.role)) {
       return NextResponse.json({ error: "沒有新增案場分期之權限" }, { status: 403 });
+    }
+
+    const access = await canUserAccessProject(user, params.id);
+    if (!access.exists) {
+      return NextResponse.json({ error: "找不到母案場" }, { status: 404 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: "僅主管或此案場相關負責人員可新增分期" }, { status: 403 });
     }
 
     const body = await req.json();
