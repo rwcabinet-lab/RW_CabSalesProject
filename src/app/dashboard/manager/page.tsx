@@ -23,6 +23,7 @@ import {
 import { ManagerAssignTaskModal } from "@/components/dashboard/ManagerAssignTaskModal";
 import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjectStatusReport";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { ColumnHeaderLabel } from "@/components/common/ColumnHeaderLabel";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
 import { usePinnedProjects, sortProjectsWithPins } from "@/hooks/usePinnedProjects";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
@@ -675,7 +676,7 @@ export default function ManagerDashboardPage() {
                         onClick={() => toggleDateSort(col.key as "expectedDate" | "billingDate")}
                         className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
                       >
-                        {col.label}
+                        <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         <span className="text-[11px] text-blue-600 font-black">
                           {dateSortField === col.key
                             ? dateSort === "ASC"
@@ -692,13 +693,13 @@ export default function ManagerDashboardPage() {
                         onClick={toggleStatusSort}
                         className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
                       >
-                        {col.label}
+                        <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         <span className="text-[11px] text-blue-600 font-black">
                           {statusSort === "URGENT_FIRST" ? "🔴🔼" : statusSort === "NORMAL_FIRST" ? "🟢🔽" : "↕️"}
                         </span>
                       </button>
                     ) : (
-                      col.label
+                      <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                     )}
                   </th>
                 ))}
@@ -840,7 +841,7 @@ export default function ManagerDashboardPage() {
                                         {p.activeMilestone.stageName}
                                         {p.activeMilestone.plannedDueDate && (
                                           <span className="text-[10px] text-blue-600 font-normal">
-                                            ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                            ({p.activeMilestone.plannedDueDate.slice(5, 10).replace("-", "/")})
                                           </span>
                                         )}
                                       </span>
@@ -1018,7 +1019,7 @@ export default function ManagerDashboardPage() {
                                         {phase.activeMilestone.stageName}
                                         {phase.activeMilestone.plannedDueDate && (
                                           <span className="text-[10px] text-blue-600 font-normal">
-                                            ({phase.activeMilestone.plannedDueDate.slice(5, 10)})
+                                            ({phase.activeMilestone.plannedDueDate.slice(5, 10).replace("-", "/")})
                                           </span>
                                         )}
                                       </span>

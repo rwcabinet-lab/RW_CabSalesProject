@@ -402,18 +402,29 @@ describe("搜尋與篩選條件功能測試", () => {
   });
 
   describe("案件清單欄位定義與規範", () => {
-    it("預設進場日期欄位標籤應統一為「預定進場」", () => {
+    it("預設進場日欄位標籤應統一為「進場日」，且複合欄位取消「/」改為上下主次顯示", () => {
       const expectedDateCol = DEFAULT_PROJECT_COLUMNS.find((c) => c.key === "expectedDate");
       expect(expectedDateCol).toBeDefined();
-      expect(expectedDateCol?.label).toBe("預定進場");
+      expect(expectedDateCol?.label).toBe("進場日");
 
-      // 測試 normalizeProjectColumns 是否亦強制更新為「預定進場」
+      const statusCol = DEFAULT_PROJECT_COLUMNS.find((c) => c.key === "trafficLight");
+      expect(statusCol?.label).toBe("狀態");
+
+      const billingCol = DEFAULT_PROJECT_COLUMNS.find((c) => c.key === "billingDate");
+      expect(billingCol?.label).toBe("立帳日");
+
+      // 複合欄位標籤不應殘留 "/" 符號
+      for (const col of DEFAULT_PROJECT_COLUMNS) {
+        expect(col.label).not.toContain("/");
+      }
+
+      // 測試 normalizeProjectColumns 是否亦強制更新為「進場日」
       const savedWithOldLabel = [
-        { key: "expectedDate", label: "預定進場日", visible: true, order: 6 },
+        { key: "expectedDate", label: "預定進場", visible: true, order: 6 },
       ];
       const normalized = normalizeProjectColumns(savedWithOldLabel);
       const normalizedExpectedDate = normalized.find((c) => c.key === "expectedDate");
-      expect(normalizedExpectedDate?.label).toBe("預定進場");
+      expect(normalizedExpectedDate?.label).toBe("進場日");
     });
   });
 });

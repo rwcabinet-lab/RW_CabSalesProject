@@ -139,10 +139,10 @@ describe("立帳日期與第七階段【立帳/結案】全手動排程規範", 
       useManagerStore.getState().resetFilters();
     });
 
-    it("DEFAULT_PROJECT_COLUMNS 包含「立帳日期」且舊配置正規化時自動補齊於「預定進場」後方", () => {
+    it("DEFAULT_PROJECT_COLUMNS 包含「立帳日」且舊配置正規化時自動補齊於「進場日」後方", () => {
       const billingCol = DEFAULT_PROJECT_COLUMNS.find((c) => c.key === "billingDate");
       expect(billingCol).toBeDefined();
-      expect(billingCol?.label).toBe("立帳日期");
+      expect(billingCol?.label).toBe("立帳日");
       expect(MILESTONE_STAGE_LABELS["7-2"]).toBe("立帳");
 
       const legacyCols = [

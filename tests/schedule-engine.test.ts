@@ -127,7 +127,7 @@ describe("ScheduleEngine (核心時程與燈號評估引擎)", () => {
       const light = ScheduleEngine.getTrafficLight(milestone, fixedCurrentDate);
       expect(light.color).toBe("RED");
       expect(light.daysDiff).toBe(-5);
-      expect(light.label).toBe("逾期 5 天");
+      expect(light.label).toBe("逾 5 天");
     });
 
     it("當天到期應顯示紅燈 (RED) 並標記已到期", () => {

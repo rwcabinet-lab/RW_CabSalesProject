@@ -177,7 +177,7 @@ export function WorkbenchAddProjectPanel({
           />
         </label>
         <label>
-          預定進場
+          進場日
           <input
             type="date"
             value={newProjectData.expectedDate}
@@ -186,7 +186,7 @@ export function WorkbenchAddProjectPanel({
           />
         </label>
         <label>
-          立帳日期 <span className="text-xs text-slate-500 font-normal">（可空白，同步 7-2）</span>
+          立帳日 <span className="text-xs text-slate-500 font-normal">（可空白，同步 7-2）</span>
           <input
             type="date"
             value={newProjectData.billingDate}
@@ -339,7 +339,7 @@ export function WorkbenchEditProjectRow({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             {hasPhases && (
               <div className="col-span-1 sm:col-span-2 md:col-span-4 rounded bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs text-indigo-800 font-medium flex items-center gap-1.5">
-                <span>🔒 <strong>多期彙總母案</strong>：戶數、成本、報價與預定進場由各分期自動加總彙整，此處唯讀防呆。若需修改請至下方各期獨立編輯。</span>
+                <span>🔒 <strong>多期彙總母案</strong>：戶數、成本、報價與進場日由各分期自動加總彙整，此處唯讀防呆。若需修改請至下方各期獨立編輯。</span>
               </div>
             )}
             <label className="font-semibold text-slate-700">
@@ -431,7 +431,7 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              預定進場 {hasPhases && <span className="text-slate-400 font-normal">(各期獨立)</span>}
+              進場日 {hasPhases && <span className="text-slate-400 font-normal">(各期獨立)</span>}
               <input
                 type="date"
                 disabled={hasPhases}
@@ -441,7 +441,7 @@ export function WorkbenchEditProjectRow({
               />
             </label>
             <label className="font-semibold text-slate-700">
-              立帳日期{" "}
+              立帳日{" "}
               {hasPhases ? (
                 <span className="text-slate-400 font-normal">(各期獨立)</span>
               ) : editingProjectBillingLocked ? (

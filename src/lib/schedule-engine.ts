@@ -205,7 +205,7 @@ export const ScheduleEngine = {
     const daysDiff = Math.round((dueDateUtc - curDateUtc) / (1000 * 60 * 60 * 24));
 
     if (daysDiff < 0) {
-      return { color: "RED", label: `逾期 ${Math.abs(daysDiff)} 天`, daysDiff };
+      return { color: "RED", label: `逾 ${Math.abs(daysDiff)} 天`, daysDiff };
     }
 
     if (daysDiff === 0) {

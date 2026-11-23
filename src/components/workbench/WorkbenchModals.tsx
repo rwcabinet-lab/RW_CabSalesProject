@@ -597,7 +597,7 @@ export function WorkbenchAddPhaseModal({
           </label>
 
           <label className="font-semibold text-slate-700">
-            預定進場（同步 6-1）
+            進場日（同步 6-1）
             <input
               type="date"
               value={expectedDate}
@@ -607,7 +607,7 @@ export function WorkbenchAddPhaseModal({
           </label>
 
           <label className="font-semibold text-slate-700">
-            立帳日期（可空白，同步 7-2）
+            立帳日（可空白，同步 7-2）
             <input
               type="date"
               value={billingDate}

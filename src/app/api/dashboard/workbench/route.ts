@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
           let rolledLabel = "正常";
           if (childPhases.some((c) => c.trafficLight.color === "RED")) {
             rolledColor = "RED";
-            rolledLabel = "逾期";
+            rolledLabel = "逾";
           } else if (childPhases.some((c) => c.trafficLight.color === "YELLOW")) {
             rolledColor = "YELLOW";
             rolledLabel = "即將到期";

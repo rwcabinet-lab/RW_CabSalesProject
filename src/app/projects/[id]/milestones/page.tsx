@@ -945,7 +945,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             <div><span className="text-slate-400">客戶類型：</span><span className="font-semibold text-slate-700">{CUSTOMER_TYPE_LABELS[project.customerType] || project.customerType}</span></div>
             <div><span className="text-slate-400">客戶折數：</span><span className="font-semibold text-slate-700">{project.defaultDiscount === 1 ? "牌價" : `${(project.defaultDiscount * 10).toFixed(1)} 折`}</span></div>
             <div><span className="text-slate-400">主責業務：</span><span className="font-semibold text-slate-700">{project.salesRepName || "未指派"}</span></div>
-            <div><span className="text-slate-400">預定進場：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
+            <div><span className="text-slate-400">進場日：</span><span className="font-semibold text-slate-700">{project.expectedDate?.slice(0, 10) || "未設定"}</span></div>
+            <div><span className="text-slate-400">立帳日：</span><span className="font-semibold text-slate-700">{project.billingDate?.slice(0, 10) || "未設定"}</span></div>
             <div><span className="text-slate-400">戶數：</span><span className="font-semibold text-slate-700">{project.unitCount ?? "未填"}{project.unitCount != null ? " 戶" : ""}</span></div>
             <div><span className="text-slate-400">報價：</span><span className="font-semibold text-slate-700">{project.quoteAmount != null ? formatNTD(project.quoteAmount, currencyUnit) : project.totalAmount != null ? formatNTD(project.totalAmount, currencyUnit) : "未填"}</span></div>
             <div><span className="text-slate-400">成本：</span><span className="font-semibold text-slate-700">{project.cost != null ? formatNTD(project.cost, currencyUnit) : "未填"}</span></div>
@@ -1094,7 +1095,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
               const isDueToday = !isProjectLost && !isSubsequent && m.trafficLight?.label === "已到期";
-              const isOverdue = !isProjectLost && !isSubsequent && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾期"));
+              const isOverdue = !isProjectLost && !isSubsequent && (m.status === "OVERDUE" || m.trafficLight?.label?.startsWith("逾"));
               const isCurrentActionable = currentActionableMilestone?.id === m.id;
               const isActive = isCurrentActionable && m.status !== "COMPLETED" && !isSubsequent;
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
@@ -1825,7 +1826,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">預定進場</label>
+                  <label className="block font-semibold text-slate-700 mb-1">進場日</label>
                   <input
                     type="date"
                     value={projectEditForm.expectedDate}
@@ -1835,7 +1836,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    立帳日期 {isBillingLocked && <span className="text-amber-700 font-normal">(已依 7-2 鎖定)</span>}
+                    立帳日 {isBillingLocked && <span className="text-amber-700 font-normal">(已依 7-2 鎖定)</span>}
                   </label>
                   <input
                     type="date"

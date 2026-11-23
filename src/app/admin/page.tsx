@@ -37,6 +37,7 @@ import {
   STANDARD_MILESTONE_STAGE_CODES,
 } from "@/lib/constants";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { ColumnHeaderLabel } from "@/components/common/ColumnHeaderLabel";
 import { AdminAnnouncementPanel } from "@/components/admin/AdminAnnouncementPanel";
 import type { ApiResponse, ColumnItemDTO, MilestonePhaseDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
 
@@ -655,8 +656,9 @@ export default function AdminPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1.5">
-                        <span className="font-bold flex items-center gap-1">
-                          ⋮⋮ {col.label}
+                        <span className="font-bold flex items-center gap-1.5">
+                          <span className="text-slate-400">⋮⋮</span>
+                          <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         </span>
                         <button
                           type="button"
@@ -708,13 +710,17 @@ export default function AdminPage() {
                     case "customer":
                       return (
                         <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
-                          隆美興業 <span className="text-[10px] bg-blue-50 text-blue-700 px-1 rounded font-semibold">8.5折</span>
+                          <div className="font-medium text-slate-900">隆美興業</div>
+                          <div className="mt-0.5">
+                            <span className="inline-block text-[10px] bg-blue-50 text-blue-700 px-1 rounded font-semibold">8.5折</span>
+                          </div>
                         </td>
                       );
                     case "salesRep":
                       return (
                         <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
-                          林宏遠 / 張育菁
+                          <div className="font-medium text-slate-700">林宏遠</div>
+                          <div className="text-[10px] text-slate-400">張育菁</div>
                         </td>
                       );
                     case "stageProgress":

@@ -41,6 +41,7 @@ import {
 } from "@/components/workbench/WorkbenchModals";
 import { WorkbenchAddProjectPanel, WorkbenchEditProjectRow } from "@/components/workbench/WorkbenchProjectForms";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
+import { ColumnHeaderLabel } from "@/components/common/ColumnHeaderLabel";
 import { usePinnedProjects, sortProjectsWithPins } from "@/hooks/usePinnedProjects";
 import { toast } from "@/stores/useToastStore";
 
@@ -514,7 +515,7 @@ export default function SalesWorkbenchPage() {
                         onClick={() => toggleDateSort(col.key as "expectedDate" | "billingDate")}
                         className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
                       >
-                        {col.label}
+                        <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         <span className="text-[11px] text-blue-600 font-black">
                           {dateSortField === col.key
                             ? dateSort === "ASC"
@@ -531,13 +532,13 @@ export default function SalesWorkbenchPage() {
                         onClick={toggleStatusSort}
                         className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
                       >
-                        {col.label}
+                        <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         <span className="text-[11px] text-blue-600 font-black">
                           {statusSort === "URGENT_FIRST" ? "🔴🔼" : statusSort === "NORMAL_FIRST" ? "🟢🔽" : "↕️"}
                         </span>
                       </button>
                     ) : (
-                      col.label
+                      <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                     )}
                   </th>
                 ))}
@@ -656,16 +657,23 @@ export default function SalesWorkbenchPage() {
                           case "customer":
                             return (
                               <td key={col.key} className="p-3">
-                                {p.customerName}{" "}
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
-                                  {p.defaultDiscount === 1 ? "牌價" : `${((p.defaultDiscount || 1) * 10).toFixed(1)}折`}
-                                </span>
+                                <div className="font-medium text-slate-900">{p.customerName}</div>
+                                <div className="mt-0.5">
+                                  <span className="inline-block text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-semibold">
+                                    {p.defaultDiscount === 1 ? "牌價" : `${((p.defaultDiscount || 1) * 10).toFixed(1)}折`}
+                                  </span>
+                                </div>
                               </td>
                             );
                           case "salesRep":
                             return (
                               <td key={col.key} className="p-3 text-slate-700 font-medium">
-                                {p.salesRepName || "-"} {p.salesAssistantName ? ` / ${p.salesAssistantName}` : ""}
+                                <div>{p.salesRepName || "-"}</div>
+                                {p.salesAssistantName && (
+                                  <div className="text-[11px] text-slate-500 font-normal">
+                                    {p.salesAssistantName}
+                                  </div>
+                                )}
                               </td>
                             );
                           case "stageProgress":
@@ -686,7 +694,7 @@ export default function SalesWorkbenchPage() {
                                           {p.activeMilestone.stageName}
                                           {p.activeMilestone.plannedDueDate && (
                                             <span className="text-[10px] text-blue-600 font-normal">
-                                              ({p.activeMilestone.plannedDueDate.slice(5, 10)})
+                                              ({p.activeMilestone.plannedDueDate.slice(5, 10).replace("-", "/")})
                                             </span>
                                           )}
                                         </span>
@@ -861,7 +869,12 @@ export default function SalesWorkbenchPage() {
                               case "salesRep":
                                 return (
                                   <td key={col.key} className="p-3 text-slate-700 font-medium">
-                                    {phase.salesRepName || "-"} {phase.salesAssistantName ? ` / ${phase.salesAssistantName}` : ""}
+                                    <div>{phase.salesRepName || "-"}</div>
+                                    {phase.salesAssistantName && (
+                                      <div className="text-[11px] text-slate-500 font-normal">
+                                        {phase.salesAssistantName}
+                                      </div>
+                                    )}
                                   </td>
                                 );
                               case "stageProgress":
@@ -878,7 +891,7 @@ export default function SalesWorkbenchPage() {
                                           {phase.activeMilestone.stageName}
                                           {phase.activeMilestone.plannedDueDate && (
                                             <span className="text-[10px] text-blue-600 font-normal">
-                                              ({phase.activeMilestone.plannedDueDate.slice(5, 10)})
+                                              ({phase.activeMilestone.plannedDueDate.slice(5, 10).replace("-", "/")})
                                             </span>
                                           )}
                                         </span>

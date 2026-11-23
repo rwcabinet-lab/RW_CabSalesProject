@@ -242,18 +242,31 @@ export function normalizeMilestoneDefaultDays(value: unknown): Record<string, nu
   return normalized;
 }
 
-/** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */
+/** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，複合欄位取消「/」並採上下主次顯示) */
 export const DEFAULT_PROJECT_COLUMNS = [
-  { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },
-  { key: "projectName", label: "案場 / 工地", visible: true, order: 1 },
-  { key: "customer", label: "客戶 / 折數", visible: true, order: 2 },
-  { key: "salesRep", label: "業務 / 業助", visible: true, order: 3 },
-  { key: "stageProgress", label: "階段 / 進度", visible: true, order: 4 },
-  { key: "quoteAndUnits", label: "報價 / 戶數", visible: true, order: 5 },
-  { key: "expectedDate", label: "預定進場", visible: true, order: 6 },
-  { key: "billingDate", label: "立帳日期", visible: true, order: 7 },
+  { key: "trafficLight", label: "狀態", visible: true, order: 0 },
+  { key: "projectName", label: "案場 工地", visible: true, order: 1 },
+  { key: "customer", label: "客戶 折數", visible: true, order: 2 },
+  { key: "salesRep", label: "業務 業助", visible: true, order: 3 },
+  { key: "stageProgress", label: "階段 進度", visible: true, order: 4 },
+  { key: "quoteAndUnits", label: "報價 戶數", visible: true, order: 5 },
+  { key: "expectedDate", label: "進場日", visible: true, order: 6 },
+  { key: "billingDate", label: "立帳日", visible: true, order: 7 },
   { key: "actions", label: "操作", visible: true, order: 8 },
 ];
+
+/** 欄位標題雙層主次顯示定義（主標在上、次標在下，無「/」分隔符號） */
+export const PROJECT_COLUMN_HEADER_LINES: Record<string, { primary: string; secondary?: string }> = {
+  trafficLight: { primary: "狀態" },
+  projectName: { primary: "案場", secondary: "工地" },
+  customer: { primary: "客戶", secondary: "折數" },
+  salesRep: { primary: "業務", secondary: "業助" },
+  stageProgress: { primary: "階段", secondary: "進度" },
+  quoteAndUnits: { primary: "報價", secondary: "戶數" },
+  expectedDate: { primary: "進場日" },
+  billingDate: { primary: "立帳日" },
+  actions: { primary: "操作" },
+};
 
 export function normalizeProjectColumns(value: unknown) {
   if (!Array.isArray(value)) return DEFAULT_PROJECT_COLUMNS;
@@ -273,7 +286,7 @@ export function normalizeProjectColumns(value: unknown) {
   const quoteColumn = quoteColumns.length
     ? {
         key: "quoteAndUnits",
-        label: "報價 / 戶數",
+        label: "報價 戶數",
         visible: quoteColumns.some((column) => column.visible !== false),
         order: Math.min(...quoteColumns.map((column) =>
           typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
@@ -283,7 +296,7 @@ export function normalizeProjectColumns(value: unknown) {
   const stageProgressColumn = stageColumns.length
     ? {
         key: "stageProgress",
-        label: "階段 / 進度",
+        label: "階段 進度",
         visible: stageColumns.some((column) => column.visible !== false),
         order: Math.min(...stageColumns.map((column) =>
           typeof column.order === "number" ? column.order : Number.MAX_SAFE_INTEGER,
