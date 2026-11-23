@@ -124,12 +124,57 @@ describe("人員案場負載統計 (computeSalesWorkload)", () => {
     expect(result.find((r) => r.salesRepName === "系統管理員")).toBeUndefined();
   });
 
-  it("流標案件不依進行中里程碑計入其他人員負載，且不計為延誤案場", () => {
+  it("流標案件不計入任何人員案場負載（含主責業務、業助、里程碑與未完成待辦），且不計為延誤案場", () => {
     const projects: WorkloadProjectInput[] = [
       {
         id: "proj-lost",
         parentId: null,
         currentStage: "LOST",
+        salesRepId: "sales-2",
+        salesRepName: "林邑珮",
+        salesAssistantId: "asst-1",
+      },
+    ];
+
+    const result = computeSalesWorkload({
+      projects,
+      milestonesByProject: {
+        "proj-lost": [{ stageCode: "X-2", status: "COMPLETED", assignedToId: "sales-1" }],
+      },
+      allTasks: [
+        { projectId: "proj-lost", isCompleted: false, assignedToId: "sales-1" },
+      ],
+      allUsers: users,
+      isProjectDelayed: () => false,
+    });
+
+    expect(result.find((r) => r.salesRepName === "林邑珮")?.totalProjects).toBe(0);
+    expect(result.find((r) => r.salesRepName === "林邑珮")?.delayedProjects).toBe(0);
+    expect(result.find((r) => r.salesRepName === "陳柔穎")?.totalProjects).toBe(0);
+    expect(result.find((r) => r.salesRepName === "業助A")?.totalProjects).toBe(0);
+  });
+
+  it("已結案案件（BILLED/CLOSED/DONE 或 7-2 立帳已完成）不計入人員案場負載；尚未完成 7-2 之第七階段案件仍計入", () => {
+    const projects: WorkloadProjectInput[] = [
+      {
+        id: "proj-billed",
+        parentId: null,
+        currentStage: "BILLED",
+        salesRepId: "sales-1",
+        salesRepName: "陳柔穎",
+        salesAssistantId: "asst-1",
+      },
+      {
+        id: "proj-closed-72",
+        parentId: null,
+        currentStage: "CLOSURE",
+        salesRepId: "sales-2",
+        salesRepName: "林邑珮",
+      },
+      {
+        id: "proj-active-71",
+        parentId: null,
+        currentStage: "CLOSURE",
         salesRepId: "sales-2",
         salesRepName: "林邑珮",
       },
@@ -138,15 +183,71 @@ describe("人員案場負載統計 (computeSalesWorkload)", () => {
     const result = computeSalesWorkload({
       projects,
       milestonesByProject: {
-        "proj-lost": [{ status: "OVERDUE", assignedToId: "sales-1" }],
+        "proj-billed": [{ stageCode: "7-3", status: "COMPLETED", assignedToId: "sales-1" }],
+        "proj-closed-72": [
+          { stageCode: "7-2", status: "COMPLETED", assignedToId: "sales-2" },
+          { stageCode: "7-3", status: "IN_PROGRESS", assignedToId: "asst-1" },
+        ],
+        "proj-active-71": [
+          { stageCode: "7-1", status: "COMPLETED", assignedToId: "sales-2" },
+          { stageCode: "7-2", status: "IN_PROGRESS", assignedToId: "asst-1" },
+        ],
       },
+      allTasks: [
+        { projectId: "proj-billed", isCompleted: false, assignedToId: "sales-1" },
+        { projectId: "proj-closed-72", isCompleted: false, assignedToId: "asst-1" },
+      ],
+      allUsers: users,
+      isProjectDelayed: () => false,
+    });
+
+    // proj-billed 完全排除
+    expect(result.find((r) => r.salesRepName === "陳柔穎")?.totalProjects).toBe(0);
+    // proj-closed-72 排除，僅計入尚未結案的 proj-active-71
+    expect(result.find((r) => r.salesRepName === "林邑珮")?.totalProjects).toBe(1);
+    expect(result.find((r) => r.salesRepName === "業助A")?.totalProjects).toBe(1);
+  });
+
+  it("多期案件中已流標或已結案的分期不計入負載，僅統計仍在進行中的分期", () => {
+    const projects: WorkloadProjectInput[] = [
+      {
+        id: "master-3",
+        parentId: null,
+        currentStage: "INSTALL",
+        salesRepId: "sales-1",
+        salesRepName: "陳柔穎",
+      },
+      {
+        id: "master-3-p1",
+        parentId: "master-3",
+        currentStage: "CLOSED",
+        salesRepId: "sales-1",
+        salesRepName: "陳柔穎",
+      },
+      {
+        id: "master-3-p2",
+        parentId: "master-3",
+        currentStage: "LOST",
+        salesRepId: "sales-1",
+        salesRepName: "陳柔穎",
+      },
+      {
+        id: "master-3-p3",
+        parentId: "master-3",
+        currentStage: "INSTALL",
+        salesRepId: "sales-1",
+        salesRepName: "陳柔穎",
+      },
+    ];
+
+    const result = computeSalesWorkload({
+      projects,
+      milestonesByProject: {},
       allTasks: [],
       allUsers: users,
       isProjectDelayed: () => false,
     });
 
-    expect(result.find((r) => r.salesRepName === "林邑珮")?.totalProjects).toBe(1);
-    expect(result.find((r) => r.salesRepName === "林邑珮")?.delayedProjects).toBe(0);
-    expect(result.find((r) => r.salesRepName === "陳柔穎")?.totalProjects).toBe(0);
+    expect(result.find((r) => r.salesRepName === "陳柔穎")?.totalProjects).toBe(1);
   });
 });

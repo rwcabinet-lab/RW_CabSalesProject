@@ -669,7 +669,7 @@ export default function ManagerDashboardPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "actions" ? "text-center" : ""}`}>
+                  <th key={col.key} className={`p-3 whitespace-nowrap ${col.key === "actions" ? "text-center" : ""}`}>
                     {col.key === "expectedDate" || col.key === "billingDate" ? (
                       <button
                         type="button"
@@ -703,7 +703,7 @@ export default function ManagerDashboardPage() {
                     )}
                   </th>
                 ))}
-                <th className="p-3 text-center">指派任務</th>
+                <th className="p-3 text-center whitespace-nowrap">指派任務</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -729,8 +729,8 @@ export default function ManagerDashboardPage() {
                       switch (col.key) {
                         case "trafficLight":
                           return (
-                            <td key={col.key} className="p-3">
-                              <span className={`px-2 py-1 rounded-full font-bold ${
+                            <td key={col.key} className="p-3 whitespace-nowrap">
+                              <span className={`inline-block whitespace-nowrap px-2 py-1 rounded-full font-bold ${
                                 p.currentStage === "LOST" || p.trafficLight.color === "GRAY" ? "bg-slate-100 text-slate-600" :
                                 p.trafficLight.color === "RED" ? "bg-red-100 text-red-700" :
                                 p.trafficLight.color === "YELLOW" ? "bg-amber-100 text-amber-700" :
@@ -814,7 +814,7 @@ export default function ManagerDashboardPage() {
                           );
                         case "salesRep":
                           return (
-                            <td key={col.key} className="p-3 text-slate-700 font-medium">
+                            <td key={col.key} className="p-3 text-slate-700 font-medium whitespace-nowrap">
                               <div>{p.salesRepName || "-"}</div>
                               {p.salesAssistantName && (
                                 <div className="text-[11px] text-slate-500 font-normal">
@@ -825,7 +825,7 @@ export default function ManagerDashboardPage() {
                           );
                         case "stageProgress":
                           return (
-                            <td key={col.key} className="p-3 font-bold text-slate-700">
+                            <td key={col.key} className="p-3 font-bold text-slate-700 whitespace-nowrap">
                               {hasPhases ? (
                                 <span className="text-slate-400 font-normal select-none">—</span>
                               ) : (
@@ -860,7 +860,7 @@ export default function ManagerDashboardPage() {
                         case "quoteAndUnits":
                         case "amount":
                           return (
-                            <td key={col.key} className="p-3">
+                            <td key={col.key} className="p-3 whitespace-nowrap">
                               <div className="tabular-nums font-bold text-slate-900">
                                 {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0, currencyUnit)}
                               </div>
@@ -873,7 +873,7 @@ export default function ManagerDashboardPage() {
                           return null;
                         case "expectedDate":
                           return (
-                            <td key={col.key} className="p-3 text-slate-600 font-medium">
+                            <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                               {hasPhases ? (
                                 <span className="text-slate-400 font-normal select-none">—</span>
                               ) : (
@@ -883,7 +883,7 @@ export default function ManagerDashboardPage() {
                           );
                         case "billingDate":
                           return (
-                            <td key={col.key} className="p-3 text-slate-600 font-medium">
+                            <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                               {hasPhases ? (
                                 <span className="text-slate-400 font-normal select-none">—</span>
                               ) : (
@@ -893,7 +893,7 @@ export default function ManagerDashboardPage() {
                           );
                         case "actions":
                           return (
-                            <td key={col.key} className="p-3 text-center align-middle">
+                            <td key={col.key} className="p-3 text-center align-middle whitespace-nowrap">
                               <div className="flex items-center justify-center gap-1.5">
                                 <Link
                                   href={`/projects/${p.id}/milestones`}
@@ -930,7 +930,7 @@ export default function ManagerDashboardPage() {
                           return null;
                       }
                     })}
-                    <td className="p-3 text-center align-middle">
+                    <td className="p-3 text-center align-middle whitespace-nowrap">
                       <div className="flex items-center justify-center">
                         <button
                           onClick={() => setAssignModal({
@@ -961,8 +961,8 @@ export default function ManagerDashboardPage() {
                           switch (col.key) {
                             case "trafficLight":
                               return (
-                                <td key={col.key} className="p-3 pl-4">
-                                  <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                                <td key={col.key} className="p-3 pl-4 whitespace-nowrap">
+                                  <span className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full font-bold text-[11px] ${
                                     phase.currentStage === "LOST" || phase.trafficLight.color === "GRAY" ? "bg-slate-100 text-slate-600" :
                                     phase.trafficLight.color === "RED" ? "bg-red-100 text-red-700" :
                                     phase.trafficLight.color === "YELLOW" ? "bg-amber-100 text-amber-700" :
@@ -996,7 +996,7 @@ export default function ManagerDashboardPage() {
                               );
                             case "salesRep":
                               return (
-                                <td key={col.key} className="p-3 text-slate-700 font-medium">
+                                <td key={col.key} className="p-3 text-slate-700 font-medium whitespace-nowrap">
                                   <div>{phase.salesRepName || "-"}</div>
                                   {phase.salesAssistantName && (
                                     <div className="text-[11px] text-slate-500 font-normal">
@@ -1007,7 +1007,7 @@ export default function ManagerDashboardPage() {
                               );
                             case "stageProgress":
                               return (
-                                <td key={col.key} className="p-3 font-bold text-slate-700">
+                                <td key={col.key} className="p-3 font-bold text-slate-700 whitespace-nowrap">
                                   <div>{phase.isClosed ? "結案" : (PROJECT_STAGE_LABELS[phase.currentStage] || phase.currentStage)}</div>
                                   <div className="mt-1 text-[11px] font-normal">
                                     {phase.currentStage === "LOST" ? (
@@ -1036,7 +1036,7 @@ export default function ManagerDashboardPage() {
                             case "quoteAndUnits":
                             case "amount":
                               return (
-                                <td key={col.key} className="p-3">
+                                <td key={col.key} className="p-3 whitespace-nowrap">
                                   <div className="tabular-nums font-bold text-slate-900">
                                     {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0, currencyUnit)}
                                   </div>
@@ -1047,13 +1047,13 @@ export default function ManagerDashboardPage() {
                               );
                             case "expectedDate":
                               return (
-                                <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                   {phase.expectedDate?.slice(0, 10) || "-"}
                                 </td>
                               );
                             case "billingDate":
                               return (
-                                <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                   {phase.billingDate?.slice(0, 10) || "-"}
                                 </td>
                               );
@@ -1071,7 +1071,7 @@ export default function ManagerDashboardPage() {
                                   sessionUser?.id === p.salesAssistantId;
 
                                 return (
-                                  <td key={col.key} className="p-3 text-center align-middle">
+                                  <td key={col.key} className="p-3 text-center align-middle whitespace-nowrap">
                                     <div className="flex items-center justify-center gap-1.5">
                                       <Link
                                         href={`/projects/${phase.id}/milestones`}
@@ -1100,7 +1100,7 @@ export default function ManagerDashboardPage() {
                               return null;
                           }
                         })}
-                        <td className="p-3 text-center align-middle">
+                        <td className="p-3 text-center align-middle whitespace-nowrap">
                           <div className="flex items-center justify-center">
                             <button
                               onClick={() => setAssignModal({

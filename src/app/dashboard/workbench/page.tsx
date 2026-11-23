@@ -508,7 +508,7 @@ export default function SalesWorkbenchPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 {visibleColumns.map((col) => (
-                  <th key={col.key} className={`p-3 ${col.key === "actions" ? "text-center" : ""}`}>
+                  <th key={col.key} className={`p-3 whitespace-nowrap ${col.key === "actions" ? "text-center" : ""}`}>
                     {col.key === "expectedDate" || col.key === "billingDate" ? (
                       <button
                         type="button"
@@ -579,9 +579,9 @@ export default function SalesWorkbenchPage() {
                         switch (col.key) {
                           case "trafficLight":
                             return (
-                              <td key={col.key} className="p-3">
+                              <td key={col.key} className="p-3 whitespace-nowrap">
                                 <span
-                                  className={`px-2 py-1 rounded-full font-bold ${
+                                  className={`inline-block whitespace-nowrap px-2 py-1 rounded-full font-bold ${
                                     p.currentStage === "LOST" || p.trafficLight.color === "GRAY"
                                       ? "bg-slate-100 text-slate-600"
                                       : p.trafficLight.color === "RED"
@@ -667,7 +667,7 @@ export default function SalesWorkbenchPage() {
                             );
                           case "salesRep":
                             return (
-                              <td key={col.key} className="p-3 text-slate-700 font-medium">
+                              <td key={col.key} className="p-3 text-slate-700 font-medium whitespace-nowrap">
                                 <div>{p.salesRepName || "-"}</div>
                                 {p.salesAssistantName && (
                                   <div className="text-[11px] text-slate-500 font-normal">
@@ -678,7 +678,7 @@ export default function SalesWorkbenchPage() {
                             );
                           case "stageProgress":
                             return (
-                              <td key={col.key} className="p-3 font-bold text-slate-700">
+                              <td key={col.key} className="p-3 font-bold text-slate-700 whitespace-nowrap">
                                 {hasPhases ? (
                                   <span className="text-slate-400 font-normal select-none">—</span>
                                 ) : (
@@ -709,7 +709,7 @@ export default function SalesWorkbenchPage() {
                           case "quoteAndUnits":
                           case "amount":
                             return (
-                              <td key={col.key} className="p-3">
+                              <td key={col.key} className="p-3 whitespace-nowrap">
                                 <div className="tabular-nums font-bold text-slate-900">
                                   {formatNTD(p.quoteAmount ?? p.totalAmount ?? 0, currencyUnit)}
                                 </div>
@@ -722,7 +722,7 @@ export default function SalesWorkbenchPage() {
                             return null;
                           case "expectedDate":
                             return (
-                              <td key={col.key} className="p-3 text-slate-600 font-medium">
+                              <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                 {hasPhases ? (
                                   <span className="text-slate-400 font-normal select-none">—</span>
                                 ) : (
@@ -732,7 +732,7 @@ export default function SalesWorkbenchPage() {
                             );
                           case "billingDate":
                             return (
-                              <td key={col.key} className="p-3 text-slate-600 font-medium">
+                              <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                 {hasPhases ? (
                                   <span className="text-slate-400 font-normal select-none">—</span>
                                 ) : (
@@ -742,13 +742,13 @@ export default function SalesWorkbenchPage() {
                             );
                           case "actions":
                             return (
-                              <td key={col.key} className="p-3 text-center align-middle">
+                              <td key={col.key} className="p-3 text-center align-middle whitespace-nowrap">
                                 <div className="flex items-center justify-center gap-1.5">
                                   {!hasPhases && p.activeMilestone && !p.isClosed && p.currentStage !== "LOST" && (
                                     <button
                                       type="button"
                                       onClick={() => setProjectToAdvance(p)}
-                                      className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                      className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors whitespace-nowrap"
                                       title={`推進當前進度：${p.activeMilestone.stageName}`}
                                     >
                                       項目推進
@@ -757,21 +757,21 @@ export default function SalesWorkbenchPage() {
                                   <Link
                                     href={`/projects/${p.id}/milestones`}
                                     prefetch={true}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors whitespace-nowrap"
                                   >
                                     細節
                                   </Link>
                                   <button
                                     type="button"
                                     onClick={() => openEditProject(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors whitespace-nowrap"
                                   >
                                     編輯
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setProjectToAddPhase(p)}
-                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs"
+                                    className="inline-flex h-7 items-center justify-center rounded bg-indigo-50 border border-indigo-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs whitespace-nowrap"
                                     title="新增分期（各期具備獨立 28 里程碑）"
                                     aria-label="新增分期"
                                   >
@@ -828,9 +828,9 @@ export default function SalesWorkbenchPage() {
                             switch (col.key) {
                               case "trafficLight":
                                 return (
-                                  <td key={col.key} className="p-3 pl-4">
+                                  <td key={col.key} className="p-3 pl-4 whitespace-nowrap">
                                     <span
-                                      className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                                      className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full font-bold text-[11px] ${
                                         phase.currentStage === "LOST" || phase.trafficLight.color === "GRAY"
                                           ? "bg-slate-100 text-slate-600"
                                           : phase.trafficLight.color === "RED"
@@ -868,7 +868,7 @@ export default function SalesWorkbenchPage() {
                                 );
                               case "salesRep":
                                 return (
-                                  <td key={col.key} className="p-3 text-slate-700 font-medium">
+                                  <td key={col.key} className="p-3 text-slate-700 font-medium whitespace-nowrap">
                                     <div>{phase.salesRepName || "-"}</div>
                                     {phase.salesAssistantName && (
                                       <div className="text-[11px] text-slate-500 font-normal">
@@ -879,7 +879,7 @@ export default function SalesWorkbenchPage() {
                                 );
                               case "stageProgress":
                                 return (
-                                  <td key={col.key} className="p-3 font-bold text-slate-700">
+                                  <td key={col.key} className="p-3 font-bold text-slate-700 whitespace-nowrap">
                                     <div>{phase.isClosed ? "結案" : (PROJECT_STAGE_LABELS[phase.currentStage] || phase.currentStage)}</div>
                                     <div className="mt-1 text-[11px] font-normal">
                                       {phase.currentStage === "LOST" ? (
@@ -904,7 +904,7 @@ export default function SalesWorkbenchPage() {
                               case "quoteAndUnits":
                               case "amount":
                                 return (
-                                  <td key={col.key} className="p-3">
+                                  <td key={col.key} className="p-3 whitespace-nowrap">
                                     <div className="tabular-nums font-bold text-slate-900">
                                       {formatNTD(phase.quoteAmount ?? phase.totalAmount ?? 0, currencyUnit)}
                                     </div>
@@ -915,13 +915,13 @@ export default function SalesWorkbenchPage() {
                                 );
                               case "expectedDate":
                                 return (
-                                  <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                  <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                     {phase.expectedDate?.slice(0, 10) || "未設定"}
                                   </td>
                                 );
                               case "billingDate":
                                 return (
-                                  <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                  <td key={col.key} className="p-3 text-slate-600 font-medium whitespace-nowrap tabular-nums">
                                     {phase.billingDate?.slice(0, 10) || "未設定"}
                                   </td>
                                 );
@@ -939,13 +939,13 @@ export default function SalesWorkbenchPage() {
                                     currentUser?.id === p.salesAssistantId;
 
                                   return (
-                                    <td key={col.key} className="p-3 text-center align-middle">
+                                    <td key={col.key} className="p-3 text-center align-middle whitespace-nowrap">
                                       <div className="flex items-center justify-center gap-1.5">
                                         {phase.activeMilestone && !phase.isClosed && phase.currentStage !== "LOST" && (
                                           <button
                                             type="button"
                                             onClick={() => setProjectToAdvance(phase)}
-                                            className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors"
+                                            className="inline-flex h-7 items-center justify-center rounded border border-blue-700 bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs transition-colors whitespace-nowrap"
                                             title={`推進當前進度：${phase.activeMilestone.stageName}`}
                                           >
                                             項目推進
@@ -954,14 +954,14 @@ export default function SalesWorkbenchPage() {
                                         <button
                                           type="button"
                                           onClick={() => openEditProject(phase)}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors"
+                                          className="inline-flex h-7 items-center justify-center rounded bg-amber-50 border border-amber-300 px-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-400 shadow-2xs transition-colors whitespace-nowrap"
                                         >
                                           編輯
                                         </button>
                                         <Link
                                           href={`/projects/${phase.id}/milestones`}
                                           prefetch={true}
-                                          className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors"
+                                          className="inline-flex h-7 items-center justify-center rounded bg-slate-50 border border-slate-300 px-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 shadow-2xs transition-colors whitespace-nowrap"
                                         >
                                           細節
                                         </Link>

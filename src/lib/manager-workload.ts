@@ -12,6 +12,7 @@ export interface WorkloadProjectInput {
 }
 
 export interface WorkloadMilestoneInput {
+  stageCode?: string;
   status: string;
   assignedToId?: string | null;
 }
@@ -46,7 +47,7 @@ function formatRoleLabel(role?: string): string {
 /**
  * 計算人員案場負載（業務、業助、工務等現階段涉入負責同仁）。
  * 多期專案之母案彙總容器（底下已有分期子案者）僅作資料夾彙整用途，不列入負載計數，
- * 避免母案容器與第 1 期等分期子案重複計數。
+ * 避免母案容器與第 1 期等分期子案重複計數；並排除已流標與已結案（含完成 7-2 立帳）案場。
  */
 export function computeSalesWorkload<TProject extends WorkloadProjectInput>(params: {
   projects: TProject[];
@@ -54,8 +55,9 @@ export function computeSalesWorkload<TProject extends WorkloadProjectInput>(para
   allTasks: WorkloadTaskInput[];
   allUsers: WorkloadUserInput[];
   isProjectDelayed: (project: TProject) => boolean;
+  isProjectClosed?: (project: TProject) => boolean;
 }): SalesWorkloadDTO[] {
-  const { projects, milestonesByProject, allTasks, allUsers, isProjectDelayed } = params;
+  const { projects, milestonesByProject, allTasks, allUsers, isProjectDelayed, isProjectClosed } = params;
 
   const assignableUsers = allUsers.filter((u) => isAssignableRole(u.role));
   const userMap = new Map(allUsers.map((u) => [u.id, u]));
@@ -90,12 +92,26 @@ export function computeSalesWorkload<TProject extends WorkloadProjectInput>(para
     if (parentProjectIds.has(p.id)) continue;
 
     const ms = milestonesByProject[p.id] || [];
+    const isLost =
+      p.currentStage === "LOST" ||
+      ms.some((m) => m.stageCode === "X-2" && m.status === "COMPLETED");
+    const isClosed =
+      isProjectClosed?.(p) ??
+      (p.currentStage === "BILLED" ||
+        p.currentStage === "CLOSED" ||
+        p.currentStage === "DONE" ||
+        ms.some(
+          (m) =>
+            (m.stageCode === "7-2" || m.stageCode === "7-3") &&
+            m.status === "COMPLETED"
+        ));
+
+    if (isLost || isClosed) continue;
+
     const delayed = isProjectDelayed(p);
     const activeMilestone =
-      p.currentStage === "LOST"
-        ? null
-        : ms.find((m) => m.status === "OVERDUE") ||
-          ms.find((m) => m.status === "IN_PROGRESS");
+      ms.find((m) => m.status === "OVERDUE") ||
+      ms.find((m) => m.status === "IN_PROGRESS");
 
     const currentPersonnelIds = new Set<string>();
 

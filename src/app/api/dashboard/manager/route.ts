@@ -102,13 +102,14 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // 3. 人員案場負載與異常分佈 (含業務、業助、工務等現階段負責同仁，排除多期母案彙總容器)
+    // 3. 人員案場負載與異常分佈 (含業務、業助、工務等現階段負責同仁，排除多期母案彙總容器、流標與結案)
     const salesWorkload = computeSalesWorkload({
       projects,
       milestonesByProject,
       allTasks,
       allUsers,
       isProjectDelayed,
+      isProjectClosed,
     });
 
     // 4. 所有案件狀態總覽 (含月份過濾)
