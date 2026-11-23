@@ -740,6 +740,12 @@ export default function AdminPage() {
                           2026-11-30
                         </td>
                       );
+                    case "billingDate":
+                      return (
+                        <td key={col.key} className={`p-3 border-r ${dragCellClass}`}>
+                          2026-12-15
+                        </td>
+                      );
                     case "actions":
                       return (
                         <td key={col.key} className={`p-3 border-r text-center ${dragCellClass}`}>
@@ -796,32 +802,46 @@ export default function AdminPage() {
               const phaseCodes = STANDARD_MILESTONE_STAGE_CODES.filter(
                 (code) => STAGE_CODE_TO_PHASE[code] === phase
               );
+              const isManualPhase = phase === "CLOSURE";
               return (
                 <div key={phase} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
-                  <div className="mb-2.5 flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-700">{PHASE_LABELS[phase]}</h3>
+                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-700">{PHASE_LABELS[phase]}</h3>
+                      {isManualPhase && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-200">
+                          全手動設定日期與推進（不套用預設天數推算）
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-slate-400">{phaseCodes.length} 項</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                     {phaseCodes.map((code) => {
                       const label = MILESTONE_STAGE_LABELS[code];
                       return (
-                        <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-white flex flex-col justify-between">
+                        <div key={code} className={`p-2.5 rounded-lg border border-slate-200 flex flex-col justify-between ${isManualPhase ? "bg-slate-100/80" : "bg-white"}`}>
                           <span className="text-xs font-bold text-slate-700 truncate" title={`[${code}] ${label}`}>
                             [{code}] {label}
                           </span>
-                          <div className="mt-2 flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              min="1"
-                              value={stageDays[code] ?? MILESTONE_DEFAULT_DAYS[code] ?? 3}
-                              onChange={(e) =>
-                                setStageDays({ ...stageDays, [code]: Math.max(1, Number(e.target.value) || 1) })
-                              }
-                              className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
-                            />
-                            <span className="text-xs text-slate-500">天</span>
-                          </div>
+                          {isManualPhase ? (
+                            <div className="mt-2 text-[11px] font-semibold text-slate-500">
+                              手動設定（不自動推算）
+                            </div>
+                          ) : (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                value={stageDays[code] ?? MILESTONE_DEFAULT_DAYS[code] ?? 3}
+                                onChange={(e) =>
+                                  setStageDays({ ...stageDays, [code]: Math.max(1, Number(e.target.value) || 1) })
+                                }
+                                className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
+                              />
+                              <span className="text-xs text-slate-500">天</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

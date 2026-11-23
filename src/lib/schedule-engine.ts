@@ -3,6 +3,7 @@ import {
   MilestoneStageCode,
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
+  isClosureStageCode,
 } from "./constants";
 import { BadRequestError, ConflictError } from "./errors";
 
@@ -131,6 +132,46 @@ export const STAGE_CODE_TO_PROJECT_STAGE: Record<MilestoneStageCode, string> = {
   "X-1": "WRAP_UP", "X-2": "LOST",
 };
 
+/**
+ * 取得第一個「納入時程連動」且未完成又缺乏預定完成日之里程碑順序。
+ * 第七階段【立帳/結案】採全手動設定日期與推進，不觸發後續暫停傳播。
+ */
+export function getPausedScheduleOrder(
+  milestones: Array<{
+    stageCode: string;
+    stageOrder?: number;
+    status: string;
+    plannedDueDate?: string | null;
+  }>,
+): number | null {
+  const sorted = [...milestones].sort((a, b) => (a.stageOrder ?? 0) - (b.stageOrder ?? 0));
+  const paused = sorted.find(
+    (m) => m.status !== "COMPLETED" && !m.plannedDueDate && !isClosureStageCode(m.stageCode),
+  );
+  return paused?.stageOrder ?? null;
+}
+
+/** 判斷單一里程碑是否因前置項目處於「需追蹤」而需暫停計算（立帳/結案項目一律不連坐暫停） */
+export function computeIsSubsequentToPaused(
+  milestone: {
+    stageCode: string;
+    stageOrder?: number;
+    status: string;
+    isSubsequentToPaused?: boolean;
+  },
+  pausedStageOrder: number | null,
+): boolean {
+  if (isClosureStageCode(milestone.stageCode)) return false;
+  if (typeof milestone.isSubsequentToPaused === "boolean") {
+    return milestone.isSubsequentToPaused;
+  }
+  return Boolean(
+    pausedStageOrder !== null &&
+      (milestone.stageOrder ?? 0) > pausedStageOrder &&
+      milestone.status !== "COMPLETED",
+  );
+}
+
 export const ScheduleEngine = {
   /**
    * 計算特定里程碑的時程燈號
@@ -236,17 +277,18 @@ export const ScheduleEngine = {
       return { milestones: sanitized, isDelayed: false };
     }
 
-    // 尋找第一個未完成且未設定/已清空預定完成日之需追蹤進度項目
-    const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-    const pausedMilestone = sorted.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
-    const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
+    // 尋找第一個納入時程連動之未完成且無預定完成日項目（第七階段立帳/結案採全手動設定日期，不參與暫停傳播）
+    const pausedStageOrder = getPausedScheduleOrder(milestones);
 
     let hasOverdue = false;
     const curDateOnly = getTaiwanDateString(currentDate);
 
     const evaluated = milestones.map((m) => {
       const isSubsequentToPaused = Boolean(
-        pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED"
+        !isClosureStageCode(m.stageCode) &&
+          pausedStageOrder !== null &&
+          m.stageOrder > pausedStageOrder &&
+          m.status !== "COMPLETED"
       );
 
       if (m.status === "COMPLETED") {

@@ -13,6 +13,7 @@ import {
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   STANDARD_MILESTONE_STAGE_CODES,
+  isClosureStageCode,
 } from "../constants";
 import {
   ScheduleEngine,
@@ -415,13 +416,14 @@ export const MilestoneService = {
         const newDueStr = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
 
         let diffDays = 0;
-        if (cascadeShift && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
+        const isClosureSource = isClosureStageCode(currentMilestone.stageCode);
+        if (cascadeShift && !isClosureSource && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
           const [oy, om, od] = oldDueStr.split("-").map(Number);
           const [ny, nm, nd] = newDueStr.split("-").map(Number);
           diffDays = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / (1000 * 60 * 60 * 24));
         }
 
-        // 找出後續需平移的未完成里程碑 (排除 X-1, X-2)
+        // 找出後續需平移的未完成里程碑 (排除 X-1, X-2 與第七階段立帳/結案)
         const pendingShiftedUpdates: { id: string; newDateStr: string }[] = [];
         if (diffDays !== 0) {
           const todayStr = getTaiwanDateString();
@@ -432,6 +434,7 @@ export const MilestoneService = {
               m.stageOrder > currentOrder &&
               m.status !== MilestoneStatus.COMPLETED &&
               !["X-1", "X-2"].includes(m.stageCode) &&
+              !isClosureStageCode(m.stageCode) &&
               m.plannedDueDate
             ) {
               const rawDueDate = m.plannedDueDate as unknown;
@@ -765,8 +768,9 @@ export const MilestoneService = {
         const targetChanged = target.status !== targetStatus;
         const nextNotes = isCompleted && notes?.trim() ? notes.trim() : target.notes;
 
-        // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數
+        // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數（立帳/結案階段全手動，不參與連動）
         const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+        const canShiftSchedule = isRegularStage && !isClosureStageCode(target.stageCode);
 
         // 狀態機防呆：正規進度不可跳級完成，目標之前的所有進度必須已全數完成
         if (isCompleted && isRegularStage) {
@@ -781,14 +785,14 @@ export const MilestoneService = {
         }
 
         let daysSaved = 0;
-        if (isCompleted && targetChanged && isRegularStage && target.plannedDueDate && completedDate) {
+        if (isCompleted && targetChanged && canShiftSchedule && target.plannedDueDate && completedDate) {
           const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
           const [ay, am, ad] = completedDate.slice(0, 10).split("-").map(Number);
           const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
           if (diffDays > 0) {
             daysSaved = diffDays;
           }
-        } else if (!isCompleted && targetChanged && isRegularStage && target.plannedDueDate && target.actualDueDate) {
+        } else if (!isCompleted && targetChanged && canShiftSchedule && target.plannedDueDate && target.actualDueDate) {
           const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
           const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
           const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
@@ -815,6 +819,7 @@ export const MilestoneService = {
             idx > targetIndex &&
             milestone.status !== MilestoneStatus.COMPLETED &&
             !["X-1", "X-2"].includes(milestone.stageCode) &&
+            !isClosureStageCode(milestone.stageCode) &&
             milestone.plannedDueDate
           ) {
             const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -925,9 +930,9 @@ export const MilestoneService = {
 
         const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
-        const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+        const canShiftSchedule = !["X-1", "X-2"].includes(target.stageCode) && !isClosureStageCode(target.stageCode);
         let daysToRestore = 0;
-        if (isRegularStage && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
+        if (canShiftSchedule && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
           const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
           const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
           const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
@@ -959,6 +964,7 @@ export const MilestoneService = {
             idx > targetIndex &&
             m.status !== "COMPLETED" &&
             !["X-1", "X-2"].includes(m.stageCode) &&
+            !isClosureStageCode(m.stageCode) &&
             m.plannedDueDate
           ) {
             const [iy, im, id] = m.plannedDueDate.slice(0, 10).split("-").map(Number);

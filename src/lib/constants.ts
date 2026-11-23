@@ -190,6 +190,40 @@ export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
   "7-1", "7-2", "7-3",
 ];
 
+/** 屬於第七階段【立帳/結案】的進度代碼（全手動設定日期與推進，不納入時程自動推算與連鎖平移） */
+export const CLOSURE_STAGE_CODES = new Set<string>(["7-1", "7-2", "7-3", "7-4"]);
+
+/** 判斷里程碑代碼是否屬於第七階段【立帳/結案】 */
+export function isClosureStageCode(stageCode: string): boolean {
+  return (
+    CLOSURE_STAGE_CODES.has(stageCode) ||
+    STAGE_CODE_TO_PHASE[stageCode as MilestoneStageCode] === "CLOSURE"
+  );
+}
+
+/** 由 7-2【立帳】里程碑萃取立帳日期與完成鎖定狀態（7-2 完成後以實際完成日為準） */
+export function resolveBillingInfoFromMilestones(
+  milestones: Array<{
+    stageCode: string;
+    status: string;
+    plannedDueDate?: string | Date | null;
+    actualDueDate?: string | Date | null;
+  }>,
+): { billingDate: string | null; isBillingCompleted: boolean } {
+  const m72 = milestones.find((m) => m.stageCode === "7-2");
+  if (!m72) return { billingDate: null, isBillingCompleted: false };
+  const isBillingCompleted = m72.status === "COMPLETED";
+  const rawDate = isBillingCompleted
+    ? (m72.actualDueDate ?? m72.plannedDueDate)
+    : m72.plannedDueDate;
+  if (!rawDate) return { billingDate: null, isBillingCompleted };
+  const dateStr =
+    rawDate instanceof Date
+      ? rawDate.toISOString().slice(0, 10)
+      : String(rawDate).slice(0, 10);
+  return { billingDate: dateStr || null, isBillingCompleted };
+}
+
 /** 正規化各階段進度預設天數設定：僅保留現行 28 項標準里程碑並排除歷史廢止代碼，缺漏或無效值以系統預設補齊 */
 export function normalizeMilestoneDefaultDays(value: unknown): Record<string, number> {
   const raw =
@@ -217,7 +251,8 @@ export const DEFAULT_PROJECT_COLUMNS = [
   { key: "stageProgress", label: "階段 / 進度", visible: true, order: 4 },
   { key: "quoteAndUnits", label: "報價 / 戶數", visible: true, order: 5 },
   { key: "expectedDate", label: "預定進場", visible: true, order: 6 },
-  { key: "actions", label: "操作", visible: true, order: 7 },
+  { key: "billingDate", label: "立帳日期", visible: true, order: 7 },
+  { key: "actions", label: "操作", visible: true, order: 8 },
 ];
 
 export function normalizeProjectColumns(value: unknown) {
@@ -265,9 +300,17 @@ export function normalizeProjectColumns(value: unknown) {
     if (column.key === "quoteAndUnits" && quoteColumn) return quoteColumn;
     if (column.key === "stageProgress" && stageProgressColumn) return stageProgressColumn;
     const saved = savedByKey.get(column.key);
-    return saved
-      ? { ...column, ...saved, label: column.label, visible: saved.visible !== false }
-      : column;
+    if (saved) {
+      return { ...column, ...saved, label: column.label, visible: saved.visible !== false };
+    }
+    if (column.key === "billingDate") {
+      // 既有儲存配置未包含立帳日期時，預設安插於「預定進場」正後方
+      const expectedOrder = savedByKey.get("expectedDate")?.order;
+      if (typeof expectedOrder === "number") {
+        return { ...column, order: expectedOrder + 0.5 };
+      }
+    }
+    return column;
   });
 
   return normalized

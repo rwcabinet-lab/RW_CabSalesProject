@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
 import { ScheduleEngine } from "@/lib/schedule-engine";
-import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
+import { MILESTONE_STAGE_LABELS, resolveBillingInfoFromMilestones } from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
 import { handleApiError } from "@/lib/errors";
 import { isAssignableRole } from "@/lib/page-access";
@@ -248,6 +248,7 @@ export async function GET(req: NextRequest) {
 
       const isDelayed = isProjectDelayed(p);
       const isClosed = isProjectClosed(p);
+      const billingInfo = resolveBillingInfoFromMilestones(milestones);
 
       return {
         id: p.id,
@@ -268,6 +269,8 @@ export async function GET(req: NextRequest) {
           ? { color: "GRAY" as const, label: "流標", daysDiff: 0 }
           : trafficLight,
         expectedDate: p.expectedDate || "",
+        billingDate: billingInfo.billingDate || "",
+        isBillingCompleted: billingInfo.isBillingCompleted,
         unitCount: p.unitCount,
         cost: p.cost,
         quoteAmount: p.quoteAmount,
@@ -346,6 +349,10 @@ export async function GET(req: NextRequest) {
             .map((c) => c.expectedDate)
             .filter(Boolean)
             .sort();
+          const upcomingBillingDates = childPhases
+            .map((c) => c.billingDate)
+            .filter((d): d is string => Boolean(d))
+            .sort();
 
           return {
             ...parent,
@@ -356,6 +363,8 @@ export async function GET(req: NextRequest) {
             isDelayed: isAnyDelayed,
             isClosed: isAllClosed,
             expectedDate: upcomingDates[0] || "",
+            billingDate: upcomingBillingDates[0] || "",
+            isBillingCompleted: childPhases.every((c) => c.isBillingCompleted),
             trafficLight: { color: rolledColor, label: rolledLabel, daysDiff: 0 },
             phases: childPhases,
           };

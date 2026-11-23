@@ -37,9 +37,15 @@ import {
   STAGE_CODE_TO_PHASE,
   AUDIT_STAGE_CODES,
   QUOTE_STAGE_CODES,
+  isClosureStageCode,
 } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
-import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
+import {
+  getTaiwanDateString,
+  getTaskScheduleStatus,
+  getPausedScheduleOrder,
+  computeIsSubsequentToPaused,
+} from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import type {
   ApiResponse,
@@ -181,9 +187,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [projectEditSaving, setProjectEditSaving] = useState(false);
   const [projectEditError, setProjectEditError] = useState("");
   const [projectEditForm, setProjectEditForm] = useState({
-    projectName: "", siteAddress: "", siteCondition: "", expectedDate: "",
+    projectName: "", siteAddress: "", siteCondition: "", expectedDate: "", billingDate: "",
     unitCount: "", cost: "", quoteAmount: "", salesRepId: "",
   });
+
+  const isBillingLocked = Boolean(
+    project?.isBillingCompleted ||
+    milestones.some((m) => m.stageCode === "7-2" && m.status === "COMPLETED")
+  );
 
   const openEditProjectInfo = () => {
     if (!project) return;
@@ -192,6 +203,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       siteAddress: project.siteAddress || "",
       siteCondition: project.siteCondition || "",
       expectedDate: project.expectedDate ? project.expectedDate.slice(0, 10) : "",
+      billingDate: project.billingDate ? project.billingDate.slice(0, 10) : "",
       unitCount: project.unitCount != null ? String(project.unitCount) : "",
       cost: project.cost != null ? String(Math.round(Number(project.cost))) : "",
       quoteAmount: project.quoteAmount != null ? String(Math.round(Number(project.quoteAmount))) : "",
@@ -213,6 +225,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         siteAddress: projectEditForm.siteAddress,
         siteCondition: projectEditForm.siteCondition,
         expectedDate: projectEditForm.expectedDate || undefined,
+        ...(isBillingLocked ? {} : { billingDate: projectEditForm.billingDate || null }),
         unitCount: projectEditForm.unitCount ? Number(projectEditForm.unitCount) : undefined,
         cost: projectEditForm.cost ? Math.round(Number(projectEditForm.cost)) : undefined,
         quoteAmount: projectEditForm.quoteAmount ? Math.round(Number(projectEditForm.quoteAmount)) : undefined,
@@ -803,8 +816,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const canRollback = canManageMilestones || (!!project && currentUserId === project.salesRepId);
 
   const sortedAllMilestones = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-  const pausedMilestone = sortedAllMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
-  const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
+  const pausedStageOrder = getPausedScheduleOrder(sortedAllMilestones);
   const lastCompletedMilestone = [...sortedAllMilestones].reverse().find((m) => m.status === "COMPLETED");
   const currentActionableMilestone =
     project?.currentStage === "WRAP_UP"
@@ -1077,10 +1089,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           <div className="space-y-3">
             {phaseGroups[activePhase].map((m) => {
               const isEditing = editingId === m.id;
-              const isSubsequent = Boolean(
-                m.isSubsequentToPaused ??
-                (pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED")
-              );
+              const isSubsequent = computeIsSubsequentToPaused(m, pausedStageOrder);
               const isPaused = !isProjectLost && m.status !== "COMPLETED" && (!m.plannedDueDate || m.trafficLight?.label === "需追蹤") && !isSubsequent;
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
@@ -1165,11 +1174,15 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             onChange={(e) => setEditForm({ ...editForm, plannedDueDate: e.target.value })}
                             className="w-full border rounded p-1.5"
                           />
-                          {syncCascadeShift && (
+                          {isClosureStageCode(m.stageCode) ? (
+                            <p className="mt-1 text-[11px] text-slate-500 font-semibold">
+                              ℹ️ ［立帳/結案］採全手動設定日期，不連動平移後續項目
+                            </p>
+                          ) : syncCascadeShift ? (
                             <p className="mt-1 text-[11px] text-blue-600 font-semibold">
                               ℹ️ 已啟用［後續日期同步平移］
                             </p>
-                          )}
+                          ) : null}
                         </div>
                         <div>
                           <label className="block text-slate-600 mb-1 font-semibold">負責人員</label>
@@ -1819,6 +1832,23 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     onChange={(e) => setProjectEditForm({ ...projectEditForm, expectedDate: e.target.value })}
                     className="w-full border rounded p-2 text-xs"
                   />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    立帳日期 {isBillingLocked && <span className="text-amber-700 font-normal">(已依 7-2 鎖定)</span>}
+                  </label>
+                  <input
+                    type="date"
+                    disabled={isBillingLocked}
+                    value={projectEditForm.billingDate}
+                    onChange={(e) => setProjectEditForm({ ...projectEditForm, billingDate: e.target.value })}
+                    className={`w-full border rounded p-2 text-xs ${isBillingLocked ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+                  />
+                  {isBillingLocked && (
+                    <p className="mt-1 text-[11px] text-amber-700">
+                      已完成 7-2 立帳，如需調整請至進度項目 7-2 修改
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">成本金額（元）</label>

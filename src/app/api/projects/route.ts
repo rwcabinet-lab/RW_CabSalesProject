@@ -45,6 +45,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// 日期字串格式檢查 (YYYY-MM-DD)
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 // POST /api/projects — 新增案場
 export async function POST(req: NextRequest) {
   try {
@@ -52,10 +59,15 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
     const body = await req.json();
-    const { projectName, customerId, siteAddress, siteCondition, expectedDate, unitCount, cost, quoteAmount, salesRepId, startStageCode } = body;
+    const { projectName, customerId, siteAddress, siteCondition, expectedDate, billingDate, unitCount, cost, quoteAmount, salesRepId, startStageCode } = body;
 
     if (!projectName || !customerId || !siteAddress) {
       return NextResponse.json({ error: "案場名稱、關聯客戶、施工地址為必填欄位" }, { status: 400 });
+    }
+    if (billingDate !== undefined && billingDate !== null && billingDate !== "") {
+      if (typeof billingDate !== "string" || !isValidDateOnly(billingDate.slice(0, 10))) {
+        return NextResponse.json({ error: "立帳日期格式無效" }, { status: 400 });
+      }
     }
 
     const project = await DataService.addProject({
@@ -64,6 +76,7 @@ export async function POST(req: NextRequest) {
       siteAddress,
       siteCondition,
       expectedDate,
+      billingDate: typeof billingDate === "string" && billingDate.trim() ? billingDate.slice(0, 10) : undefined,
       unitCount: unitCount ? Number(unitCount) : undefined,
       cost: cost ? Number(cost) : undefined,
       quoteAmount: quoteAmount ? Number(quoteAmount) : undefined,
@@ -87,6 +100,15 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, ...data } = body;
     if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+
+    if (data.billingDate !== undefined && data.billingDate !== null && data.billingDate !== "") {
+      if (typeof data.billingDate !== "string" || !isValidDateOnly(data.billingDate.slice(0, 10))) {
+        return NextResponse.json({ error: "立帳日期格式無效" }, { status: 400 });
+      }
+      data.billingDate = data.billingDate.slice(0, 10);
+    } else if (data.billingDate === "") {
+      data.billingDate = null;
+    }
 
     const existing = await DataService.getProjectById(id, { evaluateSchedule: false });
     if (!existing) return NextResponse.json({ error: "找不到案場" }, { status: 404 });

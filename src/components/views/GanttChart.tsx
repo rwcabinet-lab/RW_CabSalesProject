@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 import { MILESTONE_STAGE_LABELS } from "@/lib/constants";
-import { getTaiwanDateString } from "@/lib/schedule-engine";
+import { getTaiwanDateString, getPausedScheduleOrder, computeIsSubsequentToPaused } from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 
 interface GanttProps {
@@ -132,15 +132,10 @@ export function GanttChart({ projects, tasks }: GanttProps) {
   // 建構里程碑與待辦行
   const buildRowsForProject = useCallback(
     (proj: ProjectWithMilestonesDTO, taskByProject: Map<string, TaskDTO[]>): TimelineRow[] => {
-      const sortedMilestones = [...proj.milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-      const pausedM = sortedMilestones.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
-      const pausedOrder = pausedM ? pausedM.stageOrder : null;
+      const pausedOrder = getPausedScheduleOrder(proj.milestones);
 
       const rows: TimelineRow[] = proj.milestones.map((milestone) => {
-        const isSubsequent = Boolean(
-          milestone.isSubsequentToPaused ??
-            (pausedOrder !== null && milestone.stageOrder > pausedOrder && milestone.status !== "COMPLETED")
-        );
+        const isSubsequent = computeIsSubsequentToPaused(milestone, pausedOrder);
         return {
           id: `milestone-${milestone.id}`,
           label: milestone.stageName || MILESTONE_STAGE_LABELS[milestone.stageCode] || milestone.stageCode,

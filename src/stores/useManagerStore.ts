@@ -6,6 +6,7 @@ export interface ManagerFilterState {
   businessFilter: string;
   stageFilter: string;
   dateSort: "NONE" | "ASC" | "DESC";
+  dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
 
   setSearchQuery: (val: string) => void;
@@ -14,7 +15,7 @@ export interface ManagerFilterState {
   setStageFilter: (val: string) => void;
   setDateSort: (val: "NONE" | "ASC" | "DESC") => void;
   setStatusSort: (val: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST") => void;
-  toggleDateSort: () => void;
+  toggleDateSort: (field?: "expectedDate" | "billingDate") => void;
   toggleStatusSort: () => void;
   resetFilters: () => void;
   initFromStorage: () => void;
@@ -28,6 +29,7 @@ interface ManagerFilterFields {
   businessFilter: string;
   stageFilter: string;
   dateSort: "NONE" | "ASC" | "DESC";
+  dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
 }
 
@@ -37,6 +39,7 @@ const DEFAULT_MANAGER_FILTERS: ManagerFilterFields = {
   businessFilter: "",
   stageFilter: "ACTIVE",
   dateSort: "NONE",
+  dateSortField: "expectedDate",
   statusSort: "NONE",
 };
 
@@ -78,11 +81,17 @@ export const useManagerStore = create<ManagerFilterState>((set) => ({
     set({ statusSort: val });
     saveManagerFilters({ statusSort: val });
   },
-  toggleDateSort: () =>
+  toggleDateSort: (field = "expectedDate") =>
     set((state) => {
-      const next = state.dateSort === "NONE" ? "ASC" : state.dateSort === "ASC" ? "DESC" : "NONE";
-      saveManagerFilters({ dateSort: next });
-      return { dateSort: next };
+      const next =
+        state.dateSort === "NONE" || state.dateSortField !== field
+          ? "ASC"
+          : state.dateSort === "ASC"
+          ? "DESC"
+          : "NONE";
+      const nextField = next === "NONE" ? "expectedDate" : field;
+      saveManagerFilters({ dateSort: next, dateSortField: nextField });
+      return { dateSort: next, dateSortField: nextField };
     }),
   toggleStatusSort: () =>
     set((state) => {
@@ -115,6 +124,10 @@ export const useManagerStore = create<ManagerFilterState>((set) => ({
           businessFilter: typeof parsed.businessFilter === "string" ? parsed.businessFilter : "",
           stageFilter: typeof parsed.stageFilter === "string" ? parsed.stageFilter : "ACTIVE",
           dateSort: ["NONE", "ASC", "DESC"].includes(parsed.dateSort) ? parsed.dateSort : "NONE",
+          dateSortField:
+            parsed.dateSortField === "billingDate" || parsed.dateSortField === "expectedDate"
+              ? parsed.dateSortField
+              : "expectedDate",
           statusSort: ["NONE", "URGENT_FIRST", "NORMAL_FIRST"].includes(parsed.statusSort) ? parsed.statusSort : "NONE",
         });
       }

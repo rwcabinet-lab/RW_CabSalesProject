@@ -6,7 +6,7 @@ import {
   TaskPriority,
   TaskType,
 } from "@prisma/client";
-import { BadRequestError } from "../errors";
+import { BadRequestError, ConflictError } from "../errors";
 import {
   CUSTOMER_TYPE_LABELS,
   CUSTOMER_TYPE_START_STAGE_CODES,
@@ -14,6 +14,8 @@ import {
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   STANDARD_MILESTONE_STAGE_CODES,
+  isClosureStageCode,
+  resolveBillingInfoFromMilestones,
 } from "../constants";
 import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE } from "../schedule-engine";
 import type {
@@ -35,35 +37,47 @@ export const ProjectService = {
   async getProjects(filter?: { where?: Prisma.ProjectWhereInput }): Promise<ProjectDetail[]> {
     const projects = await prisma.project.findMany({
       where: filter?.where,
-      include: projectInclude,
+      include: {
+        ...projectInclude,
+        milestones: {
+          where: { stageCode: "7-2" },
+          select: { stageCode: true, status: true, plannedDueDate: true, actualDueDate: true },
+          take: 1,
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
-    return projects.map((p) => ({
-      id: p.id,
-      projectName: p.projectName,
-      customerId: p.customerId,
-      customerName: p.customer.name,
-      customerType: customerTypeFromDatabase(p.customer.customerType),
-      defaultDiscount: Number(p.customer.defaultDiscount),
-      siteAddress: p.siteAddress,
-      siteCondition: p.siteCondition || undefined,
-      salesRepId: p.salesRepId,
-      salesRepName: p.salesRep.name,
-      customerSalesRepId: p.customer.salesRepId,
-      customerSalesRepName: p.customer.salesRep.name,
-      salesAssistantId: p.salesAssistantId || undefined,
-      salesAssistantName: p.salesAssistant?.name,
-      currentStage: p.currentStage,
-      isDelayed: p.isDelayed,
-      expectedDate: dateValue(p.expectedDate),
-      estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
-      unitCount: p.unitCount ?? undefined,
-      cost: p.cost != null ? Number(p.cost) : undefined,
-      quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
-      parentId: p.parentId ?? undefined,
-      phaseNumber: p.phaseNumber ?? undefined,
-      phaseName: p.phaseName ?? undefined,
-    }));
+    return projects.map((p) => {
+      const billingInfo = resolveBillingInfoFromMilestones(p.milestones);
+      return {
+        id: p.id,
+        projectName: p.projectName,
+        customerId: p.customerId,
+        customerName: p.customer.name,
+        customerType: customerTypeFromDatabase(p.customer.customerType),
+        defaultDiscount: Number(p.customer.defaultDiscount),
+        siteAddress: p.siteAddress,
+        siteCondition: p.siteCondition || undefined,
+        salesRepId: p.salesRepId,
+        salesRepName: p.salesRep.name,
+        customerSalesRepId: p.customer.salesRepId,
+        customerSalesRepName: p.customer.salesRep.name,
+        salesAssistantId: p.salesAssistantId || undefined,
+        salesAssistantName: p.salesAssistant?.name,
+        currentStage: p.currentStage,
+        isDelayed: p.isDelayed,
+        expectedDate: dateValue(p.expectedDate),
+        billingDate: billingInfo.billingDate ?? undefined,
+        isBillingCompleted: billingInfo.isBillingCompleted,
+        estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
+        unitCount: p.unitCount ?? undefined,
+        cost: p.cost != null ? Number(p.cost) : undefined,
+        quoteAmount: p.quoteAmount != null ? Number(p.quoteAmount) : undefined,
+        parentId: p.parentId ?? undefined,
+        phaseNumber: p.phaseNumber ?? undefined,
+        phaseName: p.phaseName ?? undefined,
+      };
+    });
   },
 
   async getProjectById(
@@ -77,9 +91,17 @@ export const ProjectService = {
     const p = await prisma.project.findUnique({
       where: { id },
       relationLoadStrategy: "join",
-      include: projectInclude,
+      include: {
+        ...projectInclude,
+        milestones: {
+          where: { stageCode: "7-2" },
+          select: { stageCode: true, status: true, plannedDueDate: true, actualDueDate: true },
+          take: 1,
+        },
+      },
     });
     if (!p) return undefined;
+    const billingInfo = resolveBillingInfoFromMilestones(p.milestones);
     return {
       id: p.id,
       projectName: p.projectName,
@@ -98,6 +120,8 @@ export const ProjectService = {
       currentStage: p.currentStage,
       isDelayed: p.isDelayed,
       expectedDate: dateValue(p.expectedDate),
+      billingDate: billingInfo.billingDate ?? undefined,
+      isBillingCompleted: billingInfo.isBillingCompleted,
       estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
       unitCount: p.unitCount ?? undefined,
       cost: p.cost != null ? Number(p.cost) : undefined,
@@ -175,6 +199,7 @@ export const ProjectService = {
       ).catch((err) => console.error("Failed to auto-sync milestone status:", err));
     }
 
+    const billingInfo = resolveBillingInfoFromMilestones(rawMilestones);
     const project: ProjectDetail = {
       id: p.id,
       projectName: p.projectName,
@@ -193,6 +218,8 @@ export const ProjectService = {
       currentStage: p.currentStage,
       isDelayed: correctIsDelayed,
       expectedDate: dateValue(p.expectedDate),
+      billingDate: billingInfo.billingDate ?? undefined,
+      isBillingCompleted: billingInfo.isBillingCompleted,
       estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
       unitCount: p.unitCount ?? undefined,
       cost: p.cost != null ? Number(p.cost) : undefined,
@@ -210,6 +237,7 @@ export const ProjectService = {
     siteAddress: string;
     siteCondition?: string;
     expectedDate?: string;
+    billingDate?: string;
     unitCount?: number;
     cost?: number;
     quoteAmount?: number;
@@ -262,7 +290,7 @@ export const ProjectService = {
       const isSkipped = index < validTargetIndex;
       const isActive = index === validTargetIndex;
 
-      let plannedDueDate: Date;
+      let plannedDueDate: Date | null;
       let actualDueDate: Date | null = null;
       let status: MilestoneStatus;
       let notes: string | null = null;
@@ -272,6 +300,15 @@ export const ProjectService = {
         plannedDueDate = new Date(today);
         actualDueDate = new Date(today);
         notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
+      } else if (isClosureStageCode(code)) {
+        // 第七階段【立帳/結案】採全手動設定日期與推進，不納入自動天數推算（僅 7-2 立帳承接表單選填之立帳日期）
+        status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
+        if (code === "7-2" && data.billingDate) {
+          const dateStr = data.billingDate.slice(0, 10);
+          plannedDueDate = new Date(`${dateStr}T00:00:00.000Z`);
+        } else {
+          plannedDueDate = null;
+        }
       } else if (code === "6-1" && data.expectedDate) {
         status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
         const dateStr = data.expectedDate.slice(0, 10);
@@ -356,6 +393,7 @@ export const ProjectService = {
         });
       }
 
+      const billingInfo = resolveBillingInfoFromMilestones(milestoneRows);
       return {
         id: p.id,
         projectName: p.projectName,
@@ -374,6 +412,8 @@ export const ProjectService = {
         currentStage: p.currentStage,
         isDelayed: p.isDelayed,
         expectedDate: dateValue(p.expectedDate),
+        billingDate: billingInfo.billingDate ?? undefined,
+        isBillingCompleted: billingInfo.isBillingCompleted,
         estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
         unitCount: p.unitCount ?? undefined,
         cost: p.cost != null ? Number(p.cost) : undefined,
@@ -390,6 +430,7 @@ export const ProjectService = {
     data: {
       phaseName: string;
       expectedDate?: string;
+      billingDate?: string;
       unitCount?: number;
       cost?: number;
       quoteAmount?: number;
@@ -461,6 +502,29 @@ export const ProjectService = {
         });
       }
 
+      // 若有指定立帳日期且 7-2 尚未完成，連動同步 phase1 的 7-2 里程碑
+      let billingInfo = resolveBillingInfoFromMilestones(parent.milestones);
+      if (data.billingDate !== undefined) {
+        const m72 = await prisma.projectMilestone.findFirst({
+          where: { projectId: phase1.id, stageCode: "7-2" },
+          select: { id: true, status: true, plannedDueDate: true, actualDueDate: true },
+        });
+        if (m72 && m72.status !== MilestoneStatus.COMPLETED) {
+          const nextBillingDate = data.billingDate
+            ? new Date(`${data.billingDate.slice(0, 10)}T00:00:00.000Z`)
+            : null;
+          await prisma.projectMilestone.update({
+            where: { id: m72.id },
+            data: { plannedDueDate: nextBillingDate },
+          });
+          billingInfo = resolveBillingInfoFromMilestones([
+            { stageCode: "7-2", status: m72.status, plannedDueDate: nextBillingDate, actualDueDate: m72.actualDueDate },
+          ]);
+        } else if (m72) {
+          billingInfo = resolveBillingInfoFromMilestones([{ stageCode: "7-2", ...m72 }]);
+        }
+      }
+
       // 母案轉型為彙總容器，清空履約執行欄位（由各分期動態加總彙整）
       await prisma.project.update({
         where: { id: parent.id },
@@ -491,6 +555,8 @@ export const ProjectService = {
         currentStage: phase1.currentStage,
         isDelayed: phase1.isDelayed,
         expectedDate: dateValue(phase1.expectedDate),
+        billingDate: billingInfo.billingDate ?? undefined,
+        isBillingCompleted: billingInfo.isBillingCompleted,
         estimatedBudget: phase1.estimatedBudget != null ? Number(phase1.estimatedBudget) : undefined,
         unitCount: phase1.unitCount ?? undefined,
         cost: phase1.cost != null ? Number(phase1.cost) : undefined,
@@ -510,6 +576,7 @@ export const ProjectService = {
         siteAddress: parent.siteAddress,
         siteCondition: parent.siteCondition || undefined,
         expectedDate: data.expectedDate,
+        billingDate: data.billingDate,
         unitCount: data.unitCount,
         cost: data.cost,
         quoteAmount: data.quoteAmount,
@@ -530,6 +597,7 @@ export const ProjectService = {
     siteAddress?: string;
     siteCondition?: string;
     expectedDate?: string;
+    billingDate?: string | null;
     unitCount?: number | null;
     cost?: number | null;
     quoteAmount?: number | null;
@@ -632,6 +700,41 @@ export const ProjectService = {
         }
       }
 
+      // 雙向同步：同步 7-2 立帳里程碑（未完成時可更新預定立帳日；已完成則鎖定依實際完成日為準）
+      let syncedBillingDate: string | undefined;
+      let syncedBillingCompleted = false;
+      const m72 = await tx.projectMilestone.findFirst({
+        where: { projectId: id, stageCode: "7-2" },
+        select: { id: true, status: true, plannedDueDate: true, actualDueDate: true },
+      });
+      if (m72) {
+        syncedBillingCompleted = m72.status === MilestoneStatus.COMPLETED;
+        if (data.billingDate !== undefined) {
+          const normalizedInput = data.billingDate ? data.billingDate.slice(0, 10) : null;
+          const currentActual = m72.actualDueDate ? dateOnlyValue(m72.actualDueDate) : null;
+          if (m72.status === MilestoneStatus.COMPLETED) {
+            if (normalizedInput !== currentActual) {
+              throw new ConflictError("7-2 立帳已完成，立帳日期已鎖定為實際完成日，請至項目 7-2 修改");
+            }
+          } else {
+            const newBillingDate = normalizedInput ? new Date(`${normalizedInput}T00:00:00.000Z`) : null;
+            await tx.projectMilestone.update({
+              where: { id: m72.id },
+              data: { plannedDueDate: newBillingDate },
+            });
+            await tx.salesTask.updateMany({
+              where: { milestoneId: m72.id, isCompleted: false },
+              data: { dueDatetime: newBillingDate || new Date() },
+            });
+            syncedBillingDate = normalizedInput || undefined;
+          }
+        }
+        if (!(data.billingDate !== undefined && m72.status !== MilestoneStatus.COMPLETED)) {
+          const info = resolveBillingInfoFromMilestones([{ stageCode: "7-2", ...m72 }]);
+          syncedBillingDate = info.billingDate ?? undefined;
+        }
+      }
+
       return {
         id: p.id,
         projectName: p.projectName,
@@ -650,6 +753,8 @@ export const ProjectService = {
         currentStage: p.currentStage,
         isDelayed: p.isDelayed,
         expectedDate: dateValue(p.expectedDate),
+        billingDate: syncedBillingDate,
+        isBillingCompleted: syncedBillingCompleted,
         estimatedBudget: p.estimatedBudget != null ? Number(p.estimatedBudget) : undefined,
         unitCount: p.unitCount ?? undefined,
         cost: p.cost != null ? Number(p.cost) : undefined,

@@ -490,6 +490,7 @@ export function WorkbenchAddPhaseModal({
   const [saving, setSaving] = useState(false);
   const [phaseName, setPhaseName] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
+  const [billingDate, setBillingDate] = useState("");
   const [quoteAmount, setQuoteAmount] = useState("");
   const [cost, setCost] = useState("");
   const [unitCount, setUnitCount] = useState("");
@@ -502,11 +503,13 @@ export function WorkbenchAddPhaseModal({
       setPhaseName(`第 ${nextNum} 期`);
       if (!hasExistingPhases) {
         setExpectedDate(projectToAddPhase.expectedDate ? projectToAddPhase.expectedDate.slice(0, 10) : "");
+        setBillingDate(projectToAddPhase.billingDate ? projectToAddPhase.billingDate.slice(0, 10) : "");
         setQuoteAmount(projectToAddPhase.quoteAmount != null ? String(projectToAddPhase.quoteAmount) : "");
         setCost(projectToAddPhase.cost != null ? String(projectToAddPhase.cost) : "");
         setUnitCount(projectToAddPhase.unitCount != null ? String(projectToAddPhase.unitCount) : "");
       } else {
         setExpectedDate("");
+        setBillingDate("");
         setQuoteAmount("");
         setCost("");
         setUnitCount("");
@@ -528,6 +531,7 @@ export function WorkbenchAddPhaseModal({
         body: JSON.stringify({
           phaseName: phaseName.trim(),
           expectedDate: expectedDate || undefined,
+          billingDate: billingDate || undefined,
           quoteAmount: quoteAmount ? Math.round(Number(quoteAmount)) : undefined,
           cost: cost ? Math.round(Number(cost)) : undefined,
           unitCount: unitCount ? Number(unitCount) : undefined,
@@ -598,6 +602,16 @@ export function WorkbenchAddPhaseModal({
               type="date"
               value={expectedDate}
               onChange={(e) => setExpectedDate(e.target.value)}
+              className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="font-semibold text-slate-700">
+            立帳日期（可空白，同步 7-2）
+            <input
+              type="date"
+              value={billingDate}
+              onChange={(e) => setBillingDate(e.target.value)}
               className="mt-1 w-full rounded border border-slate-300 p-2 text-xs font-normal focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </label>

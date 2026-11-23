@@ -50,6 +50,7 @@ export function WorkbenchAddProjectPanel({
     try {
       const payload = {
         ...newProjectData,
+        billingDate: newProjectData.billingDate || undefined,
         startStageCode: effectiveStartCode,
         unitCount: newProjectData.unitCount ? Number(newProjectData.unitCount) : undefined,
         cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
@@ -184,6 +185,15 @@ export function WorkbenchAddProjectPanel({
             className="w-full border rounded p-1.5 mt-1"
           />
         </label>
+        <label>
+          立帳日期 <span className="text-xs text-slate-500 font-normal">（可空白，同步 7-2）</span>
+          <input
+            type="date"
+            value={newProjectData.billingDate}
+            onChange={(e) => setNewProjectData({ billingDate: e.target.value })}
+            className="w-full border rounded p-1.5 mt-1"
+          />
+        </label>
         <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
           <button
             type="button"
@@ -226,6 +236,7 @@ export function WorkbenchEditProjectRow({
 }: WorkbenchEditProjectRowProps) {
   const queryClient = useQueryClient();
   const closeEditProject = useWorkbenchStore((s) => s.closeEditProject);
+  const editingProjectBillingLocked = useWorkbenchStore((s) => s.editingProjectBillingLocked);
   const newProjectData = useWorkbenchStore((s) => s.newProjectData);
   const setNewProjectData = useWorkbenchStore((s) => s.setNewProjectData);
 
@@ -249,6 +260,7 @@ export function WorkbenchEditProjectRow({
               cost: newProjectData.cost ? Math.round(Number(newProjectData.cost)) : undefined,
               quoteAmount: newProjectData.quoteAmount ? Math.round(Number(newProjectData.quoteAmount)) : undefined,
               expectedDate: newProjectData.expectedDate || undefined,
+              ...(editingProjectBillingLocked ? {} : { billingDate: newProjectData.billingDate || null }),
             }),
       };
       const res = await fetch("/api/projects", {
@@ -276,6 +288,11 @@ export function WorkbenchEditProjectRow({
                       siteAddress: savedProject.siteAddress,
                       siteCondition: savedProject.siteCondition || "",
                       expectedDate: hasPhases ? p.expectedDate : savedProject.expectedDate ? savedProject.expectedDate.slice(0, 10) : "",
+                      billingDate: hasPhases
+                        ? p.billingDate
+                        : editingProjectBillingLocked
+                          ? p.billingDate
+                          : (savedProject.billingDate ? savedProject.billingDate.slice(0, 10) : ""),
                       unitCount: hasPhases ? p.unitCount : savedProject.unitCount,
                       cost: hasPhases ? p.cost : savedProject.cost,
                       quoteAmount: hasPhases ? p.quoteAmount : savedProject.quoteAmount,
@@ -422,6 +439,30 @@ export function WorkbenchEditProjectRow({
                 onChange={(e) => setNewProjectData({ expectedDate: e.target.value })}
                 className={`w-full border rounded p-1.5 mt-1 ${hasPhases ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
               />
+            </label>
+            <label className="font-semibold text-slate-700">
+              立帳日期{" "}
+              {hasPhases ? (
+                <span className="text-slate-400 font-normal">(各期獨立)</span>
+              ) : editingProjectBillingLocked ? (
+                <span className="text-amber-700 font-normal">(已鎖定)</span>
+              ) : null}
+              <input
+                type="date"
+                disabled={hasPhases || editingProjectBillingLocked}
+                value={newProjectData.billingDate}
+                onChange={(e) => setNewProjectData({ billingDate: e.target.value })}
+                className={`w-full border rounded p-1.5 mt-1 ${
+                  hasPhases || editingProjectBillingLocked
+                    ? "bg-slate-100 text-slate-500 cursor-not-allowed"
+                    : "bg-white"
+                }`}
+              />
+              {!hasPhases && editingProjectBillingLocked && (
+                <span className="mt-0.5 block text-[10px] font-normal text-amber-700">
+                  已完成 7-2 立帳，請至項目 7-2 修改實際完成日
+                </span>
+              )}
             </label>
             <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end gap-2 pt-2 border-t border-emerald-200">
               <button

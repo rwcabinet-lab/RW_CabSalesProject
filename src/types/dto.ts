@@ -144,6 +144,8 @@ export interface ProjectDTO {
   currentStage: string;
   isDelayed: boolean;
   expectedDate?: string;
+  billingDate?: string | null;
+  isBillingCompleted?: boolean;
   estimatedBudget?: number;
   unitCount?: number;
   cost?: number;
@@ -164,6 +166,8 @@ export interface WorkbenchProjectDTO {
   defaultDiscount: number;
   siteCondition: string;
   expectedDate: string;
+  billingDate?: string | null;
+  isBillingCompleted?: boolean;
   currentStage: string;
   siteAddress: string;
   isDelayed: boolean;
@@ -342,6 +346,8 @@ export interface ManagerProjectOverviewDTO {
   isClosed?: boolean;
   trafficLight: TrafficLightDTO;
   expectedDate: string;
+  billingDate?: string | null;
+  isBillingCompleted?: boolean;
   unitCount?: number;
   cost?: number;
   quoteAmount?: number;

@@ -68,6 +68,7 @@ export default function SalesWorkbenchPage() {
     statusFilter,
     stageFilter,
     dateSort,
+    dateSortField,
     statusSort,
     isProjectPanelOpen,
     editingProjectId,
@@ -77,6 +78,7 @@ export default function SalesWorkbenchPage() {
       statusFilter: s.statusFilter,
       stageFilter: s.stageFilter,
       dateSort: s.dateSort,
+      dateSortField: s.dateSortField,
       statusSort: s.statusSort,
       isProjectPanelOpen: s.isProjectPanelOpen,
       editingProjectId: s.editingProjectId,
@@ -179,14 +181,15 @@ export default function SalesWorkbenchPage() {
         }
       }
       if (dateSort === "NONE") return 0;
-      const dateA = a.expectedDate || "";
-      const dateB = b.expectedDate || "";
+      const sortKey = dateSortField === "billingDate" ? "billingDate" : "expectedDate";
+      const dateA = a[sortKey] || "";
+      const dateB = b[sortKey] || "";
       if (!dateA && !dateB) return 0;
       if (!dateA) return 1;
       if (!dateB) return -1;
       return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
     });
-  }, [filteredProjects, statusSort, dateSort, pinnedSet]);
+  }, [filteredProjects, statusSort, dateSort, dateSortField, pinnedSet]);
 
   const totalFilteredAmount = useMemo(() => {
     return sortedProjects.reduce(
@@ -505,15 +508,21 @@ export default function SalesWorkbenchPage() {
               <tr>
                 {visibleColumns.map((col) => (
                   <th key={col.key} className={`p-3 ${col.key === "actions" ? "text-center" : ""}`}>
-                    {col.key === "expectedDate" ? (
+                    {col.key === "expectedDate" || col.key === "billingDate" ? (
                       <button
                         type="button"
-                        onClick={toggleDateSort}
+                        onClick={() => toggleDateSort(col.key as "expectedDate" | "billingDate")}
                         className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
                       >
                         {col.label}
                         <span className="text-[11px] text-blue-600 font-black">
-                          {dateSort === "ASC" ? "🔼" : dateSort === "DESC" ? "🔽" : "↕️"}
+                          {dateSortField === col.key
+                            ? dateSort === "ASC"
+                              ? "🔼"
+                              : dateSort === "DESC"
+                              ? "🔽"
+                              : "↕️"
+                            : "↕️"}
                         </span>
                       </button>
                     ) : col.key === "trafficLight" ? (
@@ -706,7 +715,21 @@ export default function SalesWorkbenchPage() {
                           case "expectedDate":
                             return (
                               <td key={col.key} className="p-3 text-slate-600 font-medium">
-                                {p.expectedDate?.slice(0, 10) || "未設定"}
+                                {hasPhases ? (
+                                  <span className="text-slate-400 font-normal select-none">—</span>
+                                ) : (
+                                  p.expectedDate?.slice(0, 10) || "未設定"
+                                )}
+                              </td>
+                            );
+                          case "billingDate":
+                            return (
+                              <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                {hasPhases ? (
+                                  <span className="text-slate-400 font-normal select-none">—</span>
+                                ) : (
+                                  p.billingDate?.slice(0, 10) || "未設定"
+                                )}
                               </td>
                             );
                           case "actions":
@@ -881,6 +904,12 @@ export default function SalesWorkbenchPage() {
                                 return (
                                   <td key={col.key} className="p-3 text-slate-600 font-medium">
                                     {phase.expectedDate?.slice(0, 10) || "未設定"}
+                                  </td>
+                                );
+                              case "billingDate":
+                                return (
+                                  <td key={col.key} className="p-3 text-slate-600 font-medium">
+                                    {phase.billingDate?.slice(0, 10) || "未設定"}
                                   </td>
                                 );
                               case "actions":

@@ -59,11 +59,21 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { phaseName, expectedDate, unitCount, cost, quoteAmount, salesRepId, startStageCode } = body;
+    const { phaseName, expectedDate, billingDate, unitCount, cost, quoteAmount, salesRepId, startStageCode } = body;
+
+    if (billingDate !== undefined && billingDate !== null && billingDate !== "") {
+      if (
+        typeof billingDate !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(billingDate.slice(0, 10))
+      ) {
+        return NextResponse.json({ error: "立帳日期格式無效" }, { status: 400 });
+      }
+    }
 
     const newPhase = await DataService.addProjectPhase(params.id, {
       phaseName: typeof phaseName === "string" ? phaseName : "",
       expectedDate: typeof expectedDate === "string" && expectedDate ? expectedDate : undefined,
+      billingDate: typeof billingDate === "string" && billingDate ? billingDate.slice(0, 10) : undefined,
       unitCount: unitCount ? Number(unitCount) : undefined,
       cost: cost ? Number(cost) : undefined,
       quoteAmount: quoteAmount ? Number(quoteAmount) : undefined,

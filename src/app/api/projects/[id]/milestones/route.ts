@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { ScheduleEngine, STAGE_CODE_TO_PROJECT_STAGE, getTaiwanDateString } from "@/lib/schedule-engine";
+import {
+  ScheduleEngine,
+  STAGE_CODE_TO_PROJECT_STAGE,
+  getTaiwanDateString,
+  getPausedScheduleOrder,
+  computeIsSubsequentToPaused,
+} from "@/lib/schedule-engine";
 import { getUserFromRequest, getRolePages } from "@/lib/access-control";
-import { AUDIT_STAGE_CODES, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
+import {
+  AUDIT_STAGE_CODES,
+  STANDARD_MILESTONE_STAGE_CODES,
+  resolveBillingInfoFromMilestones,
+} from "@/lib/constants";
 import { AppError, handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -13,18 +23,16 @@ function isValidDateOnly(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTrafficLight>[0]>(
+function attachTrafficLights<
+  T extends Parameters<typeof ScheduleEngine.getTrafficLight>[0] & { stageOrder?: number }
+>(
   milestones: T[],
   isProjectLost = false,
 ) {
-  const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-  const pausedMilestone = sorted.find((m) => m.status !== "COMPLETED" && !m.plannedDueDate);
-  const pausedStageOrder = pausedMilestone ? pausedMilestone.stageOrder : null;
+  const pausedStageOrder = getPausedScheduleOrder(milestones);
 
   return milestones.map((m) => {
-    const isSubsequentToPaused = Boolean(
-      m.isSubsequentToPaused ?? (pausedStageOrder !== null && m.stageOrder > pausedStageOrder && m.status !== "COMPLETED")
-    );
+    const isSubsequentToPaused = computeIsSubsequentToPaused(m, pausedStageOrder);
     const itemWithSubsequent = { ...m, isSubsequentToPaused };
     const status = isProjectLost && itemWithSubsequent.status === "OVERDUE" ? ("IN_PROGRESS" as const) : itemWithSubsequent.status;
     return {
@@ -35,6 +43,18 @@ function attachTrafficLights<T extends Parameters<typeof ScheduleEngine.getTraff
         : ScheduleEngine.getTrafficLight(itemWithSubsequent),
     };
   });
+}
+
+function withProjectBillingInfo<T extends Record<string, unknown>>(
+  project: T,
+  milestones: Array<{ stageCode: string; status: string; plannedDueDate?: string | null; actualDueDate?: string | null }>,
+) {
+  const { billingDate, isBillingCompleted } = resolveBillingInfoFromMilestones(milestones);
+  return {
+    ...project,
+    billingDate: billingDate ?? undefined,
+    isBillingCompleted,
+  };
 }
 
 export async function GET(
@@ -196,7 +216,7 @@ export async function PUT(
           Object.keys(datesMap).length > 0 ? datesMap : undefined
         );
         const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedMilestones);
-        const updatedProject = { ...project, isDelayed };
+        const updatedProject = withProjectBillingInfo({ ...project, isDelayed }, evaluatedMilestones);
 
         return NextResponse.json({
           success: true,
@@ -349,7 +369,10 @@ export async function PUT(
       const updatedStage = targetMilestone
         ? STAGE_CODE_TO_PROJECT_STAGE[targetMilestone.stageCode] || project.currentStage
         : project.currentStage;
-      const updatedProject = { ...project, currentStage: updatedStage, isDelayed };
+      const updatedProject = withProjectBillingInfo(
+        { ...project, currentStage: updatedStage, isDelayed },
+        milestones,
+      );
       return NextResponse.json({
         success: true,
         project: updatedProject,
@@ -388,7 +411,10 @@ export async function PUT(
         ? STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode] || project.currentStage
         : targetMilestone?.stageCode === "X-1" ? "WRAP_UP" : "DONE";
       const { isDelayed } = ScheduleEngine.evaluateMilestones(milestones);
-      const updatedProject = { ...project, currentStage, isDelayed };
+      const updatedProject = withProjectBillingInfo(
+        { ...project, currentStage, isDelayed },
+        milestones,
+      );
       return NextResponse.json({
         success: true,
         project: updatedProject,
@@ -498,12 +524,15 @@ export async function PUT(
         initialMilestones,
       );
 
-      const updatedProject = {
-        ...project,
-        ...(effInstallationDate ? { expectedDate: effInstallationDate } : {}),
-        currentStage: result.newStage,
-        isDelayed: result.isDelayed,
-      };
+      const updatedProject = withProjectBillingInfo(
+        {
+          ...project,
+          ...(effInstallationDate ? { expectedDate: effInstallationDate } : {}),
+          currentStage: result.newStage,
+          isDelayed: result.isDelayed,
+        },
+        result.updatedMilestones,
+      );
 
       return NextResponse.json({
         success: true,
@@ -538,7 +567,7 @@ export async function PUT(
       Boolean(cascadeShift),
     );
     const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(allMilestones);
-    const updatedProject = { ...project, isDelayed };
+    const updatedProject = withProjectBillingInfo({ ...project, isDelayed }, evaluatedMilestones);
 
     const didDateChange = Boolean(
       updates?.plannedDueDate &&

@@ -190,7 +190,7 @@ describe("Customer Type Milestone Auto-Skip Logic (特定客戶類型起始進�
   });
 
   it("建立後直接推進里程碑 (advanceMilestone) 能無阻礙進行至下一階段", () => {
-    const { rows } = generateMilestoneRows("CABINET_FACTORY");
+    const { rows } = generateMilestoneRows("CABINET_FACTORY", undefined, new Date());
     const mockList = rows.map((r, i) => ({
       id: `m-${i + 1}`,
       projectId: "proj-1",

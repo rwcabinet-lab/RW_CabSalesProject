@@ -7,6 +7,7 @@ export interface ProjectFormData {
   siteAddress: string;
   siteCondition: string;
   expectedDate: string;
+  billingDate: string;
   unitCount: string;
   cost: string;
   quoteAmount: string;
@@ -25,6 +26,7 @@ export type AddPhaseProjectTarget = {
   id: string;
   projectName: string;
   expectedDate?: string | null;
+  billingDate?: string | null;
   salesRepId?: string | null;
   quoteAmount?: number | null;
   cost?: number | null;
@@ -38,11 +40,13 @@ interface WorkbenchState {
   statusFilter: string;
   stageFilter: string;
   dateSort: "NONE" | "ASC" | "DESC";
+  dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
 
   // 專案面板
   isProjectPanelOpen: boolean;
   editingProjectId: string | null;
+  editingProjectBillingLocked: boolean;
   newProjectData: ProjectFormData;
 
   // 待辦 Modal
@@ -67,7 +71,7 @@ interface WorkbenchState {
   setStageFilter: (val: string) => void;
   setDateSort: (val: "NONE" | "ASC" | "DESC") => void;
   setStatusSort: (val: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST") => void;
-  toggleDateSort: () => void;
+  toggleDateSort: (field?: "expectedDate" | "billingDate") => void;
   toggleStatusSort: () => void;
   resetFilters: () => void;
   initFromStorage: () => void;
@@ -104,6 +108,7 @@ const initialProjectForm: ProjectFormData = {
   siteAddress: "",
   siteCondition: "",
   expectedDate: "",
+  billingDate: "",
   unitCount: "",
   cost: "",
   quoteAmount: "",
@@ -125,6 +130,7 @@ interface WorkbenchFilterFields {
   statusFilter: string;
   stageFilter: string;
   dateSort: "NONE" | "ASC" | "DESC";
+  dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
 }
 
@@ -133,6 +139,7 @@ const DEFAULT_WORKBENCH_FILTERS: WorkbenchFilterFields = {
   statusFilter: "",
   stageFilter: "ACTIVE",
   dateSort: "NONE",
+  dateSortField: "expectedDate",
   statusSort: "NONE",
 };
 
@@ -152,6 +159,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
 
   isProjectPanelOpen: false,
   editingProjectId: null,
+  editingProjectBillingLocked: false,
   newProjectData: initialProjectForm,
 
   showTaskModal: false,
@@ -187,11 +195,17 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
     set({ statusSort: val });
     saveWorkbenchFilters({ statusSort: val });
   },
-  toggleDateSort: () =>
+  toggleDateSort: (field = "expectedDate") =>
     set((state) => {
-      const next = state.dateSort === "NONE" ? "ASC" : state.dateSort === "ASC" ? "DESC" : "NONE";
-      saveWorkbenchFilters({ dateSort: next });
-      return { dateSort: next };
+      const next =
+        state.dateSort === "NONE" || state.dateSortField !== field
+          ? "ASC"
+          : state.dateSort === "ASC"
+          ? "DESC"
+          : "NONE";
+      const nextField = next === "NONE" ? "expectedDate" : field;
+      saveWorkbenchFilters({ dateSort: next, dateSortField: nextField });
+      return { dateSort: next, dateSortField: nextField };
     }),
   toggleStatusSort: () =>
     set((state) => {
@@ -223,6 +237,10 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
           statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "",
           stageFilter: typeof parsed.stageFilter === "string" ? parsed.stageFilter : "ACTIVE",
           dateSort: ["NONE", "ASC", "DESC"].includes(parsed.dateSort) ? parsed.dateSort : "NONE",
+          dateSortField:
+            parsed.dateSortField === "billingDate" || parsed.dateSortField === "expectedDate"
+              ? parsed.dateSortField
+              : "expectedDate",
           statusSort: ["NONE", "URGENT_FIRST", "NORMAL_FIRST"].includes(parsed.statusSort) ? parsed.statusSort : "NONE",
         });
       }
@@ -240,22 +258,25 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   openAddProject: (defaultCustomerId = "", defaultSalesRepId = "") =>
     set({
       editingProjectId: null,
+      editingProjectBillingLocked: false,
       newProjectData: { ...initialProjectForm, customerId: defaultCustomerId, salesRepId: defaultSalesRepId },
       isProjectPanelOpen: true,
     }),
   openEditProject: (p) =>
     set((state) => {
       if (state.editingProjectId === p.id) {
-        return { editingProjectId: null };
+        return { editingProjectId: null, editingProjectBillingLocked: false };
       }
       return {
         editingProjectId: p.id,
+        editingProjectBillingLocked: Boolean(p.isBillingCompleted),
         newProjectData: {
           projectName: p.projectName,
           customerId: p.customerId,
           siteAddress: p.siteAddress,
           siteCondition: p.siteCondition,
           expectedDate: p.expectedDate ? p.expectedDate.slice(0, 10) : "",
+          billingDate: p.billingDate ? p.billingDate.slice(0, 10) : "",
           unitCount: p.unitCount?.toString() || "",
           cost: p.cost != null ? String(Math.round(Number(p.cost))) : "",
           quoteAmount: p.quoteAmount != null ? String(Math.round(Number(p.quoteAmount))) : "",
@@ -263,7 +284,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
         },
       };
     }),
-  closeEditProject: () => set({ editingProjectId: null }),
+  closeEditProject: () => set({ editingProjectId: null, editingProjectBillingLocked: false }),
 
   setShowTaskModal: (show) => set({ showTaskModal: show }),
   setNewTaskData: (data) =>
