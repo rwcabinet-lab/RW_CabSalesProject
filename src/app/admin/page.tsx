@@ -22,6 +22,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  RotateCcw,
 } from "lucide-react";
 import { AppRole, PageAccessKey, PAGE_ACCESS_OPTIONS, ROLE_OPTIONS } from "@/lib/page-access";
 import {
@@ -29,13 +30,25 @@ import {
   MILESTONE_STAGE_LABELS,
   MILESTONE_DEFAULT_DAYS,
   PHASE_LABELS,
+  STAGE_CODE_TO_PHASE,
+  normalizeMilestoneDefaultDays,
   normalizeProjectColumns,
   CUSTOMER_TYPE_START_STAGE_CODES,
   STANDARD_MILESTONE_STAGE_CODES,
 } from "@/lib/constants";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { AdminAnnouncementPanel } from "@/components/admin/AdminAnnouncementPanel";
-import type { ApiResponse, ColumnItemDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
+import type { ApiResponse, ColumnItemDTO, MilestonePhaseDTO, MilestoneStageCodeDTO, LoginRecordDTO } from "@/types/dto";
+
+const STANDARD_PHASE_ORDER: MilestonePhaseDTO[] = [
+  "DEVELOP",
+  "REQUIREMENT",
+  "PROPOSAL",
+  "PRE_PROD",
+  "PROD_SHIP",
+  "INSTALL",
+  "CLOSURE",
+];
 
 type ManagedUser = {
   id: string;
@@ -201,7 +214,9 @@ export default function AdminPage() {
   const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
 
   // 階段預設天數設定
-  const [stageDays, setStageDays] = useState<Record<string, number>>(MILESTONE_DEFAULT_DAYS);
+  const [stageDays, setStageDays] = useState<Record<string, number>>(() =>
+    normalizeMilestoneDefaultDays(MILESTONE_DEFAULT_DAYS)
+  );
   const [savingDays, setSavingDays] = useState(false);
 
   // 各客戶類型預設起始進度設定
@@ -246,7 +261,7 @@ export default function AdminPage() {
       const dayData = await dayRes.json();
       const typeData = await typeRes.json();
       setColumns(normalizeProjectColumns(colData.columns));
-      if (dayData.stageDays) setStageDays(dayData.stageDays);
+      if (dayData.stageDays) setStageDays(normalizeMilestoneDefaultDays(dayData.stageDays));
       if (typeData.customerTypeStages) setCustomerTypeStages(typeData.customerTypeStages);
     } catch (err) {
       console.error("Failed to load configs", err);
@@ -410,18 +425,28 @@ export default function AdminPage() {
     setError("");
     setNotice("");
     try {
+      const normalizedDays = normalizeMilestoneDefaultDays(stageDays);
       const res = await fetch("/api/admin/config", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "milestone_default_days", value: stageDays }),
+        body: JSON.stringify({ key: "milestone_default_days", value: normalizedDays }),
       });
       if (!res.ok) throw new Error("儲存預設天數失敗");
+      const result = await res.json() as { stageDays?: Record<string, number> };
+      setStageDays(normalizeMilestoneDefaultDays(result.stageDays ?? normalizedDays));
       setNotice("各階段進度預設天數已成功更新！");
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存預設天數失敗");
     } finally {
       setSavingDays(false);
     }
+  };
+
+  const resetStageDaysToDefault = () => {
+    setStageDays(normalizeMilestoneDefaultDays(MILESTONE_DEFAULT_DAYS));
+    setError("");
+    setNotice("已填入現行 28 項進度之系統預設天數，請點擊右上角「儲存預設天數」生效。");
   };
 
   const saveCustomerTypeStagesConfig = async () => {
@@ -735,45 +760,71 @@ export default function AdminPage() {
       {/* 分頁 2. 各階段進度預設天數設定 */}
       {configTab === "stageDays" && (
         <div>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-indigo-600" />
               <h2 className="text-lg font-bold">各階段進度預設天數設定</h2>
               <SectionHelpButton sectionId="admin-stage-days" />
             </div>
-            <button
-              type="button"
-              onClick={saveStageDaysConfig}
-              disabled={savingDays}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {savingDays ? "儲存中..." : "儲存預設天數"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={resetStageDaysToDefault}
+                disabled={savingDays}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                回復系統預設
+              </button>
+              <button
+                type="button"
+                onClick={saveStageDaysConfig}
+                disabled={savingDays}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {savingDays ? "儲存中..." : "儲存預設天數"}
+              </button>
+            </div>
           </div>
           <p className="mb-4 text-xs text-slate-500">
-            設定新建立案場時自動計算預定完成日的標準作業天數，各案場細節內仍可自行手動覆蓋修改。
+            設定新建立案場時自動計算預定完成日的標準作業天數（對應現行 7 大階段、28 項標準進度），各案場細節內仍可自行手動覆蓋修改。
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {STANDARD_MILESTONE_STAGE_CODES.map((code) => {
-              const label = MILESTONE_STAGE_LABELS[code];
+          <div className="space-y-4">
+            {STANDARD_PHASE_ORDER.map((phase) => {
+              const phaseCodes = STANDARD_MILESTONE_STAGE_CODES.filter(
+                (code) => STAGE_CODE_TO_PHASE[code] === phase
+              );
               return (
-                <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
-                  <span className="text-xs font-bold text-slate-700 truncate" title={label}>
-                    [{code}] {label}
-                  </span>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min="1"
-                      value={stageDays[code] ?? 3}
-                      onChange={(e) =>
-                        setStageDays({ ...stageDays, [code]: Number(e.target.value) || 1 })
-                      }
-                      className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
-                    />
-                    <span className="text-xs text-slate-500">天</span>
+                <div key={phase} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-700">{PHASE_LABELS[phase]}</h3>
+                    <span className="text-[11px] text-slate-400">{phaseCodes.length} 項</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                    {phaseCodes.map((code) => {
+                      const label = MILESTONE_STAGE_LABELS[code];
+                      return (
+                        <div key={code} className="p-2.5 rounded-lg border border-slate-200 bg-white flex flex-col justify-between">
+                          <span className="text-xs font-bold text-slate-700 truncate" title={`[${code}] ${label}`}>
+                            [{code}] {label}
+                          </span>
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min="1"
+                              value={stageDays[code] ?? MILESTONE_DEFAULT_DAYS[code] ?? 3}
+                              onChange={(e) =>
+                                setStageDays({ ...stageDays, [code]: Math.max(1, Number(e.target.value) || 1) })
+                              }
+                              className="w-16 rounded border border-slate-300 px-2 py-1 text-xs text-center font-bold"
+                            />
+                            <span className="text-xs text-slate-500">天</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

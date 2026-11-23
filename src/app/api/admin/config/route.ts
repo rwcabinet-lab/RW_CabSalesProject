@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DataService } from "@/lib/data-service";
-import { MILESTONE_DEFAULT_DAYS, normalizeProjectColumns } from "@/lib/constants";
+import {
+  MILESTONE_DEFAULT_DAYS,
+  normalizeMilestoneDefaultDays,
+  normalizeProjectColumns,
+} from "@/lib/constants";
 import { getUserFromRequest } from "@/lib/access-control";
 import { handleApiError } from "@/lib/errors";
 
@@ -21,8 +25,15 @@ export async function GET(req: NextRequest) {
       );
     }
     if (key === "stageDays") {
-      const stageDays = await DataService.getAppConfig("milestone_default_days", MILESTONE_DEFAULT_DAYS);
-      return NextResponse.json({ stageDays });
+      const rawStageDays = await DataService.getAppConfig<unknown>(
+        "milestone_default_days",
+        MILESTONE_DEFAULT_DAYS,
+      );
+      const stageDays = normalizeMilestoneDefaultDays(rawStageDays);
+      return NextResponse.json(
+        { stageDays },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      );
     }
     if (key === "customerTypeStages" || key === "customer_type_start_stages") {
       const customerTypeStages = await DataService.getCustomerTypeStartStages();
@@ -42,13 +53,28 @@ export async function POST(req: NextRequest) {
     }
     const body = await req.json();
     const { key, value } = body;
-    if (!key || value === undefined) {
+    if (!key || typeof key !== "string" || value === undefined) {
       return NextResponse.json({ error: "缺少 key 或 value" }, { status: 400 });
     }
-    const savedValue = key === "project_columns" ? normalizeProjectColumns(value) : value;
+    if (
+      key === "milestone_default_days" &&
+      (typeof value !== "object" || value === null || Array.isArray(value))
+    ) {
+      return NextResponse.json({ error: "預設天數設定格式無效" }, { status: 400 });
+    }
+    const savedValue =
+      key === "project_columns"
+        ? normalizeProjectColumns(value)
+        : key === "milestone_default_days"
+          ? normalizeMilestoneDefaultDays(value)
+          : value;
     await DataService.setAppConfig(key, savedValue);
     return NextResponse.json(
-      { success: true, ...(key === "project_columns" ? { columns: savedValue } : {}) },
+      {
+        success: true,
+        ...(key === "project_columns" ? { columns: savedValue } : {}),
+        ...(key === "milestone_default_days" ? { stageDays: savedValue } : {}),
+      },
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (err) {

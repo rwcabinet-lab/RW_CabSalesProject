@@ -190,6 +190,24 @@ export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
   "7-1", "7-2", "7-3",
 ];
 
+/** 正規化各階段進度預設天數設定：僅保留現行 28 項標準里程碑並排除歷史廢止代碼，缺漏或無效值以系統預設補齊 */
+export function normalizeMilestoneDefaultDays(value: unknown): Record<string, number> {
+  const raw =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  const normalized: Record<string, number> = {};
+  for (const code of STANDARD_MILESTONE_STAGE_CODES) {
+    const candidate = Number(raw[code]);
+    normalized[code] =
+      Number.isFinite(candidate) && candidate >= 1
+        ? Math.floor(candidate)
+        : MILESTONE_DEFAULT_DAYS[code] || 3;
+  }
+  return normalized;
+}
+
 /** 預設案件表格欄位定義 (合併報價/戶數為單一欄位，全域通用) */
 export const DEFAULT_PROJECT_COLUMNS = [
   { key: "trafficLight", label: "狀態燈號", visible: true, order: 0 },

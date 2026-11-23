@@ -4,6 +4,7 @@ import {
   CUSTOMER_TYPE_START_STAGE_CODES,
   MILESTONE_DEFAULT_DAYS,
   MilestoneStageCode,
+  normalizeMilestoneDefaultDays,
 } from "../constants";
 import { appConfigCache, APP_CONFIG_TTL_MS } from "./shared";
 
@@ -66,7 +67,11 @@ export const ConfigService = {
   },
 
   async getMilestoneDefaultDays(): Promise<Record<string, number>> {
-    return ConfigService.getAppConfig<Record<string, number>>("milestone_default_days", MILESTONE_DEFAULT_DAYS);
+    const raw = await ConfigService.getAppConfig<Record<string, number>>(
+      "milestone_default_days",
+      MILESTONE_DEFAULT_DAYS,
+    );
+    return normalizeMilestoneDefaultDays(raw);
   },
 
   async getCustomerTypeStartStages(): Promise<Record<string, MilestoneStageCode>> {
