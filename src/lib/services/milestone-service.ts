@@ -28,6 +28,78 @@ import type {
 import { ConfigService } from "./config-service";
 import { dateOnlyValue, milestoneInclude } from "./shared";
 
+type MilestoneRowWithRelations = {
+  id: string;
+  projectId: string;
+  stageCode: string;
+  phase: string;
+  stageOrder: number;
+  plannedDueDate: Date | null;
+  actualDueDate: Date | null;
+  status: MilestoneStatus;
+  priority: TaskPriority;
+  assignedToId: string | null;
+  assignedTo?: { name: string } | null;
+  attachments: string | null;
+  notes: string | null;
+  salesTask?: { subject: string; isCompleted: boolean } | null;
+};
+
+function mapMilestoneRowToItem(m: MilestoneRowWithRelations): ProjectMilestoneItem {
+  const isAuditSubmitted = Boolean(
+    m.salesTask?.subject.startsWith("【需審核】") &&
+    !m.salesTask?.isCompleted &&
+    m.status !== "COMPLETED"
+  );
+  return {
+    id: m.id,
+    projectId: m.projectId,
+    stageCode: m.stageCode as MilestoneStageCode,
+    phase: m.phase as MilestonePhaseDTO,
+    stageOrder: m.stageOrder,
+    plannedDueDate: dateOnlyValue(m.plannedDueDate),
+    actualDueDate: dateOnlyValue(m.actualDueDate),
+    status: m.status,
+    priority: m.priority,
+    assignedToId: m.assignedToId || null,
+    assignedToName: m.assignedTo?.name || null,
+    attachments: m.attachments,
+    notes: m.notes,
+    auditSubmitted: isAuditSubmitted,
+  };
+}
+
+/** 交易內取得專案列鎖（FOR UPDATE），序列化同一案場的排序、推進與回退避免競態 */
+async function lockProjectInTx(tx: Prisma.TransactionClient, projectId: string): Promise<void> {
+  const rawClient = tx as unknown as {
+    $queryRaw?: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+  };
+  if (typeof rawClient.$queryRaw === "function") {
+    await rawClient.$queryRaw`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`;
+  }
+}
+
+/** 交易內重讀案場最新里程碑並依 stageOrder 排序；若為簡化測試 Mock 環境則回退至傳入快照 */
+async function fetchMilestonesInTx(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  fallback?: ProjectMilestoneItem[],
+): Promise<ProjectMilestoneItem[]> {
+  const milestoneDelegate = (tx as unknown as {
+    projectMilestone?: { findMany?: typeof prisma.projectMilestone.findMany };
+  }).projectMilestone;
+  if (typeof milestoneDelegate?.findMany === "function") {
+    const rows = await milestoneDelegate.findMany({
+      where: { projectId },
+      include: milestoneInclude,
+      orderBy: { stageOrder: "asc" },
+    });
+    const list = rows.map(mapMilestoneRowToItem);
+    return ScheduleEngine.evaluateMilestones(list).milestones;
+  }
+  return fallback ? [...fallback].sort((a, b) => a.stageOrder - b.stageOrder) : [];
+}
+
 export const MilestoneService = {
   async getMilestonesByProjectIds(projectIds?: string[]): Promise<Record<string, ProjectMilestoneItem[]>> {
     if (projectIds && projectIds.length === 0) return {};
@@ -39,27 +111,7 @@ export const MilestoneService = {
     const result: Record<string, ProjectMilestoneItem[]> = {};
     for (const m of ms) {
       const list = result[m.projectId] || [];
-      const isAuditSubmitted = Boolean(
-        m.salesTask?.subject.startsWith("【需審核】") &&
-        !m.salesTask?.isCompleted &&
-        m.status !== "COMPLETED"
-      );
-      list.push({
-        id: m.id,
-        projectId: m.projectId,
-        stageCode: m.stageCode as MilestoneStageCode,
-        phase: m.phase as MilestonePhaseDTO,
-        stageOrder: m.stageOrder,
-        plannedDueDate: dateOnlyValue(m.plannedDueDate),
-        actualDueDate: dateOnlyValue(m.actualDueDate),
-        status: m.status,
-        priority: m.priority,
-        assignedToId: m.assignedToId || null,
-        assignedToName: m.assignedTo?.name || null,
-        attachments: m.attachments,
-        notes: m.notes,
-        auditSubmitted: isAuditSubmitted,
-      });
+      list.push(mapMilestoneRowToItem(m));
       result[m.projectId] = list;
     }
     return Object.fromEntries(
@@ -312,232 +364,234 @@ export const MilestoneService = {
     customerSalesRep?: { id: string; name: string },
     cascadeShift: boolean = false,
   ): Promise<{ milestone: ProjectMilestoneItem; allMilestones: ProjectMilestoneItem[] }> {
-    const fullMilestones = existingMilestones
-      ? existingMilestones
-      : await MilestoneService.getMilestonesByProjectId(projectId);
+    const { updatedRow, fullMilestones, shiftedMilestoneUpdates } = await prisma.$transaction(
+      async (tx) => {
+        await lockProjectInTx(tx, projectId);
+        const currentFullMilestones = await fetchMilestonesInTx(tx, projectId, existingMilestones);
 
-    const currentMilestone = fullMilestones.find((m) => m.id === milestoneId)
-      ?? await prisma.projectMilestone.findFirst({
+        const currentMilestone = currentFullMilestones.find((m) => m.id === milestoneId)
+          ?? await tx.projectMilestone.findFirst({
+              where: { id: milestoneId, projectId },
+              select: {
+                id: true,
+                status: true,
+                stageCode: true,
+                phase: true,
+                plannedDueDate: true,
+                actualDueDate: true,
+                priority: true,
+                assignedToId: true,
+                stageOrder: true,
+              },
+            });
+        if (!currentMilestone) {
+          throw new NotFoundError("找不到此里程碑");
+        }
+        if (currentMilestone.status === MilestoneStatus.COMPLETED) {
+          throw new ConflictError("已完成的里程碑不可編輯");
+        }
+
+        let targetStatus = updates.status;
+        if (targetStatus === undefined && updates.plannedDueDate !== undefined) {
+          const newDue = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
+          const today = getTaiwanDateString();
+          if (currentMilestone.status === MilestoneStatus.OVERDUE) {
+            if (!newDue || newDue >= today) {
+              targetStatus = MilestoneStatus.IN_PROGRESS;
+            }
+          } else if (currentMilestone.status === MilestoneStatus.IN_PROGRESS) {
+            if (newDue && newDue < today) {
+              targetStatus = MilestoneStatus.OVERDUE;
+            }
+          }
+        }
+
+        // 計算連鎖平移天數
+        const oldDueStr = currentMilestone.plannedDueDate
+          ? typeof currentMilestone.plannedDueDate === "string"
+            ? currentMilestone.plannedDueDate.slice(0, 10)
+            : currentMilestone.plannedDueDate.toISOString().slice(0, 10)
+          : null;
+        const newDueStr = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
+
+        let diffDays = 0;
+        if (cascadeShift && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
+          const [oy, om, od] = oldDueStr.split("-").map(Number);
+          const [ny, nm, nd] = newDueStr.split("-").map(Number);
+          diffDays = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / (1000 * 60 * 60 * 24));
+        }
+
+        // 找出後續需平移的未完成里程碑 (排除 X-1, X-2)
+        const pendingShiftedUpdates: { id: string; newDateStr: string }[] = [];
+        if (diffDays !== 0) {
+          const todayStr = getTaiwanDateString();
+          const currentOrder = currentMilestone.stageOrder ?? 0;
+          for (const m of currentFullMilestones) {
+            if (
+              m.id !== milestoneId &&
+              m.stageOrder > currentOrder &&
+              m.status !== MilestoneStatus.COMPLETED &&
+              !["X-1", "X-2"].includes(m.stageCode) &&
+              m.plannedDueDate
+            ) {
+              const rawDueDate = m.plannedDueDate as unknown;
+              const mDueDateStr =
+                typeof rawDueDate === "string"
+                  ? rawDueDate
+                  : rawDueDate instanceof Date
+                    ? rawDueDate.toISOString()
+                    : null;
+              if (!mDueDateStr) continue;
+              const [my, mm, md] = mDueDateStr.slice(0, 10).split("-").map(Number);
+              const nextPlanned = new Date(Date.UTC(my, mm - 1, md));
+              nextPlanned.setUTCDate(nextPlanned.getUTCDate() + diffDays);
+              const nextDateStr = nextPlanned.toISOString().slice(0, 10);
+              // 若提前平移，確保日期不早於今日
+              const finalDateStr = diffDays < 0 && nextDateStr < todayStr ? todayStr : nextDateStr;
+              pendingShiftedUpdates.push({ id: m.id, newDateStr: finalDateStr });
+            }
+          }
+        }
+
+        const milestone = await tx.projectMilestone.update({
           where: { id: milestoneId, projectId },
-          select: {
-            id: true,
-            status: true,
-            stageCode: true,
-            phase: true,
-            plannedDueDate: true,
-            actualDueDate: true,
-            priority: true,
-            assignedToId: true,
-            stageOrder: true,
+          data: {
+            plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
+            actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
+            status: targetStatus,
+            priority: updates.priority,
+            assignedToId: updates.assignedToId,
+            attachments: updates.attachments,
+            notes: updates.notes,
+          },
+          include: {
+            assignedTo: { select: { name: true } },
+            salesTask: { select: { id: true, subject: true, isCompleted: true } },
           },
         });
-    if (!currentMilestone) {
-      throw new NotFoundError("找不到此里程碑");
-    }
-    if (currentMilestone.status === MilestoneStatus.COMPLETED) {
-      throw new ConflictError("已完成的里程碑不可編輯");
-    }
 
-    let targetStatus = updates.status;
-    if (targetStatus === undefined && updates.plannedDueDate !== undefined) {
-      const newDue = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
-      const today = getTaiwanDateString();
-      if (currentMilestone.status === MilestoneStatus.OVERDUE) {
-        if (!newDue || newDue >= today) {
-          targetStatus = MilestoneStatus.IN_PROGRESS;
-        }
-      } else if (currentMilestone.status === MilestoneStatus.IN_PROGRESS) {
-        if (newDue && newDue < today) {
-          targetStatus = MilestoneStatus.OVERDUE;
-        }
-      }
-    }
+        const effectiveStatus = (targetStatus ?? currentMilestone.status) as MilestoneStatus;
+        const isActiveStatus =
+          effectiveStatus === MilestoneStatus.IN_PROGRESS ||
+          effectiveStatus === MilestoneStatus.OVERDUE;
 
-    // 計算連鎖平移天數
-    const oldDueStr = currentMilestone.plannedDueDate
-      ? typeof currentMilestone.plannedDueDate === "string"
-        ? currentMilestone.plannedDueDate.slice(0, 10)
-        : currentMilestone.plannedDueDate.toISOString().slice(0, 10)
-      : null;
-    const newDueStr = updates.plannedDueDate ? updates.plannedDueDate.slice(0, 10) : null;
-
-    let diffDays = 0;
-    if (cascadeShift && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
-      const [oy, om, od] = oldDueStr.split("-").map(Number);
-      const [ny, nm, nd] = newDueStr.split("-").map(Number);
-      diffDays = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / (1000 * 60 * 60 * 24));
-    }
-
-    // 找出後續需平移的未完成里程碑 (排除 X-1, X-2)
-    const shiftedMilestoneUpdates: { id: string; newDateStr: string }[] = [];
-    if (diffDays !== 0) {
-      const todayStr = getTaiwanDateString();
-      const currentOrder = currentMilestone.stageOrder ?? 0;
-      for (const m of fullMilestones) {
-        if (
-          m.id !== milestoneId &&
-          m.stageOrder > currentOrder &&
-          m.status !== MilestoneStatus.COMPLETED &&
-          !["X-1", "X-2"].includes(m.stageCode) &&
-          m.plannedDueDate
-        ) {
-          const rawDueDate = m.plannedDueDate as unknown;
-          const mDueDateStr =
-            typeof rawDueDate === "string"
-              ? rawDueDate
-              : rawDueDate instanceof Date
-                ? rawDueDate.toISOString()
-                : null;
-          if (!mDueDateStr) continue;
-          const [my, mm, md] = mDueDateStr.slice(0, 10).split("-").map(Number);
-          const nextPlanned = new Date(Date.UTC(my, mm - 1, md));
-          nextPlanned.setUTCDate(nextPlanned.getUTCDate() + diffDays);
-          const nextDateStr = nextPlanned.toISOString().slice(0, 10);
-          // 若提前平移，確保日期不早於今日
-          const finalDateStr = diffDays < 0 && nextDateStr < todayStr ? todayStr : nextDateStr;
-          shiftedMilestoneUpdates.push({ id: m.id, newDateStr: finalDateStr });
-        }
-      }
-    }
-
-    const updatedRow = await prisma.$transaction(
-      async (tx) => {
-      const milestone = await tx.projectMilestone.update({
-        where: { id: milestoneId, projectId },
-        data: {
-          plannedDueDate: updates.plannedDueDate ? new Date(updates.plannedDueDate) : updates.plannedDueDate === null ? null : undefined,
-          actualDueDate: updates.actualDueDate ? new Date(updates.actualDueDate) : updates.actualDueDate === null ? null : undefined,
-          status: targetStatus,
-          priority: updates.priority,
-          assignedToId: updates.assignedToId,
-          attachments: updates.attachments,
-          notes: updates.notes,
-        },
-        include: {
-          assignedTo: { select: { name: true } },
-          salesTask: { select: { id: true, subject: true, isCompleted: true } },
-        },
-      });
-
-      const effectiveStatus = (targetStatus ?? currentMilestone.status) as MilestoneStatus;
-      const isActiveStatus =
-        effectiveStatus === MilestoneStatus.IN_PROGRESS ||
-        effectiveStatus === MilestoneStatus.OVERDUE;
-
-      if (updates.assignedToId !== undefined) {
-        if (!updates.assignedToId) {
-          await tx.salesTask.deleteMany({ where: { milestoneId } });
-        } else if (isActiveStatus) {
-          const auditSubmissionPending = Boolean(
-            existingMilestones &&
-            "auditSubmitted" in currentMilestone &&
-            currentMilestone.auditSubmitted
-          );
-          if (!auditSubmissionPending) {
-            const nextDue =
-              updates.plannedDueDate !== undefined
-                ? updates.plannedDueDate
-                  ? new Date(updates.plannedDueDate)
-                  : new Date()
-                : currentMilestone.plannedDueDate
-                  ? new Date(currentMilestone.plannedDueDate)
-                  : new Date();
-            const nextPriority = (updates.priority ?? currentMilestone.priority) as TaskPriority;
-            const assigneeChanged = currentMilestone.assignedToId !== updates.assignedToId;
-            await tx.salesTask.upsert({
-              where: { milestoneId },
-              create: {
-                projectId,
-                milestoneId,
-                assignedToId: updates.assignedToId,
-                taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
-                subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
-                dueDatetime: nextDue,
-                priority: nextPriority,
-                isCompleted: false,
-                completedAt: null,
-              },
-              update: {
-                assignedToId: updates.assignedToId,
-                taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
-                subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
-                dueDatetime: nextDue,
-                priority: nextPriority,
-                ...(assigneeChanged ? { isCompleted: false, completedAt: null, resultNotes: null } : {}),
-              },
+        if (updates.assignedToId !== undefined) {
+          if (!updates.assignedToId) {
+            await tx.salesTask.deleteMany({ where: { milestoneId } });
+          } else if (isActiveStatus) {
+            const auditSubmissionPending = Boolean(
+              "auditSubmitted" in currentMilestone &&
+              currentMilestone.auditSubmitted
+            );
+            if (!auditSubmissionPending) {
+              const nextDue =
+                updates.plannedDueDate !== undefined
+                  ? updates.plannedDueDate
+                    ? new Date(updates.plannedDueDate)
+                    : new Date()
+                  : currentMilestone.plannedDueDate
+                    ? new Date(currentMilestone.plannedDueDate)
+                    : new Date();
+              const nextPriority = (updates.priority ?? currentMilestone.priority) as TaskPriority;
+              const assigneeChanged = currentMilestone.assignedToId !== updates.assignedToId;
+              await tx.salesTask.upsert({
+                where: { milestoneId },
+                create: {
+                  projectId,
+                  milestoneId,
+                  assignedToId: updates.assignedToId,
+                  taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                  subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
+                  dueDatetime: nextDue,
+                  priority: nextPriority,
+                  isCompleted: false,
+                  completedAt: null,
+                },
+                update: {
+                  assignedToId: updates.assignedToId,
+                  taskType: currentMilestone.phase === "DESIGN" ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                  subject: MILESTONE_STAGE_LABELS[currentMilestone.stageCode as MilestoneStageCode],
+                  dueDatetime: nextDue,
+                  priority: nextPriority,
+                  ...(assigneeChanged ? { isCompleted: false, completedAt: null, resultNotes: null } : {}),
+                },
+              });
+            }
+          } else {
+            // 里程碑尚未進入進行中階段（例如 PENDING 待開始），僅記錄進度負責人，不建立/保留未完成待辦（避免幽靈待辦與409衝突）
+            await tx.salesTask.deleteMany({
+              where: { milestoneId, isCompleted: false },
             });
           }
-        } else {
-          // 里程碑尚未進入進行中階段（例如 PENDING 待開始），僅記錄進度負責人，不建立/保留未完成待辦（避免幽靈待辦與409衝突）
-          await tx.salesTask.deleteMany({
-            where: { milestoneId, isCompleted: false },
+        } else if (updates.plannedDueDate !== undefined) {
+          const nextDue = updates.plannedDueDate ? new Date(updates.plannedDueDate) : new Date();
+          await tx.salesTask.updateMany({
+            where: { milestoneId },
+            data: { dueDatetime: nextDue },
+          });
+        } else if (updates.priority !== undefined) {
+          await tx.salesTask.updateMany({
+            where: { milestoneId },
+            data: { priority: updates.priority as TaskPriority },
           });
         }
-      } else if (updates.plannedDueDate !== undefined) {
-        const nextDue = updates.plannedDueDate ? new Date(updates.plannedDueDate) : new Date();
-        await tx.salesTask.updateMany({
-          where: { milestoneId },
-          data: { dueDatetime: nextDue },
-        });
-      } else if (updates.priority !== undefined) {
-        await tx.salesTask.updateMany({
-          where: { milestoneId },
-          data: { priority: updates.priority as TaskPriority },
-        });
-      }
 
-      // 雙向同步：若修改 6-1 進場安裝預定日，同步更新專案主檔 expectedDate
-      if (currentMilestone.stageCode === "6-1" && updates.plannedDueDate !== undefined) {
-        const newExpectedDate = updates.plannedDueDate
-          ? new Date(`${updates.plannedDueDate.slice(0, 10)}T00:00:00.000Z`)
-          : null;
-        await tx.project.update({
-          where: { id: projectId },
-          data: { expectedDate: newExpectedDate },
-        });
-      }
-
-      // 執行後續進度日期同步平移
-      if (shiftedMilestoneUpdates.length > 0) {
-        // 先查出後續里程碑中確實存在待辦任務者，避免對不存在任務之里程碑逐一發送無效的 updateMany 查詢
-        const shiftedIds = shiftedMilestoneUpdates.map((s) => s.id);
-        const existingTasks = await tx.salesTask.findMany({
-          where: { milestoneId: { in: shiftedIds } },
-          select: { id: true, milestoneId: true },
-        });
-        const taskMilestoneMap = new Map(existingTasks.map((t) => [t.milestoneId!, t.id]));
-
-        for (const shift of shiftedMilestoneUpdates) {
-          const shiftDate = new Date(`${shift.newDateStr}T00:00:00.000Z`);
-          await tx.projectMilestone.update({
-            where: { id: shift.id },
-            data: { plannedDueDate: shiftDate },
-          });
-          if (taskMilestoneMap.has(shift.id)) {
-            await tx.salesTask.update({
-              where: { id: taskMilestoneMap.get(shift.id)! },
-              data: { dueDatetime: shiftDate },
-            });
-          }
-        }
-
-        // 雙向同步：若連鎖平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
-        const shift61 = shiftedMilestoneUpdates.find((s) => {
-          const target = fullMilestones.find((m) => m.id === s.id);
-          return target?.stageCode === "6-1";
-        });
-        if (shift61) {
+        // 雙向同步：若修改 6-1 進場安裝預定日，同步更新專案主檔 expectedDate
+        if (currentMilestone.stageCode === "6-1" && updates.plannedDueDate !== undefined) {
+          const newExpectedDate = updates.plannedDueDate
+            ? new Date(`${updates.plannedDueDate.slice(0, 10)}T00:00:00.000Z`)
+            : null;
           await tx.project.update({
             where: { id: projectId },
-            data: { expectedDate: new Date(`${shift61.newDateStr}T00:00:00.000Z`) },
+            data: { expectedDate: newExpectedDate },
           });
         }
-      }
 
-      return milestone;
-    },
-    { maxWait: 10000, timeout: 25000 }
-  );
+        // 執行後續進度日期同步平移
+        if (pendingShiftedUpdates.length > 0) {
+          // 先查出後續里程碑中確實存在待辦任務者，避免對不存在任務之里程碑逐一發送無效的 updateMany 查詢
+          const shiftedIds = pendingShiftedUpdates.map((s) => s.id);
+          const existingTasks = await tx.salesTask.findMany({
+            where: { milestoneId: { in: shiftedIds } },
+            select: { id: true, milestoneId: true },
+          });
+          const taskMilestoneMap = new Map(existingTasks.map((t) => [t.milestoneId!, t.id]));
+
+          for (const shift of pendingShiftedUpdates) {
+            const shiftDate = new Date(`${shift.newDateStr}T00:00:00.000Z`);
+            await tx.projectMilestone.update({
+              where: { id: shift.id },
+              data: { plannedDueDate: shiftDate },
+            });
+            if (taskMilestoneMap.has(shift.id)) {
+              await tx.salesTask.update({
+                where: { id: taskMilestoneMap.get(shift.id)! },
+                data: { dueDatetime: shiftDate },
+              });
+            }
+          }
+
+          // 雙向同步：若連鎖平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
+          const shift61 = pendingShiftedUpdates.find((s) => {
+            const target = currentFullMilestones.find((m) => m.id === s.id);
+            return target?.stageCode === "6-1";
+          });
+          if (shift61) {
+            await tx.project.update({
+              where: { id: projectId },
+              data: { expectedDate: new Date(`${shift61.newDateStr}T00:00:00.000Z`) },
+            });
+          }
+        }
+
+        return {
+          updatedRow: milestone,
+          fullMilestones: currentFullMilestones,
+          shiftedMilestoneUpdates: pendingShiftedUpdates,
+        };
+      },
+      { maxWait: 10000, timeout: 25000 }
+    );
 
     const shiftedDateMap = new Map(shiftedMilestoneUpdates.map((u) => [u.id, u.newDateStr]));
     const currentList = fullMilestones.map((m) => {
@@ -586,101 +640,107 @@ export const MilestoneService = {
     options?: { notes?: string; attachments?: string; completedDate?: string; installationDate?: string },
     existingMilestones?: ProjectMilestoneItem[]
   ) {
-    const [list, projectRecord] = await Promise.all([
-      existingMilestones ? Promise.resolve(existingMilestones) : MilestoneService.getMilestonesByProjectId(projectId),
-      prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } }),
-    ]);
-    const originalById = new Map(list.map((m) => [m.id, m]));
-    const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
-    const operations: Prisma.PrismaPromise<unknown>[] = [];
-    for (const milestone of result.updatedMilestones) {
-      const orig = originalById.get(milestone.id);
-      const hasChanged =
-        !orig ||
-        orig.status !== milestone.status ||
-        orig.actualDueDate !== milestone.actualDueDate ||
-        orig.plannedDueDate !== milestone.plannedDueDate ||
-        orig.notes !== milestone.notes ||
-        orig.attachments !== milestone.attachments;
-      if (hasChanged) {
-        operations.push(prisma.projectMilestone.update({
-          where: { id: milestone.id },
-          data: {
-            status: milestone.status,
-            plannedDueDate: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : null,
-            actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
-            notes: milestone.notes,
-            attachments: milestone.attachments,
-          },
-        }));
-        if (orig && orig.plannedDueDate !== milestone.plannedDueDate && milestone.plannedDueDate) {
-          operations.push(prisma.salesTask.updateMany({
-            where: { milestoneId: milestone.id, isCompleted: false },
-            data: {
-              dueDatetime: new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`),
-            },
-          }));
-        }
-      }
-      if (milestone.id === milestoneId) {
-        operations.push(prisma.salesTask.updateMany({
-          where: { milestoneId },
-          data: {
-            isCompleted: true,
-            completedAt: milestone.actualDueDate ? new Date(milestone.actualDueDate) : new Date(),
-            resultNotes: milestone.notes || null,
-          },
-        }));
-      }
-      if (orig && orig.status !== "IN_PROGRESS" && milestone.status === "IN_PROGRESS") {
-        const isDrawing =
-          milestone.phase === "PROPOSAL" ||
-          milestone.phase === "PRE_PROD" ||
-          milestone.stageCode.startsWith("3-") ||
-          milestone.stageCode.startsWith("4-");
-        const targetAssigneeId = milestone.assignedToId || orig?.assignedToId || projectRecord?.salesRepId;
-        if (targetAssigneeId) {
-          operations.push(
-            prisma.salesTask.upsert({
-              where: { milestoneId: milestone.id },
-              update: {
-                assignedToId: targetAssigneeId,
-                dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
-                isCompleted: false,
+    return prisma.$transaction(
+      async (tx) => {
+        await lockProjectInTx(tx, projectId);
+        const list = await fetchMilestonesInTx(tx, projectId, existingMilestones);
+        const projectRecord = typeof (tx as unknown as { project?: { findUnique?: unknown } }).project?.findUnique === "function"
+          ? await tx.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } })
+          : await prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } });
+
+        const originalById = new Map(list.map((m) => [m.id, m]));
+        const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
+
+        for (const milestone of result.updatedMilestones) {
+          const orig = originalById.get(milestone.id);
+          const hasChanged =
+            !orig ||
+            orig.status !== milestone.status ||
+            orig.actualDueDate !== milestone.actualDueDate ||
+            orig.plannedDueDate !== milestone.plannedDueDate ||
+            orig.notes !== milestone.notes ||
+            orig.attachments !== milestone.attachments;
+          if (hasChanged) {
+            await tx.projectMilestone.update({
+              where: { id: milestone.id },
+              data: {
+                status: milestone.status,
+                plannedDueDate: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : null,
+                actualDueDate: milestone.actualDueDate ? new Date(milestone.actualDueDate) : null,
+                notes: milestone.notes,
+                attachments: milestone.attachments,
               },
-              create: {
-                projectId,
-                milestoneId: milestone.id,
-                assignedToId: targetAssigneeId,
-                taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
-                subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode] || "里程碑任務",
-                dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
-                priority: milestone.priority || TaskPriority.MEDIUM,
-                isCompleted: false,
+            });
+            if (orig && orig.plannedDueDate !== milestone.plannedDueDate && milestone.plannedDueDate) {
+              await tx.salesTask.updateMany({
+                where: { milestoneId: milestone.id, isCompleted: false },
+                data: {
+                  dueDatetime: new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`),
+                },
+              });
+            }
+          }
+          if (milestone.id === milestoneId) {
+            await tx.salesTask.updateMany({
+              where: { milestoneId },
+              data: {
+                isCompleted: true,
+                completedAt: milestone.actualDueDate ? new Date(milestone.actualDueDate) : new Date(),
+                resultNotes: milestone.notes || null,
               },
-            })
-          );
+            });
+          }
+          if (orig && orig.status !== "IN_PROGRESS" && milestone.status === "IN_PROGRESS") {
+            const isDrawing =
+              milestone.phase === "PROPOSAL" ||
+              milestone.phase === "PRE_PROD" ||
+              milestone.stageCode.startsWith("3-") ||
+              milestone.stageCode.startsWith("4-");
+            const targetAssigneeId = milestone.assignedToId || orig?.assignedToId || projectRecord?.salesRepId;
+            if (targetAssigneeId) {
+              await tx.salesTask.upsert({
+                where: { milestoneId: milestone.id },
+                update: {
+                  assignedToId: targetAssigneeId,
+                  dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                  isCompleted: false,
+                },
+                create: {
+                  projectId,
+                  milestoneId: milestone.id,
+                  assignedToId: targetAssigneeId,
+                  taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                  subject: MILESTONE_STAGE_LABELS[milestone.stageCode as MilestoneStageCode] || "里程碑任務",
+                  dueDatetime: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                  priority: milestone.priority || TaskPriority.MEDIUM,
+                  isCompleted: false,
+                },
+              });
+            }
+          }
         }
-      }
-    }
-    const projectUpdateData: Prisma.ProjectUpdateInput = {
-      currentStage: result.newCurrentStage as ProjectStage,
-      isDelayed: result.isProjectDelayed,
-    };
-    const installDate = options?.installationDate || (
-      (list.find((m) => m.id === milestoneId)?.stageCode === "4-3" || list.find((m) => m.id === milestoneId)?.stageCode === "5-3")
-        ? options?.completedDate
-        : undefined
+
+        const projectUpdateData: Prisma.ProjectUpdateInput = {
+          currentStage: result.newCurrentStage as ProjectStage,
+          isDelayed: result.isProjectDelayed,
+        };
+        const installDate = options?.installationDate || (
+          (list.find((m) => m.id === milestoneId)?.stageCode === "4-3" || list.find((m) => m.id === milestoneId)?.stageCode === "5-3")
+            ? options?.completedDate
+            : undefined
+        );
+        if (installDate) {
+          projectUpdateData.expectedDate = new Date(`${installDate.slice(0, 10)}T00:00:00.000Z`);
+        }
+        await tx.project.update({
+          where: { id: projectId },
+          data: projectUpdateData,
+        });
+
+        return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
+      },
+      { maxWait: 10000, timeout: 25000 }
     );
-    if (installDate) {
-      projectUpdateData.expectedDate = new Date(`${installDate.slice(0, 10)}T00:00:00.000Z`);
-    }
-    operations.push(prisma.project.update({
-      where: { id: projectId },
-      data: projectUpdateData,
-    }));
-    await prisma.$transaction(operations);
-    return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
   },
 
   async setMilestoneCompletion(
@@ -691,329 +751,342 @@ export const MilestoneService = {
     notes?: string,
     existingMilestones?: ProjectMilestoneItem[]
   ) {
-    const milestones = existingMilestones ?? await MilestoneService.getMilestonesByProjectId(projectId);
-    const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
-    if (targetIndex < 0) {
-      throw new NotFoundError("找不到此里程碑");
-    }
-    const target = milestones[targetIndex];
-
-    const targetStatus = isCompleted ? MilestoneStatus.COMPLETED : MilestoneStatus.IN_PROGRESS;
-    const targetChanged = target.status !== targetStatus;
-    const nextNotes = isCompleted && notes?.trim() ? notes.trim() : target.notes;
-
-    // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數
-    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
-
-    // 狀態機防呆：正規進度不可跳級完成，目標之前的所有進度必須已全數完成
-    if (isCompleted && isRegularStage) {
-      const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-      const sortedTargetIndex = sorted.findIndex((m) => m.id === milestoneId);
-      if (sortedTargetIndex > 0) {
-        const hasIncompletePreceding = sorted.slice(0, sortedTargetIndex).some((m) => m.status !== MilestoneStatus.COMPLETED);
-        if (hasIncompletePreceding) {
-          throw new ConflictError("無法跳級完成：前置里程碑尚未全數完成");
+    return prisma.$transaction(
+      async (tx) => {
+        await lockProjectInTx(tx, projectId);
+        const milestones = await fetchMilestonesInTx(tx, projectId, existingMilestones);
+        const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
+        if (targetIndex < 0) {
+          throw new NotFoundError("找不到此里程碑");
         }
-      }
-    }
+        const target = milestones[targetIndex];
 
-    let daysSaved = 0;
-    if (isCompleted && targetChanged && isRegularStage && target.plannedDueDate && completedDate) {
-      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
-      const [ay, am, ad] = completedDate.slice(0, 10).split("-").map(Number);
-      const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
-      if (diffDays > 0) {
-        daysSaved = diffDays;
-      }
-    } else if (!isCompleted && targetChanged && isRegularStage && target.plannedDueDate && target.actualDueDate) {
-      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
-      const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
-      const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
-      if (diffDays > 0) {
-        daysSaved = -diffDays;
-      }
-    }
+        const targetStatus = isCompleted ? MilestoneStatus.COMPLETED : MilestoneStatus.IN_PROGRESS;
+        const targetChanged = target.status !== targetStatus;
+        const nextNotes = isCompleted && notes?.trim() ? notes.trim() : target.notes;
 
-    const nextMilestones = milestones.map((milestone, idx) => {
-      if (milestone.id === milestoneId) {
-        return {
-          ...milestone,
-          actualDueDate: targetChanged
-            ? isCompleted
-              ? completedDate
-              : null
-            : milestone.actualDueDate,
-          status: targetStatus,
-          notes: nextNotes,
-        };
-      }
-      if (
-        daysSaved !== 0 &&
-        idx > targetIndex &&
-        milestone.status !== MilestoneStatus.COMPLETED &&
-        !["X-1", "X-2"].includes(milestone.stageCode) &&
-        milestone.plannedDueDate
-      ) {
-        const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
-        const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
-        nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
-        const todayStr = getTaiwanDateString();
-        const nextPlannedStr = nextPlanned.toISOString().slice(0, 10);
-        const finalPlannedStr = nextPlannedStr < todayStr ? todayStr : nextPlannedStr;
-        return {
-          ...milestone,
-          plannedDueDate: finalPlannedStr,
-        };
-      }
-      return milestone;
-    });
+        // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數
+        const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
 
-    const firstIncomplete = nextMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
-    const currentStage = firstIncomplete
-      ? STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode] as ProjectStage
-      : target.stageCode === "X-1" ? ProjectStage.WRAP_UP : ProjectStage.DONE;
-    const evaluated = ScheduleEngine.evaluateMilestones(nextMilestones);
-
-    const operations: Prisma.PrismaPromise<unknown>[] = [
-      prisma.project.update({
-        where: { id: projectId },
-        data: { currentStage, isDelayed: evaluated.isDelayed },
-      }),
-    ];
-    if (targetChanged) {
-      operations.push(
-        prisma.projectMilestone.update({
-          where: { id: milestoneId, projectId },
-          data: {
-            status: targetStatus,
-            actualDueDate: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
-            ...(isCompleted && notes?.trim() ? { notes: notes.trim() } : {}),
-          },
-        }),
-        prisma.salesTask.updateMany({
-          where: { milestoneId },
-          data: {
-            isCompleted,
-            completedAt: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
-            ...(isCompleted && notes?.trim() ? { resultNotes: notes.trim() } : {}),
-          },
-        })
-      );
-      if (daysSaved !== 0) {
-        for (let i = targetIndex + 1; i < nextMilestones.length; i++) {
-          const m = nextMilestones[i];
-          const orig = milestones[i];
-          if (m.plannedDueDate !== orig.plannedDueDate && m.plannedDueDate) {
-            operations.push(
-              prisma.projectMilestone.update({
-                where: { id: m.id, projectId },
-                data: {
-                  plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
-                },
-              }),
-              prisma.salesTask.updateMany({
-                where: { milestoneId: m.id, isCompleted: false },
-                data: {
-                  dueDatetime: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
-                },
-              })
-            );
-            if (m.stageCode === "6-1") {
-              operations.push(
-                prisma.project.update({
-                  where: { id: projectId },
-                  data: {
-                    expectedDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
-                  },
-                })
-              );
+        // 狀態機防呆：正規進度不可跳級完成，目標之前的所有進度必須已全數完成
+        if (isCompleted && isRegularStage) {
+          const sorted = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
+          const sortedTargetIndex = sorted.findIndex((m) => m.id === milestoneId);
+          if (sortedTargetIndex > 0) {
+            const hasIncompletePreceding = sorted.slice(0, sortedTargetIndex).some((m) => m.status !== MilestoneStatus.COMPLETED);
+            if (hasIncompletePreceding) {
+              throw new ConflictError("無法跳級完成：前置里程碑尚未全數完成");
             }
           }
         }
-      }
-    }
 
-    await prisma.$transaction(operations);
-    return evaluated.milestones;
+        let daysSaved = 0;
+        if (isCompleted && targetChanged && isRegularStage && target.plannedDueDate && completedDate) {
+          const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const [ay, am, ad] = completedDate.slice(0, 10).split("-").map(Number);
+          const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
+          if (diffDays > 0) {
+            daysSaved = diffDays;
+          }
+        } else if (!isCompleted && targetChanged && isRegularStage && target.plannedDueDate && target.actualDueDate) {
+          const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
+          const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
+          if (diffDays > 0) {
+            daysSaved = -diffDays;
+          }
+        }
+
+        const nextMilestones = milestones.map((milestone, idx) => {
+          if (milestone.id === milestoneId) {
+            return {
+              ...milestone,
+              actualDueDate: targetChanged
+                ? isCompleted
+                  ? completedDate
+                  : null
+                : milestone.actualDueDate,
+              status: targetStatus,
+              notes: nextNotes,
+            };
+          }
+          if (
+            daysSaved !== 0 &&
+            idx > targetIndex &&
+            milestone.status !== MilestoneStatus.COMPLETED &&
+            !["X-1", "X-2"].includes(milestone.stageCode) &&
+            milestone.plannedDueDate
+          ) {
+            const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
+            const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
+            nextPlanned.setUTCDate(nextPlanned.getUTCDate() - daysSaved);
+            const todayStr = getTaiwanDateString();
+            const nextPlannedStr = nextPlanned.toISOString().slice(0, 10);
+            const finalPlannedStr = nextPlannedStr < todayStr ? todayStr : nextPlannedStr;
+            return {
+              ...milestone,
+              plannedDueDate: finalPlannedStr,
+            };
+          }
+          return milestone;
+        });
+
+        const firstIncomplete = nextMilestones.find((milestone) => milestone.status !== MilestoneStatus.COMPLETED);
+        const currentStage = firstIncomplete
+          ? STAGE_CODE_TO_PROJECT_STAGE[firstIncomplete.stageCode] as ProjectStage
+          : target.stageCode === "X-1" ? ProjectStage.WRAP_UP : ProjectStage.DONE;
+        const evaluated = ScheduleEngine.evaluateMilestones(nextMilestones);
+
+        await tx.project.update({
+          where: { id: projectId },
+          data: { currentStage, isDelayed: evaluated.isDelayed },
+        });
+
+        if (targetChanged) {
+          await tx.projectMilestone.update({
+            where: { id: milestoneId, projectId },
+            data: {
+              status: targetStatus,
+              actualDueDate: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+              ...(isCompleted && notes?.trim() ? { notes: notes.trim() } : {}),
+            },
+          });
+          await tx.salesTask.updateMany({
+            where: { milestoneId },
+            data: {
+              isCompleted,
+              completedAt: isCompleted ? new Date(`${completedDate}T00:00:00.000Z`) : null,
+              ...(isCompleted && notes?.trim() ? { resultNotes: notes.trim() } : {}),
+            },
+          });
+          if (daysSaved !== 0) {
+            for (let i = targetIndex + 1; i < nextMilestones.length; i++) {
+              const m = nextMilestones[i];
+              const orig = milestones[i];
+              if (m.plannedDueDate !== orig.plannedDueDate && m.plannedDueDate) {
+                await tx.projectMilestone.update({
+                  where: { id: m.id, projectId },
+                  data: {
+                    plannedDueDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                  },
+                });
+                await tx.salesTask.updateMany({
+                  where: { milestoneId: m.id, isCompleted: false },
+                  data: {
+                    dueDatetime: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                  },
+                });
+                if (m.stageCode === "6-1") {
+                  await tx.project.update({
+                    where: { id: projectId },
+                    data: {
+                      expectedDate: new Date(`${m.plannedDueDate}T00:00:00.000Z`),
+                    },
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        return evaluated.milestones;
+      },
+      { maxWait: 10000, timeout: 25000 }
+    );
   },
 
   async rollbackMilestone(projectId: string, milestoneId: string, existingMilestones?: ProjectMilestoneItem[]) {
-    const milestones = existingMilestones ?? await MilestoneService.getMilestonesByProjectId(projectId);
-    const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
-    if (targetIndex < 0 || milestones[targetIndex].status !== "COMPLETED") {
-      throw new NotFoundError("找不到已完成的里程碑");
-    }
-    if (milestones.slice(targetIndex + 1).some((milestone) => milestone.status === "COMPLETED")) {
-      throw new ConflictError("請由最後一個已完成的里程碑開始回退");
-    }
-    const target = milestones[targetIndex];
-    const isAutoSkipped = Boolean(target.notes?.includes("系統自動略過"));
+    const defaultDaysConfig = await ConfigService.getMilestoneDefaultDays();
 
-    // 配套 2: 若為系統自動略過項目，重新展期預定完成日（避免過期變紅燈）
-    let targetNewPlannedDueDate = target.plannedDueDate;
-    if (isAutoSkipped) {
-      const defaultDaysConfig = await ConfigService.getMilestoneDefaultDays();
-      const defaultDays = Number(defaultDaysConfig[target.stageCode]) || MILESTONE_DEFAULT_DAYS[target.stageCode] || 3;
-      const newDue = new Date();
-      newDue.setDate(newDue.getDate() + defaultDays);
-      targetNewPlannedDueDate = newDue.toISOString().slice(0, 10);
-    }
+    return prisma.$transaction(
+      async (tx) => {
+        await lockProjectInTx(tx, projectId);
+        const rawMilestones = await fetchMilestonesInTx(tx, projectId, existingMilestones);
+        const milestones = [...rawMilestones].sort((a, b) => a.stageOrder - b.stageOrder);
 
-    const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
-
-    const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
-    let daysToRestore = 0;
-    if (isRegularStage && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
-      const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
-      const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
-      const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
-      if (diffDays > 0) {
-        daysToRestore = diffDays;
-      }
-    }
-
-    const updatedList = milestones.map((m, idx) => {
-      const updated = { ...m };
-      if (idx === targetIndex) {
-        updated.status = MilestoneStatus.IN_PROGRESS;
-        updated.actualDueDate = null;
-        // 配套 2 & 3: 展期預定日，且只限第一次回退系統自動略過項目時清空該備註，避免誤清使用者輸入資訊
-        if (isAutoSkipped) {
-          updated.plannedDueDate = targetNewPlannedDueDate;
-          updated.notes = null;
+        const targetIndex = milestones.findIndex((milestone) => milestone.id === milestoneId);
+        if (targetIndex < 0 || milestones[targetIndex].status !== "COMPLETED") {
+          throw new NotFoundError("找不到已完成的里程碑");
         }
-      } else if (idx === targetIndex + 1 && m.status !== "COMPLETED") {
-        updated.status = MilestoneStatus.PENDING;
-      }
-      if (
-        daysToRestore > 0 &&
-        idx > targetIndex &&
-        m.status !== "COMPLETED" &&
-        !["X-1", "X-2"].includes(m.stageCode) &&
-        m.plannedDueDate
-      ) {
-        const [iy, im, id] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
-        const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
-        nextPlanned.setUTCDate(nextPlanned.getUTCDate() + daysToRestore);
-        updated.plannedDueDate = nextPlanned.toISOString().slice(0, 10);
-      }
-      return updated;
-    });
-    const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedList);
-    const evaluatedTarget = evaluatedMilestones[targetIndex];
+        if (milestones.slice(targetIndex + 1).some((milestone) => milestone.status === "COMPLETED")) {
+          throw new ConflictError("請由最後一個已完成的里程碑開始回退");
+        }
+        const target = milestones[targetIndex];
+        const isAutoSkipped = Boolean(target.notes?.includes("系統自動略過"));
 
-    const resetPendingMilestoneIds: string[] = [];
-    const shiftMilestoneIds: string[] = [];
+        // 配套 2: 若為系統自動略過項目，重新展期預定完成日（避免過期變紅燈）
+        let targetNewPlannedDueDate = target.plannedDueDate;
+        if (isAutoSkipped) {
+          const defaultDays = Number(defaultDaysConfig[target.stageCode]) || MILESTONE_DEFAULT_DAYS[target.stageCode] || 3;
+          const newDue = new Date();
+          newDue.setDate(newDue.getDate() + defaultDays);
+          targetNewPlannedDueDate = newDue.toISOString().slice(0, 10);
+        }
 
-    for (let i = targetIndex + 1; i < updatedList.length; i++) {
-      const m = updatedList[i];
-      const orig = milestones[i];
-      if (m.status !== orig.status && m.status === MilestoneStatus.PENDING) {
-        resetPendingMilestoneIds.push(m.id);
-      }
-      if (
-        daysToRestore > 0 &&
-        m.status !== MilestoneStatus.COMPLETED &&
-        !["X-1", "X-2"].includes(m.stageCode) &&
-        m.plannedDueDate
-      ) {
-        shiftMilestoneIds.push(m.id);
-      }
-    }
+        const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
-    const projectRecord = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { salesRepId: true },
-    });
-    const targetAssigneeId = target.assignedToId || projectRecord?.salesRepId;
-    const isDrawing =
-      target.phase === "PROPOSAL" ||
-      target.phase === "PRE_PROD" ||
-      target.stageCode.startsWith("3-") ||
-      target.stageCode.startsWith("4-");
+        const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
+        let daysToRestore = 0;
+        if (isRegularStage && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
+          const [py, pm, pd] = target.plannedDueDate.slice(0, 10).split("-").map(Number);
+          const [ay, am, ad] = target.actualDueDate.slice(0, 10).split("-").map(Number);
+          const diffDays = Math.round((Date.UTC(py, pm - 1, pd) - Date.UTC(ay, am - 1, ad)) / (1000 * 60 * 60 * 24));
+          if (diffDays > 0) {
+            daysToRestore = diffDays;
+          }
+        }
 
-    await prisma.$transaction(async (tx) => {
-      // 1. 回退目標里程碑狀態並清空實際完成日（若為自動略過項目，同步更新重新展期之預定日並清空備註）
-      await tx.projectMilestone.update({
-        where: { id: target.id },
-        data: {
-          status: evaluatedTarget.status,
-          actualDueDate: null,
-          ...(isAutoSkipped && targetNewPlannedDueDate ? { plannedDueDate: new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`) } : {}),
-          ...(isAutoSkipped ? { notes: null } : {}),
-        },
-      });
-      // 2. 配套 1: 重置關聯任務為未完成，若無待辦任務（如自動略過項目）則自動補建對應類型之待辦任務
-      if (targetAssigneeId) {
-        const targetDue = targetNewPlannedDueDate
-          ? new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`)
-          : target.plannedDueDate
-            ? new Date(target.plannedDueDate)
-            : new Date();
-        await tx.salesTask.upsert({
-          where: { milestoneId: target.id },
-          update: {
-            isCompleted: false,
-            completedAt: null,
-            dueDatetime: targetDue,
-            ...(isAutoSkipped ? { resultNotes: null } : {}),
+        // 回退徹底清理：將目標之後所有未完成的常規里程碑一律重置為 PENDING，避免殘留錯位的 IN_PROGRESS / OVERDUE
+        const updatedList = milestones.map((m, idx) => {
+          const updated = { ...m };
+          if (idx === targetIndex) {
+            updated.status = MilestoneStatus.IN_PROGRESS;
+            updated.actualDueDate = null;
+            // 配套 2 & 3: 展期預定日，且只限第一次回退系統自動略過項目時清空該備註，避免誤清使用者輸入資訊
+            if (isAutoSkipped) {
+              updated.plannedDueDate = targetNewPlannedDueDate;
+              updated.notes = null;
+            }
+          } else if (
+            idx > targetIndex &&
+            m.status !== "COMPLETED" &&
+            !["X-1", "X-2"].includes(m.stageCode)
+          ) {
+            updated.status = MilestoneStatus.PENDING;
+          }
+          if (
+            daysToRestore > 0 &&
+            idx > targetIndex &&
+            m.status !== "COMPLETED" &&
+            !["X-1", "X-2"].includes(m.stageCode) &&
+            m.plannedDueDate
+          ) {
+            const [iy, im, id] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
+            const nextPlanned = new Date(Date.UTC(iy, im - 1, id));
+            nextPlanned.setUTCDate(nextPlanned.getUTCDate() + daysToRestore);
+            updated.plannedDueDate = nextPlanned.toISOString().slice(0, 10);
+          }
+          return updated;
+        });
+        const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(updatedList);
+        const evaluatedTarget = evaluatedMilestones[targetIndex];
+
+        const resetPendingMilestoneIds: string[] = [];
+        const subsequentCleanupTaskMilestoneIds: string[] = [];
+        const shiftMilestoneIds: string[] = [];
+
+        for (let i = targetIndex + 1; i < updatedList.length; i++) {
+          const m = updatedList[i];
+          const orig = milestones[i];
+          const isSubseqRegularIncomplete =
+            m.status !== MilestoneStatus.COMPLETED && !["X-1", "X-2"].includes(m.stageCode);
+
+          if (m.status !== orig.status && m.status === MilestoneStatus.PENDING) {
+            resetPendingMilestoneIds.push(m.id);
+          }
+          if (isSubseqRegularIncomplete) {
+            subsequentCleanupTaskMilestoneIds.push(m.id);
+          }
+          if (isSubseqRegularIncomplete && daysToRestore > 0 && m.plannedDueDate) {
+            shiftMilestoneIds.push(m.id);
+          }
+        }
+
+        const projectRecord = typeof (tx as unknown as { project?: { findUnique?: unknown } }).project?.findUnique === "function"
+          ? await tx.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } })
+          : await prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } });
+        const targetAssigneeId = target.assignedToId || projectRecord?.salesRepId;
+        const isDrawing =
+          target.phase === "PROPOSAL" ||
+          target.phase === "PRE_PROD" ||
+          target.stageCode.startsWith("3-") ||
+          target.stageCode.startsWith("4-");
+
+        // 1. 回退目標里程碑狀態並清空實際完成日（若為自動略過項目，同步更新重新展期之預定日並清空備註）
+        await tx.projectMilestone.update({
+          where: { id: target.id },
+          data: {
+            status: evaluatedTarget.status,
+            actualDueDate: null,
+            ...(isAutoSkipped && targetNewPlannedDueDate ? { plannedDueDate: new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`) } : {}),
+            ...(isAutoSkipped ? { notes: null } : {}),
           },
-          create: {
-            projectId,
-            milestoneId: target.id,
-            assignedToId: targetAssigneeId,
-            taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
-            subject: MILESTONE_STAGE_LABELS[target.stageCode as MilestoneStageCode] || "里程碑任務",
-            dueDatetime: targetDue,
-            priority: (target.priority as TaskPriority) || TaskPriority.MEDIUM,
-            isCompleted: false,
-          },
         });
-      }
-      // 3. 更新案場階段與逾期評估
-      await tx.project.update({
-        where: { id: projectId },
-        data: { currentStage: stage, isDelayed },
-      });
-
-      // 4. 批次將受影響的後續里程碑重置為 PENDING，並批次清理幽靈待辦任務
-      if (resetPendingMilestoneIds.length > 0) {
-        await tx.projectMilestone.updateMany({
-          where: { id: { in: resetPendingMilestoneIds } },
-          data: { status: MilestoneStatus.PENDING },
-        });
-        await tx.salesTask.deleteMany({
-          where: { milestoneId: { in: resetPendingMilestoneIds }, isCompleted: false },
-        });
-      }
-
-      // 5. 若有提前天數需還原，使用單一高效 SQL 批次平移所有後續里程碑與任務日期，避免數十次循序網路往返延遲
-      if (daysToRestore > 0 && shiftMilestoneIds.length > 0) {
-        await tx.$executeRaw`
-          UPDATE project_milestones
-          SET planned_due_date = planned_due_date + (${daysToRestore} * INTERVAL '1 day')
-          WHERE id = ANY(${shiftMilestoneIds}::text[])
-        `;
-        await tx.$executeRaw`
-          UPDATE sales_tasks
-          SET due_datetime = due_datetime + (${daysToRestore} * INTERVAL '1 day')
-          WHERE milestone_id = ANY(${shiftMilestoneIds}::text[]) AND is_completed = false
-        `;
-
-        // 雙向同步：若還原平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
-        const shifted61 = updatedList.find(
-          (m, idx) => idx > targetIndex && m.stageCode === "6-1" && m.plannedDueDate
-        );
-        if (shifted61?.plannedDueDate) {
-          await tx.project.update({
-            where: { id: projectId },
-            data: { expectedDate: new Date(`${shifted61.plannedDueDate}T00:00:00.000Z`) },
+        // 2. 配套 1: 重置關聯任務為未完成，若無待辦任務（如自動略過項目）則自動補建對應類型之待辦任務
+        if (targetAssigneeId) {
+          const targetDue = targetNewPlannedDueDate
+            ? new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`)
+            : target.plannedDueDate
+              ? new Date(target.plannedDueDate)
+              : new Date();
+          await tx.salesTask.upsert({
+            where: { milestoneId: target.id },
+            update: {
+              isCompleted: false,
+              completedAt: null,
+              dueDatetime: targetDue,
+              ...(isAutoSkipped ? { resultNotes: null } : {}),
+            },
+            create: {
+              projectId,
+              milestoneId: target.id,
+              assignedToId: targetAssigneeId,
+              taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+              subject: MILESTONE_STAGE_LABELS[target.stageCode as MilestoneStageCode] || "里程碑任務",
+              dueDatetime: targetDue,
+              priority: (target.priority as TaskPriority) || TaskPriority.MEDIUM,
+              isCompleted: false,
+            },
           });
         }
-      }
-    });
+        // 3. 更新案場階段與逾期評估
+        await tx.project.update({
+          where: { id: projectId },
+          data: { currentStage: stage, isDelayed },
+        });
 
-    return evaluatedMilestones;
+        // 4. 批次將所有受影響的後續未完成里程碑重置為 PENDING，並徹底清理後續殘留待辦任務
+        if (resetPendingMilestoneIds.length > 0) {
+          await tx.projectMilestone.updateMany({
+            where: { id: { in: resetPendingMilestoneIds } },
+            data: { status: MilestoneStatus.PENDING },
+          });
+        }
+        if (subsequentCleanupTaskMilestoneIds.length > 0) {
+          await tx.salesTask.deleteMany({
+            where: { milestoneId: { in: subsequentCleanupTaskMilestoneIds }, isCompleted: false },
+          });
+        }
+
+        // 5. 若有提前天數需還原，使用單一高效 SQL 批次平移所有後續里程碑與任務日期，避免數十次循序網路往返延遲
+        if (daysToRestore > 0 && shiftMilestoneIds.length > 0) {
+          await tx.$executeRaw`
+            UPDATE project_milestones
+            SET planned_due_date = planned_due_date + (${daysToRestore} * INTERVAL '1 day')
+            WHERE id = ANY(${shiftMilestoneIds}::text[])
+          `;
+          await tx.$executeRaw`
+            UPDATE sales_tasks
+            SET due_datetime = due_datetime + (${daysToRestore} * INTERVAL '1 day')
+            WHERE milestone_id = ANY(${shiftMilestoneIds}::text[]) AND is_completed = false
+          `;
+
+          // 雙向同步：若還原平移包含 6-1 進場安裝，同步更新專案主檔 expectedDate
+          const shifted61 = updatedList.find(
+            (m, idx) => idx > targetIndex && m.stageCode === "6-1" && m.plannedDueDate
+          );
+          if (shifted61?.plannedDueDate) {
+            await tx.project.update({
+              where: { id: projectId },
+              data: { expectedDate: new Date(`${shifted61.plannedDueDate}T00:00:00.000Z`) },
+            });
+          }
+        }
+
+        return evaluatedMilestones;
+      },
+      { maxWait: 10000, timeout: 25000 }
+    );
   },
 
   async advanceProjectToSpecialStage(
@@ -1467,12 +1540,17 @@ export const MilestoneService = {
   ): Promise<ProjectMilestoneItem[]> {
     return prisma.$transaction(
       async (tx) => {
+        await lockProjectInTx(tx, projectId);
         const existing = await tx.projectMilestone.findMany({
           where: { projectId },
-          select: { id: true, status: true, stageOrder: true, plannedDueDate: true, stageCode: true },
+          select: { id: true, status: true, stageOrder: true, plannedDueDate: true, stageCode: true, phase: true },
           orderBy: { stageOrder: "asc" },
         });
         const existingIdSet = new Set(existing.map((m) => m.id));
+        const orderedSet = new Set(orderedMilestoneIds);
+        if (orderedSet.size !== orderedMilestoneIds.length) {
+          throw new BadRequestError("排序清單包含重複的里程碑項目");
+        }
 
         for (const id of orderedMilestoneIds) {
           if (!existingIdSet.has(id)) {
@@ -1481,7 +1559,6 @@ export const MilestoneService = {
         }
 
         // 補足可能未在傳入清單中的其他項目（確保全量排序不遺漏）
-        const orderedSet = new Set(orderedMilestoneIds);
         const fullOrderedIds = [...orderedMilestoneIds];
         for (const m of existing) {
           if (!orderedSet.has(m.id)) {
@@ -1489,16 +1566,41 @@ export const MilestoneService = {
           }
         }
 
-        // 建立現有資料對照表（含 stageOrder 與 plannedDueDate）
+        // 建立現有資料對照表（含 stageOrder、status、stageCode、phase 與 plannedDueDate）
         const existingMap = new Map(
           existing.map((m) => [
             m.id,
             {
               stageOrder: m.stageOrder,
+              status: m.status,
+              stageCode: m.stageCode,
+              phase: STAGE_CODE_TO_PHASE[m.stageCode as MilestoneStageCode] || m.phase,
               plannedDueDateStr: dateOnlyValue(m.plannedDueDate),
             },
           ])
         );
+
+        // 防撞車與狀態機不變量檢查：已完成/進行中/已逾期與額外階段不可變動順位，且待開始項目不可跨階段移動
+        for (let idx = 0; idx < existing.length; idx++) {
+          const slotExisting = existing[idx];
+          const targetId = fullOrderedIds[idx];
+          if (
+            (slotExisting.status !== MilestoneStatus.PENDING || ["X-1", "X-2"].includes(slotExisting.stageCode)) &&
+            targetId !== slotExisting.id
+          ) {
+            throw new ConflictError("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
+          }
+          if (targetId !== slotExisting.id) {
+            const movedItem = existingMap.get(targetId);
+            const slotPhase = STAGE_CODE_TO_PHASE[slotExisting.stageCode as MilestoneStageCode] || slotExisting.phase;
+            if (movedItem && (movedItem.status !== MilestoneStatus.PENDING || ["X-1", "X-2"].includes(movedItem.stageCode))) {
+              throw new ConflictError("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
+            }
+            if (movedItem && movedItem.phase !== slotPhase) {
+              throw new ConflictError("不可跨大階段調整里程碑順序");
+            }
+          }
+        }
 
         // 僅針對順序或預定完成日有實際變動的項目進行更新，大幅減少遠端資料庫負擔與避免交易超時 (Timeout)
         const toUpdate = fullOrderedIds
@@ -1544,7 +1646,7 @@ export const MilestoneService = {
               });
               if (data.plannedDueDate !== undefined) {
                 await tx.salesTask.updateMany({
-                  where: { milestoneId: id },
+                  where: { milestoneId: id, isCompleted: false },
                   data: { dueDatetime: data.plannedDueDate || new Date() },
                 });
               }
@@ -1570,29 +1672,7 @@ export const MilestoneService = {
           orderBy: { stageOrder: "asc" },
         });
 
-        return updated.map((m) => {
-          const isAuditSubmitted = Boolean(
-            m.salesTask?.subject.startsWith("【需審核】") &&
-            !m.salesTask?.isCompleted &&
-            m.status !== "COMPLETED"
-          );
-          return {
-            id: m.id,
-            projectId: m.projectId,
-            stageCode: m.stageCode as MilestoneStageCode,
-            phase: m.phase as MilestonePhaseDTO,
-            stageOrder: m.stageOrder,
-            plannedDueDate: dateOnlyValue(m.plannedDueDate),
-            actualDueDate: dateOnlyValue(m.actualDueDate),
-            status: m.status,
-            priority: m.priority,
-            assignedToId: m.assignedToId || null,
-            assignedToName: m.assignedTo?.name || null,
-            attachments: m.attachments,
-            notes: m.notes,
-            auditSubmitted: isAuditSubmitted,
-          };
-        });
+        return updated.map(mapMilestoneRowToItem);
       },
       { maxWait: 10000, timeout: 20000 }
     );

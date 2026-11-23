@@ -127,6 +127,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [activePhase, setActivePhase] = useState<MilestonePhaseDTO>("DEVELOP");
   const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null);
   const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
   const [cancellingLost, setCancellingLost] = useState(false);
 
   // 行內編輯
@@ -413,6 +414,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       toast.warning("您沒有變更進度順序的權限");
       return;
     }
+    if (reordering || advancing || rollingBack || saving || submittingAudit || withdrawingAudit || cancellingLost) {
+      return;
+    }
     if (sourceId === targetId || isProjectLost) return;
     const currentPhaseList = phaseGroups[phase];
     const sourceIndex = currentPhaseList.findIndex(({ id }) => id === sourceId);
@@ -452,6 +456,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     const orderedIds = newOrderedAll.filter(Boolean).map(({ id }) => id);
     const previousMilestones = milestones;
     setMilestones(newOrderedAll.map((milestone, index) => ({ ...milestone, stageOrder: index + 1 })));
+    setReordering(true);
 
     try {
       const milestoneDates: Record<string, string | null> = {};
@@ -480,6 +485,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       console.error("更新順序失敗", error);
       toast.error(error instanceof Error ? error.message : "更新順序失敗");
       setMilestones(previousMilestones);
+      void refreshMilestonesOnly();
+    } finally {
+      setReordering(false);
     }
   };
 
@@ -788,6 +796,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     );
   }
 
+  const isMutatingMilestones =
+    reordering || advancing || rollingBack || saving || submittingAudit || withdrawingAudit || cancellingLost;
+
   const isProjectLost = project?.currentStage === "LOST";
   const canReviewAudit =
     canManageMilestones || (!!project && currentUserId === project.salesRepId);
@@ -1018,7 +1029,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               <span>{PHASE_LABELS[activePhase]}</span>
               <SectionHelpButton sectionId="milestones-cards" />
             </h2>
-            <span className="text-xs text-slate-400">拖曳圖卡可即時預覽調整未開始子進度順序</span>
+            <span className="text-xs text-slate-400">
+              {reordering ? "正在儲存排序..." : "拖曳圖卡可即時預覽調整未開始子進度順序"}
+            </span>
           </div>
 
           {/* 額外階段：流標操作 */}
@@ -1080,7 +1093,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
-              const canDrag = canReorderMilestones && !isProjectLost && !isEditing && m.status === "PENDING";
+              const canDrag = canReorderMilestones && !isProjectLost && !isEditing && !isMutatingMilestones && m.status === "PENDING";
               const isBeingDragged = draggedMilestoneId === m.id;
               const isDragOver = dragOverMilestoneId === m.id && draggedMilestoneId !== m.id;
 
@@ -1287,11 +1300,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           {isActive && !isProjectLost && isAuditStage && !isAuditSubmitted && (currentUserId === m.assignedToId || canReviewAudit) && (
                             <button
                               type="button"
+                              disabled={isMutatingMilestones}
                               onClick={() => setSubmitAuditModal({
                                 milestone: m,
                                 notes: currentUserId !== m.assignedToId ? `[主管/主責代送審] ` : "",
                               })}
-                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition"
+                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition disabled:opacity-50"
                             >
                               <Send className="w-3 h-3" /> {currentUserId === m.assignedToId ? "提交審核" : "代送審核"}
                             </button>
@@ -1302,8 +1316,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             <button
                               type="button"
                               onClick={() => handleWithdrawAudit(m)}
-                              disabled={withdrawingAudit}
-                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition"
+                              disabled={isMutatingMilestones}
+                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition disabled:opacity-50"
                               title={currentUserId === m.assignedToId ? "撤回提交的審核" : "退回/撤回此審核"}
                             >
                               <Undo2 className="w-3 h-3" /> {withdrawingAudit ? "撤回中..." : (currentUserId === m.assignedToId ? "撤回審核" : "退回/撤回")}
@@ -1315,11 +1329,12 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             (!isAuditStage || (isAuditSubmitted && canReviewAudit)) && (
                             <button
                               type="button"
+                              disabled={isMutatingMilestones}
                               onClick={() => {
                                 const isDispatch = m.stageCode === "4-3" || m.stageCode === "5-3";
                                 setCompletionModal({ milestone: m, actualDueDate: isDispatch ? "" : todayDate(), notes: "" });
                               }}
-                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
+                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition disabled:opacity-50"
                             >
                               <Sparkles className="w-3 h-3" /> {isAuditStage ? "審核完成" : "進度完成"}
                             </button>
@@ -1331,8 +1346,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                             <button
                               type="button"
                               onClick={() => handleRollback(m)}
-                              disabled={rollingBack}
-                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 shadow-xs transition"
+                              disabled={isMutatingMilestones}
+                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 shadow-xs transition disabled:opacity-50"
                               title="將進度回退至此項目"
                             >
                               <RotateCcw className="w-3 h-3 text-amber-600" /> {rollingBack ? "回退中..." : "回退至此"}
@@ -1355,6 +1370,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           {canEditMilestones && !isProjectLost && m.status !== "COMPLETED" && (
                             <button
                               type="button"
+                              disabled={isMutatingMilestones}
                               onClick={() => {
                                 setEditingId(m.id);
                                 setEditForm({
@@ -1364,7 +1380,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   notes: m.notes || "",
                                 });
                               }}
-                              className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-slate-800 rounded hover:bg-slate-100 border border-transparent hover:border-slate-200 transition"
+                              className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-slate-800 rounded hover:bg-slate-100 border border-transparent hover:border-slate-200 transition disabled:opacity-50"
                               title="編輯時程與負責人"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
