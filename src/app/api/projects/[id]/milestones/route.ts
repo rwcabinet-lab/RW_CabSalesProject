@@ -540,12 +540,17 @@ export async function PUT(
     const { milestones: evaluatedMilestones, isDelayed } = ScheduleEngine.evaluateMilestones(allMilestones);
     const updatedProject = { ...project, isDelayed };
 
+    const didDateChange = Boolean(
+      updates?.plannedDueDate &&
+      targetMilestone?.plannedDueDate?.slice(0, 10) !== String(updates.plannedDueDate).slice(0, 10)
+    );
+
     return NextResponse.json({
       success: true,
       milestone: updated,
       project: updatedProject,
       milestones: attachTrafficLights(evaluatedMilestones),
-      message: cascadeShift && updates?.plannedDueDate
+      message: cascadeShift && didDateChange
         ? "已儲存進度設定，並同步平移後續未完成進度之預定完成日"
         : undefined,
     });

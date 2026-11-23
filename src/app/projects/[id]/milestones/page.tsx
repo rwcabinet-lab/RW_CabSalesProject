@@ -130,8 +130,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [reordering, setReordering] = useState(false);
   const [cancellingLost, setCancellingLost] = useState(false);
 
-  // 行內編輯
-  const [syncCascadeShift, setSyncCascadeShift] = useState(false);
+  // 行內編輯（後續日期同步平移預設開啟）
+  const [syncCascadeShift, setSyncCascadeShift] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     plannedDueDate: "", assignedToId: "", priority: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW", notes: ""
@@ -686,7 +686,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             priority: editForm.priority,
             notes: editForm.notes,
           },
-          cascadeShift: syncCascadeShift,
+          cascadeShift: canReorderMilestones ? syncCascadeShift : false,
         }),
       });
       const data = await res.json();
@@ -703,8 +703,6 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       }
       if (data.message) {
         toast.success(data.message);
-      } else if (syncCascadeShift) {
-        toast.success("已儲存設定並同步平移後續進度預定日");
       } else {
         toast.success("已儲存進度設定");
       }
