@@ -164,9 +164,9 @@ export function AdminAnnouncementPanel() {
             <Megaphone className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">全體系統公告欄（登入推送通知）</h2>
+            <h2 className="text-lg font-bold text-slate-900">全體系統公告欄（推送通知）</h2>
             <p className="text-xs text-slate-500">
-              設定並推送公告後，每位使用者登入系統時皆會自動彈出公告視窗提醒。
+              設定並推送公告後，每位使用者進入系統時會自動彈出公告視窗提醒一次，按下按鈕確認後不再重複出現。
             </p>
           </div>
         </div>
@@ -318,7 +318,7 @@ export function AdminAnnouncementPanel() {
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <span className="text-[11px] text-slate-500">
-                點擊推送後將產生新推播通知，每位使用者登入時皆會自動顯示此訊息視窗。
+                點擊推送後將產生新推播通知，每位使用者僅會顯示一次，按下確認按鈕後不再重複出現。
               </span>
               <button
                 type="submit"

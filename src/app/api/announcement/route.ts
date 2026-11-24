@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       success: true,
       announcement: entry,
       history: nextHistory,
-      message: "公告已儲存並設定推送，所有使用者登入時皆會收到提示",
+      message: "公告已儲存並設定推送，所有使用者皆會收到一次提示（確認後不再重複出現）",
     });
   } catch (err) {
     return handleApiError(err, "推送系統公告失敗");

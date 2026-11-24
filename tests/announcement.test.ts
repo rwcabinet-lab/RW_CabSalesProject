@@ -42,7 +42,7 @@ describe("System Announcement Board (管理者公告欄與登入提示規則)", 
     expect(fallbackLevel.pushedBy).toBe("管理員");
   });
 
-  it("shouldShowAnnouncementModal 嚴格遵守「登入時提示」與「已確認後不重複打擾」規則", () => {
+  it("shouldShowAnnouncementModal 嚴格遵守「未確認時顯示」與「按下按鈕確認後不再出現第二次」規則", () => {
     const activeAnn = createAnnouncementEntry({
       title: "重要公告",
       message: "最新報價規範上線",
@@ -50,30 +50,27 @@ describe("System Announcement Board (管理者公告欄與登入提示規則)", 
       pushedBy: "ADMIN",
     });
 
-    // 1. 剛登入且公告啟用中 -> 必須顯示（即使先前已看過同則公告，重新登入仍應提醒）
+    // 1. 尚未點擊按鈕確認（無已讀紀錄）-> 顯示公告彈窗
     expect(
       shouldShowAnnouncementModal({
         announcement: activeAnn,
-        acknowledgedId: activeAnn.id,
-        justLoggedIn: true,
+        acknowledgedId: null,
       })
     ).toBe(true);
 
-    // 2. 同工作階段已點擊「我知道了」且尚未推送新公告 -> 不重複彈出
+    // 2. 已點擊按鈕確認過同則公告（即使重新登入或重整頁面）-> 不再出現第二次
     expect(
       shouldShowAnnouncementModal({
         announcement: activeAnn,
         acknowledgedId: activeAnn.id,
-        justLoggedIn: false,
       })
     ).toBe(false);
 
-    // 3. 已登入狀態下管理者推送了新公告（ID 變更）-> 主動彈出提醒
+    // 3. 管理者推送了新公告（ID 變更）-> 主動彈出提醒一次
     expect(
       shouldShowAnnouncementModal({
         announcement: activeAnn,
         acknowledgedId: "ann_older_id",
-        justLoggedIn: false,
       })
     ).toBe(true);
 
@@ -82,7 +79,6 @@ describe("System Announcement Board (管理者公告欄與登入提示規則)", 
       shouldShowAnnouncementModal({
         announcement: activeAnn,
         acknowledgedId: null,
-        justLoggedIn: true,
         dismissedInRender: true,
       })
     ).toBe(false);
@@ -92,14 +88,12 @@ describe("System Announcement Board (管理者公告欄與登入提示規則)", 
       shouldShowAnnouncementModal({
         announcement: { ...activeAnn, isActive: false },
         acknowledgedId: null,
-        justLoggedIn: true,
       })
     ).toBe(false);
     expect(
       shouldShowAnnouncementModal({
         announcement: null,
         acknowledgedId: null,
-        justLoggedIn: true,
       })
     ).toBe(false);
   });

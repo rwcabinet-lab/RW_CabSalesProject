@@ -14,10 +14,15 @@ import {
   shouldShowAnnouncementModal,
 } from "@/lib/announcement";
 
-export const JUST_LOGGED_IN_STORAGE_KEY = "cab_just_logged_in";
+const LOCAL_ACK_KEY_PREFIX = "cab_announcement_ack_";
+
+function getLocalAckStorageKey(userId: string): string {
+  return `${LOCAL_ACK_KEY_PREFIX}${userId}`;
+}
 
 interface LoginAnnouncementModalProps {
   isAuthenticated: boolean;
+  userId?: string | null;
 }
 
 function formatPushedTime(isoStr: string): string {
@@ -35,10 +40,11 @@ function formatPushedTime(isoStr: string): string {
 
 export function LoginAnnouncementModal({
   isAuthenticated,
+  userId,
 }: LoginAnnouncementModalProps) {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
-  const [justLoggedIn, setJustLoggedIn] = useState(false);
+  const [localAckedId, setLocalAckedId] = useState<string | null>(null);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
 
   const { data } = useAnnouncementQuery(isAuthenticated);
@@ -46,20 +52,32 @@ export function LoginAnnouncementModal({
 
   useEffect(() => {
     setMounted(true);
-    try {
-      setJustLoggedIn(sessionStorage.getItem(JUST_LOGGED_IN_STORAGE_KEY) === "1");
-    } catch {
-      setJustLoggedIn(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      setLocalAckedId(null);
+      setDismissedId(null);
+      return;
     }
-  }, [isAuthenticated]);
+    try {
+      setLocalAckedId(localStorage.getItem(getLocalAckStorageKey(userId)));
+    } catch {
+      setLocalAckedId(null);
+    }
+  }, [isAuthenticated, userId]);
+
+  const effectiveAcknowledgedId =
+    announcement && localAckedId === announcement.id
+      ? announcement.id
+      : data?.acknowledgedId;
 
   const isOpen = Boolean(
     mounted &&
       isAuthenticated &&
       shouldShowAnnouncementModal({
         announcement,
-        acknowledgedId: data?.acknowledgedId,
-        justLoggedIn,
+        acknowledgedId: effectiveAcknowledgedId,
         dismissedInRender: Boolean(announcement && dismissedId === announcement.id),
       })
   );
@@ -67,12 +85,14 @@ export function LoginAnnouncementModal({
   const handleAcknowledge = useCallback(async () => {
     if (!announcement) return;
     setDismissedId(announcement.id);
-    setJustLoggedIn(false);
+    setLocalAckedId(announcement.id);
 
-    try {
-      sessionStorage.removeItem(JUST_LOGGED_IN_STORAGE_KEY);
-    } catch {
-      // ignore storage errors
+    if (userId) {
+      try {
+        localStorage.setItem(getLocalAckStorageKey(userId), announcement.id);
+      } catch {
+        // ignore storage errors
+      }
     }
 
     queryClient.setQueryData<AnnouncementResponseDTO>(
@@ -85,11 +105,12 @@ export function LoginAnnouncementModal({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ announcementId: announcement.id }),
+        keepalive: true,
       });
     } catch {
-      // fallback: cache + sessionStorage already dismissed locally
+      // fallback: cache + localStorage already dismissed locally
     }
-  }, [announcement, queryClient]);
+  }, [announcement, queryClient, userId]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -98,21 +98,17 @@ export function createAnnouncementEntry(params: {
 /**
  * 判斷目前使用者是否應跳出公告提示彈窗：
  * 1. 僅在公告處於「啟用推送 (isActive)」時顯示
- * 2. 若本次為剛完成登入（justLoggedIn），每次登入皆提示一次
- * 3. 若已登入狀態下管理者推送了新公告（id 與已讀紀錄不同），亦主動提示一次
+ * 2. 僅在目前使用者尚未點擊按鈕確認（acknowledgedId !== announcement.id）時顯示
+ * 3. 使用者按下按鈕確認後即寫入已讀紀錄，同一則公告不再出現第二次
  */
 export function shouldShowAnnouncementModal(params: {
   announcement: SystemAnnouncement | null | undefined;
   acknowledgedId: string | null | undefined;
-  justLoggedIn: boolean;
   dismissedInRender?: boolean;
 }): boolean {
-  const { announcement, acknowledgedId, justLoggedIn, dismissedInRender } = params;
+  const { announcement, acknowledgedId, dismissedInRender } = params;
   if (!announcement || !announcement.isActive || dismissedInRender) {
     return false;
-  }
-  if (justLoggedIn) {
-    return true;
   }
   return acknowledgedId !== announcement.id;
 }
