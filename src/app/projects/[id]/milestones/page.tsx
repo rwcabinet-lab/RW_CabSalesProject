@@ -1188,11 +1188,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 isJumpableStageCode(m.stageCode) &&
                 Boolean(currentActionableMilestone) &&
                 m.stageOrder > (currentActionableMilestone?.stageOrder ?? 0);
-              const hasJumpColumnSlot =
-                showJumpColumn && activePhase !== "CLOSURE" && m.status !== "COMPLETED";
 
               return (
-                <div key={m.id} className={hasJumpColumnSlot ? "flex items-center gap-3" : ""}>
+                <div key={m.id} className={canJumpToThis ? "flex items-center gap-2.5" : ""}>
                 <div
                   draggable={canDrag}
                   onDragStart={(event) => {
@@ -1215,7 +1213,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     }
                   }}
                   onDragEnd={handleDragEndItem}
-                  className={`${hasJumpColumnSlot ? "flex-1 min-w-0 " : ""}rounded-xl border p-4 transition-all duration-150 ${
+                  className={`${canJumpToThis ? "flex-1 min-w-0 " : ""}rounded-xl border p-4 transition-all duration-150 ${
                     isDragOver
                       ? "ring-2 ring-blue-500 border-blue-400 bg-blue-50/50 scale-[1.01]"
                       : isBeingDragged
@@ -1653,21 +1651,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </div>
-                {hasJumpColumnSlot && (
-                  <div className="w-[92px] shrink-0 flex items-center justify-center">
-                    {canJumpToThis && (
-                      <button
-                        type="button"
-                        disabled={isMutatingMilestones}
-                        onClick={() => setJumpModal({ milestone: m, skip: true, actualDueDate: todayDate(), notes: "" })}
-                        className="h-8 w-full px-2 flex items-center justify-center gap-1 text-xs font-bold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-xs transition disabled:opacity-50"
-                        title={`一鍵跳轉至【${MILESTONE_STAGE_LABELS[m.stageCode]}】`}
-                      >
-                        <FastForward className="w-3.5 h-3.5 shrink-0" />
-                        <span>跳轉至此</span>
-                      </button>
-                    )}
-                  </div>
+                {canJumpToThis && (
+                  <button
+                    type="button"
+                    disabled={isMutatingMilestones}
+                    onClick={() => setJumpModal({ milestone: m, skip: true, actualDueDate: todayDate(), notes: "" })}
+                    className="w-12 shrink-0 py-2 px-1.5 flex flex-col items-center justify-center leading-tight text-xs font-bold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-xs transition disabled:opacity-50"
+                    title={`一鍵跳轉至【${MILESTONE_STAGE_LABELS[m.stageCode]}】`}
+                  >
+                    <span>跳轉</span>
+                    <span>至此</span>
+                  </button>
                 )}
                 </div>
               );

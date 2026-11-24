@@ -3,6 +3,8 @@ import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useManagerStore } from "@/stores/useManagerStore";
 import { useViewsStore } from "@/stores/useViewsStore";
 import { DEFAULT_PROJECT_COLUMNS, normalizeProjectColumns } from "@/lib/constants";
+import { compareSalesRepByStroke, compareManagerOverviewProjects } from "@/lib/sort-utils";
+import { sortProjectsWithPins } from "@/hooks/usePinnedProjects";
 import type { WorkbenchProjectDTO, ManagerProjectOverviewDTO } from "@/types/dto";
 
 describe("搜尋與篩選條件功能測試", () => {
@@ -351,6 +353,7 @@ describe("搜尋與篩選條件功能測試", () => {
       store.setStageFilter("PRE_PROD");
       store.toggleDateSort();
       store.toggleStatusSort();
+      store.toggleSalesRepSort();
 
       expect(useManagerStore.getState().searchQuery).toBe("南港");
       expect(useManagerStore.getState().statusFilter).toBe("YELLOW");
@@ -358,6 +361,7 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(useManagerStore.getState().stageFilter).toBe("PRE_PROD");
       expect(useManagerStore.getState().dateSort).toBe("ASC");
       expect(useManagerStore.getState().statusSort).toBe("URGENT_FIRST");
+      expect(useManagerStore.getState().salesRepSort).toBe("ASC");
 
       // 點擊【回復預設】
       store.resetFilters();
@@ -367,6 +371,52 @@ describe("搜尋與篩選條件功能測試", () => {
       expect(useManagerStore.getState().stageFilter).toBe("ACTIVE");
       expect(useManagerStore.getState().dateSort).toBe("NONE");
       expect(useManagerStore.getState().statusSort).toBe("NONE");
+      expect(useManagerStore.getState().salesRepSort).toBe("NONE");
+    });
+
+    it("主管總控業務欄位應嚴格依繁體中文筆畫排序，相同業務集中於同區塊且未指定固定排末", () => {
+      // 筆畫比較：丁(2) < 王(4) < 李(7) < 林(8) < 謝(17)
+      expect(compareSalesRepByStroke("丁專員", "王專員", "ASC")).toBeLessThan(0);
+      expect(compareSalesRepByStroke("王專員", "李專員", "ASC")).toBeLessThan(0);
+      expect(compareSalesRepByStroke("李專員", "林專員", "ASC")).toBeLessThan(0);
+      expect(compareSalesRepByStroke("林專員", "謝專員", "ASC")).toBeLessThan(0);
+      expect(compareSalesRepByStroke("王專員", "王專員", "ASC")).toBe(0);
+
+      // 未指定／未指派在正序與倒序時皆固定排於最末
+      expect(compareSalesRepByStroke("未指定", "謝專員", "ASC")).toBe(1);
+      expect(compareSalesRepByStroke("未指派", "丁專員", "DESC")).toBe(1);
+
+      const items = [
+        { id: "a", salesRepName: "謝專員", currentStage: "DEVELOP", trafficLight: { color: "GREEN" }, expectedDate: "2026-12-10" },
+        { id: "b", salesRepName: "王專員", currentStage: "DEVELOP", trafficLight: { color: "GREEN" }, expectedDate: "2026-12-15" },
+        { id: "c", salesRepName: "未指定", currentStage: "DEVELOP", trafficLight: { color: "RED" }, expectedDate: "2026-12-01" },
+        { id: "d", salesRepName: "李專員", currentStage: "DEVELOP", trafficLight: { color: "GREEN" }, expectedDate: "2026-12-05" },
+        { id: "e", salesRepName: "王專員", currentStage: "DEVELOP", trafficLight: { color: "RED" }, expectedDate: "2026-12-08" },
+      ];
+
+      // 依業務筆畫正序 + 區塊內依狀態緊急優先，且支援圖釘置頂
+      const sorted = sortProjectsWithPins(items, new Set<string>(["a"]), (x, y) =>
+        compareManagerOverviewProjects(x, y, {
+          salesRepSort: "ASC",
+          statusSort: "URGENT_FIRST",
+          dateSort: "NONE",
+          dateSortField: "expectedDate",
+        })
+      );
+
+      // a 置頂第一；其餘依 王(4畫: e 紅燈 -> b 綠燈) ➔ 李(7畫: d) ➔ 未指定(c)
+      expect(sorted.map((item) => item.id)).toEqual(["a", "e", "b", "d", "c"]);
+
+      // 倒序時：李 ➔ 王(e -> b) ➔ 謝 ➔ 未指定(仍排最後)
+      const sortedDesc = [...items].sort((x, y) =>
+        compareManagerOverviewProjects(x, y, {
+          salesRepSort: "DESC",
+          statusSort: "URGENT_FIRST",
+          dateSort: "NONE",
+          dateSortField: "expectedDate",
+        })
+      );
+      expect(sortedDesc.map((item) => item.id)).toEqual(["a", "d", "e", "b", "c"]);
     });
 
     it("useViewsStore 正確管理視覺時程之篩選狀態與 resetFilters", () => {

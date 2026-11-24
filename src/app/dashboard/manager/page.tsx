@@ -25,6 +25,7 @@ import { ManagerProjectStatusReport } from "@/components/dashboard/ManagerProjec
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { ColumnHeaderLabel } from "@/components/common/ColumnHeaderLabel";
 import { getTaiwanDateString, getTaskScheduleStatus } from "@/lib/schedule-engine";
+import { compareManagerOverviewProjects } from "@/lib/sort-utils";
 import { usePinnedProjects, sortProjectsWithPins } from "@/hooks/usePinnedProjects";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { WorkbenchAddPhaseModal } from "@/components/workbench/WorkbenchModals";
@@ -64,6 +65,7 @@ export default function ManagerDashboardPage() {
     dateSort,
     dateSortField,
     statusSort,
+    salesRepSort,
   } = useManagerStore(
     useShallow((s) => ({
       searchQuery: s.searchQuery,
@@ -73,6 +75,7 @@ export default function ManagerDashboardPage() {
       dateSort: s.dateSort,
       dateSortField: s.dateSortField,
       statusSort: s.statusSort,
+      salesRepSort: s.salesRepSort,
     }))
   );
 
@@ -82,6 +85,7 @@ export default function ManagerDashboardPage() {
   const setStatusFilter = useManagerStore((s) => s.setStatusFilter);
   const toggleDateSort = useManagerStore((s) => s.toggleDateSort);
   const toggleStatusSort = useManagerStore((s) => s.toggleStatusSort);
+  const toggleSalesRepSort = useManagerStore((s) => s.toggleSalesRepSort);
   const resetFilters = useManagerStore((s) => s.resetFilters);
   const initFromStorage = useManagerStore((s) => s.initFromStorage);
 
@@ -278,32 +282,17 @@ export default function ManagerDashboardPage() {
     });
   }, [allProjectsOverview, stageFilter, businessFilter, statusFilter, searchQuery]);
 
-  // 依進場日與狀態排序（支援圖釘置頂）
+  // 依業務筆畫、進場日與狀態排序（支援圖釘置頂）
   const sortedOverview = useMemo(() => {
-    return sortProjectsWithPins(filteredOverview, pinnedSet, (a, b) => {
-      if (statusSort !== "NONE") {
-        const getStatusWeight = (item: typeof a) => {
-          if (item.currentStage === "LOST") return 5;
-          if (item.trafficLight.color === "RED") return 1;
-          if (item.trafficLight.color === "YELLOW") return 2;
-          if (item.trafficLight.color === "GREEN") return 3;
-          return 4;
-        };
-        const diff = getStatusWeight(a) - getStatusWeight(b);
-        if (diff !== 0) {
-          return statusSort === "URGENT_FIRST" ? diff : -diff;
-        }
-      }
-      if (dateSort === "NONE") return 0;
-      const sortKey = dateSortField === "billingDate" ? "billingDate" : "expectedDate";
-      const dateA = a[sortKey] || "";
-      const dateB = b[sortKey] || "";
-      if (!dateA && !dateB) return 0;
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      return dateSort === "ASC" ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-    });
-  }, [filteredOverview, statusSort, dateSort, dateSortField, pinnedSet]);
+    return sortProjectsWithPins(filteredOverview, pinnedSet, (a, b) =>
+      compareManagerOverviewProjects(a, b, {
+        salesRepSort,
+        statusSort,
+        dateSort,
+        dateSortField,
+      })
+    );
+  }, [filteredOverview, salesRepSort, statusSort, dateSort, dateSortField, pinnedSet]);
 
   const totalFilteredAmount = useMemo(() => {
     return sortedOverview.reduce(
@@ -696,6 +685,18 @@ export default function ManagerDashboardPage() {
                         <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
                         <span className="text-[11px] text-blue-600 font-black">
                           {statusSort === "URGENT_FIRST" ? "🔴🔼" : statusSort === "NORMAL_FIRST" ? "🟢🔽" : "↕️"}
+                        </span>
+                      </button>
+                    ) : col.key === "salesRep" ? (
+                      <button
+                        type="button"
+                        onClick={toggleSalesRepSort}
+                        className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 focus:outline-none"
+                        title="依主責業務姓名筆畫排序，將相同業務之案場集中在同區塊"
+                      >
+                        <ColumnHeaderLabel colKey={col.key} fallbackLabel={col.label} />
+                        <span className="text-[11px] text-blue-600 font-black">
+                          {salesRepSort === "ASC" ? "🔼" : salesRepSort === "DESC" ? "🔽" : "↕️"}
                         </span>
                       </button>
                     ) : (

@@ -8,6 +8,7 @@ export interface ManagerFilterState {
   dateSort: "NONE" | "ASC" | "DESC";
   dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
+  salesRepSort: "NONE" | "ASC" | "DESC";
 
   setSearchQuery: (val: string) => void;
   setStatusFilter: (val: string) => void;
@@ -15,8 +16,10 @@ export interface ManagerFilterState {
   setStageFilter: (val: string) => void;
   setDateSort: (val: "NONE" | "ASC" | "DESC") => void;
   setStatusSort: (val: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST") => void;
+  setSalesRepSort: (val: "NONE" | "ASC" | "DESC") => void;
   toggleDateSort: (field?: "expectedDate" | "billingDate") => void;
   toggleStatusSort: () => void;
+  toggleSalesRepSort: () => void;
   resetFilters: () => void;
   initFromStorage: () => void;
 }
@@ -31,6 +34,7 @@ interface ManagerFilterFields {
   dateSort: "NONE" | "ASC" | "DESC";
   dateSortField: "expectedDate" | "billingDate";
   statusSort: "NONE" | "URGENT_FIRST" | "NORMAL_FIRST";
+  salesRepSort: "NONE" | "ASC" | "DESC";
 }
 
 const DEFAULT_MANAGER_FILTERS: ManagerFilterFields = {
@@ -41,6 +45,7 @@ const DEFAULT_MANAGER_FILTERS: ManagerFilterFields = {
   dateSort: "NONE",
   dateSortField: "expectedDate",
   statusSort: "NONE",
+  salesRepSort: "NONE",
 };
 
 function saveManagerFilters(partial: Partial<ManagerFilterFields>) {
@@ -81,6 +86,10 @@ export const useManagerStore = create<ManagerFilterState>((set) => ({
     set({ statusSort: val });
     saveManagerFilters({ statusSort: val });
   },
+  setSalesRepSort: (val) => {
+    set({ salesRepSort: val });
+    saveManagerFilters({ salesRepSort: val });
+  },
   toggleDateSort: (field = "expectedDate") =>
     set((state) => {
       const next =
@@ -103,6 +112,17 @@ export const useManagerStore = create<ManagerFilterState>((set) => ({
           : "NONE";
       saveManagerFilters({ statusSort: next });
       return { statusSort: next };
+    }),
+  toggleSalesRepSort: () =>
+    set((state) => {
+      const next =
+        state.salesRepSort === "NONE"
+          ? "ASC"
+          : state.salesRepSort === "ASC"
+          ? "DESC"
+          : "NONE";
+      saveManagerFilters({ salesRepSort: next });
+      return { salesRepSort: next };
     }),
   resetFilters: () => {
     set(DEFAULT_MANAGER_FILTERS);
@@ -129,6 +149,7 @@ export const useManagerStore = create<ManagerFilterState>((set) => ({
               ? parsed.dateSortField
               : "expectedDate",
           statusSort: ["NONE", "URGENT_FIRST", "NORMAL_FIRST"].includes(parsed.statusSort) ? parsed.statusSort : "NONE",
+          salesRepSort: ["NONE", "ASC", "DESC"].includes(parsed.salesRepSort) ? parsed.salesRepSort : "NONE",
         });
       }
     } catch {

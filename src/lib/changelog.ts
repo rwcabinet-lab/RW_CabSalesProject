@@ -32,6 +32,17 @@ export const CHANGELOG_CATEGORY_CONFIG = {
 
 export const DEFAULT_CHANGELOG: ChangelogEntry[] = [
   {
+    id: "cl-20261124-03",
+    version: "v1.6.4",
+    date: "2026-11-24",
+    title: "主管總控案場總覽新增業務欄位筆畫排序，並優化細節頁跳轉按鈕版面",
+    category: "OPTIMIZE",
+    details: [
+      "主管總控業務筆畫分區排序：點擊「業務」表頭可依主責業務姓名繁體中文筆畫排序（正序／倒序／取消），將相同業務之案場集中於同區塊，區塊內仍支援搭配狀態與日期排序",
+      "細節頁【跳轉至此】按鈕精簡：按鈕改為兩行精簡排列（「跳轉／至此」）縮短寬度，右側未顯示跳轉按鈕的項目條一律保持原始全寬",
+    ],
+  },
+  {
     id: "cl-20261124-02",
     version: "v1.6.3",
     date: "2026-11-24",
