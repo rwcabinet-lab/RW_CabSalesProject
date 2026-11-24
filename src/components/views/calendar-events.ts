@@ -1,4 +1,4 @@
-import { ScheduleEngine, getPausedScheduleOrder, computeIsSubsequentToPaused } from "@/lib/schedule-engine";
+import { ScheduleEngine, getPausedScheduleOrders, computeIsSubsequentToPaused } from "@/lib/schedule-engine";
 import type { MilestoneDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
 
 export type CalendarEvent =
@@ -63,12 +63,12 @@ export function buildCalendarEventsByDate({
     concreteProjectById.set(project.id, project);
     if (!isCalendarProjectActive(project)) continue;
 
-    const pausedOrder = getPausedScheduleOrder(project.milestones);
+    const pausedOrders = getPausedScheduleOrders(project.milestones);
 
     for (const milestone of project.milestones) {
       if (milestone.status !== "IN_PROGRESS" && milestone.status !== "OVERDUE") continue;
 
-      const isSubsequent = computeIsSubsequentToPaused(milestone, pausedOrder);
+      const isSubsequent = computeIsSubsequentToPaused(milestone, pausedOrders);
       if (isSubsequent) continue;
       if (milestone.assignedToId && hiddenStaffIds?.has(milestone.assignedToId)) continue;
       addEvent(toDateKey(milestone.plannedDueDate), { type: "MILESTONE", project, milestone });

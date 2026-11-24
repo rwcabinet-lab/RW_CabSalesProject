@@ -323,11 +323,59 @@ export const STANDARD_MILESTONE_STAGE_CODES: MilestoneStageCode[] = [
 /** 屬於第七階段【立帳/結案】的進度代碼（全手動設定日期與推進，不納入時程自動推算與連鎖平移） */
 export const CLOSURE_STAGE_CODES = new Set<string>(["7-1", "7-2", "7-3", "7-4"]);
 
+/** 屬於第六階段【安裝及驗收】的進度代碼（以手動設定之 6-1 進場日為基準，與前段 1-1 ~ 5-2 時程脫鉤） */
+export const INSTALL_STAGE_CODES = new Set<string>(["6-1", "6-2", "6-3", "6-4", "6-5"]);
+
 /** 判斷里程碑代碼是否屬於第七階段【立帳/結案】 */
 export function isClosureStageCode(stageCode: string): boolean {
   return (
     CLOSURE_STAGE_CODES.has(stageCode) ||
     STAGE_CODE_TO_PHASE[stageCode as MilestoneStageCode] === "CLOSURE"
+  );
+}
+
+/** 判斷里程碑代碼是否屬於第六階段【安裝及驗收】 */
+export function isInstallStageCode(stageCode: string): boolean {
+  return (
+    INSTALL_STAGE_CODES.has(stageCode) ||
+    STAGE_CODE_TO_PHASE[stageCode as MilestoneStageCode] === "INSTALL"
+  );
+}
+
+/** 判斷里程碑代碼是否屬於前段自動排程區（1-1 ~ 5-2，不含安裝與立帳/額外階段） */
+export function isPreInstallStageCode(stageCode: string): boolean {
+  return (
+    !isInstallStageCode(stageCode) &&
+    !isClosureStageCode(stageCode) &&
+    stageCode !== "X-1" &&
+    stageCode !== "X-2"
+  );
+}
+
+/** 判斷里程碑代碼是否允許「一鍵跳轉」或「項目略過」（標準進度 1-1 ~ 6-5，不含第七階段與額外階段） */
+export function isJumpableStageCode(stageCode: string): boolean {
+  return (
+    STANDARD_MILESTONE_STAGE_CODES.includes(stageCode as MilestoneStageCode) &&
+    !isClosureStageCode(stageCode)
+  );
+}
+
+/** 判斷里程碑是否為「已略過」（含系統自動略過、單項略過與一鍵跳轉略過） */
+export function isMilestoneSkipped(milestone: { status: string; notes?: string | null }): boolean {
+  if (milestone.status !== "COMPLETED") return false;
+  return Boolean(
+    milestone.notes?.includes("已略過") || milestone.notes?.includes("系統自動略過"),
+  );
+}
+
+/** 判斷備註是否僅為系統產生的略過標記（回退時可安全清除） */
+export function isPureSystemSkipNote(notes?: string | null): boolean {
+  if (!notes) return false;
+  const trimmed = notes.trim();
+  return (
+    trimmed.startsWith("【系統自動略過") ||
+    trimmed.startsWith("【已略過") ||
+    trimmed.startsWith("【一鍵跳轉")
   );
 }
 

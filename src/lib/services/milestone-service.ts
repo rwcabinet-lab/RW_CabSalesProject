@@ -15,12 +15,16 @@ import {
   STANDARD_MILESTONE_STAGE_CODES,
   extractAuditSubmittedAt,
   isClosureStageCode,
+  isInstallStageCode,
+  isPreInstallStageCode,
+  isPureSystemSkipNote,
   parseAuditSubmittedAtInput,
   withAuditSubmittedAtInAttachments,
 } from "../constants";
 import {
   ScheduleEngine,
   STAGE_CODE_TO_PROJECT_STAGE,
+  addDaysToDateStr,
   getTaiwanDateString,
   getTaiwanDateTimeString,
 } from "../schedule-engine";
@@ -401,6 +405,11 @@ export const MilestoneService = {
     customerSalesRep?: { id: string; name: string },
     cascadeShift: boolean = false,
   ): Promise<{ milestone: ProjectMilestoneItem; allMilestones: ProjectMilestoneItem[] }> {
+    const defaultDaysConfig =
+      updates.plannedDueDate !== undefined
+        ? await ConfigService.getMilestoneDefaultDays()
+        : MILESTONE_DEFAULT_DAYS;
+
     const { updatedRow, fullMilestones, shiftedMilestoneUpdates } = await prisma.$transaction(
       async (tx) => {
         await lockProjectInTx(tx, projectId);
@@ -468,24 +477,50 @@ export const MilestoneService = {
 
         let diffDays = 0;
         const isClosureSource = isClosureStageCode(currentMilestone.stageCode);
+        const isPreInstallSource = isPreInstallStageCode(currentMilestone.stageCode);
+        const isInstallSource = isInstallStageCode(currentMilestone.stageCode);
         if (cascadeShift && !isClosureSource && oldDueStr && newDueStr && oldDueStr !== newDueStr) {
           const [oy, om, od] = oldDueStr.split("-").map(Number);
           const [ny, nm, nd] = newDueStr.split("-").map(Number);
           diffDays = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(oy, om - 1, od)) / (1000 * 60 * 60 * 24));
         }
 
-        // 找出後續需平移的未完成里程碑 (排除 X-1, X-2 與第七階段立帳/結案)
-        const pendingShiftedUpdates: { id: string; newDateStr: string }[] = [];
-        if (diffDays !== 0) {
+        // 找出後續需平移或聯動推算的未完成里程碑（前段 1-1~5-2 與安裝段 6-1~6-5 互不越界，立帳階段不參與）
+        const pendingShiftedUpdates: { id: string; newDateStr: string | null }[] = [];
+        if (currentMilestone.stageCode === "6-1" && updates.plannedDueDate !== undefined) {
+          const shouldSyncInstallChildren =
+            updates.plannedDueDate === null ||
+            oldDueStr === null ||
+            cascadeShift;
+          if (shouldSyncInstallChildren) {
+            const derived = ScheduleEngine.applyInstallDateToMilestones(
+              currentFullMilestones,
+              newDueStr,
+              defaultDaysConfig,
+            );
+            for (const m of derived) {
+              if (m.id === milestoneId || !isInstallStageCode(m.stageCode) || m.status === MilestoneStatus.COMPLETED) {
+                continue;
+              }
+              const orig = currentFullMilestones.find((o) => o.id === m.id);
+              const origDateStr = orig?.plannedDueDate ? String(orig.plannedDueDate).slice(0, 10) : null;
+              if ((origDateStr ?? null) !== (m.plannedDueDate ?? null)) {
+                pendingShiftedUpdates.push({ id: m.id, newDateStr: m.plannedDueDate ?? null });
+              }
+            }
+          }
+        } else if (diffDays !== 0 && (isPreInstallSource || isInstallSource)) {
           const todayStr = getTaiwanDateString();
           const currentOrder = currentMilestone.stageOrder ?? 0;
           for (const m of currentFullMilestones) {
+            const inSameZone = isPreInstallSource
+              ? isPreInstallStageCode(m.stageCode)
+              : isInstallStageCode(m.stageCode) && m.stageCode !== "6-1";
             if (
               m.id !== milestoneId &&
               m.stageOrder > currentOrder &&
               m.status !== MilestoneStatus.COMPLETED &&
-              !["X-1", "X-2"].includes(m.stageCode) &&
-              !isClosureStageCode(m.stageCode) &&
+              inSameZone &&
               m.plannedDueDate
             ) {
               const rawDueDate = m.plannedDueDate as unknown;
@@ -612,12 +647,12 @@ export const MilestoneService = {
           const taskMilestoneMap = new Map(existingTasks.map((t) => [t.milestoneId!, t.id]));
 
           for (const shift of pendingShiftedUpdates) {
-            const shiftDate = new Date(`${shift.newDateStr}T00:00:00.000Z`);
+            const shiftDate = shift.newDateStr ? new Date(`${shift.newDateStr}T00:00:00.000Z`) : null;
             await tx.projectMilestone.update({
               where: { id: shift.id },
               data: { plannedDueDate: shiftDate },
             });
-            if (taskMilestoneMap.has(shift.id)) {
+            if (shiftDate && taskMilestoneMap.has(shift.id)) {
               await tx.salesTask.update({
                 where: { id: taskMilestoneMap.get(shift.id)! },
                 data: { dueDatetime: shiftDate },
@@ -633,7 +668,7 @@ export const MilestoneService = {
           if (shift61) {
             await tx.project.update({
               where: { id: projectId },
-              data: { expectedDate: new Date(`${shift61.newDateStr}T00:00:00.000Z`) },
+              data: { expectedDate: shift61.newDateStr ? new Date(`${shift61.newDateStr}T00:00:00.000Z`) : null },
             });
           }
         }
@@ -668,7 +703,7 @@ export const MilestoneService = {
       if (shiftedDateMap.has(m.id)) {
         return {
           ...m,
-          plannedDueDate: shiftedDateMap.get(m.id)!,
+          plannedDueDate: shiftedDateMap.get(m.id) ?? null,
         };
       }
       return m;
@@ -694,9 +729,11 @@ export const MilestoneService = {
   async advanceMilestone(
     projectId: string,
     milestoneId: string,
-    options?: { notes?: string; attachments?: string; completedDate?: string; installationDate?: string },
+    options?: { notes?: string; attachments?: string; completedDate?: string; installationDate?: string; skip?: boolean },
     existingMilestones?: ProjectMilestoneItem[]
   ) {
+    const defaultDays = await ConfigService.getMilestoneDefaultDays();
+
     return prisma.$transaction(
       async (tx) => {
         await lockProjectInTx(tx, projectId);
@@ -706,7 +743,7 @@ export const MilestoneService = {
           : await prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } });
 
         const originalById = new Map(list.map((m) => [m.id, m]));
-        const result = ScheduleEngine.advanceMilestone(list, milestoneId, options);
+        const result = ScheduleEngine.advanceMilestone(list, milestoneId, { ...options, defaultDays });
 
         for (const milestone of result.updatedMilestones) {
           const orig = originalById.get(milestone.id);
@@ -781,11 +818,11 @@ export const MilestoneService = {
           currentStage: result.newCurrentStage as ProjectStage,
           isDelayed: result.isProjectDelayed,
         };
-        const installDate = options?.installationDate || (
-          (list.find((m) => m.id === milestoneId)?.stageCode === "4-3" || list.find((m) => m.id === milestoneId)?.stageCode === "5-3")
-            ? options?.completedDate
-            : undefined
-        );
+        const targetOrig = originalById.get(milestoneId);
+        const isDispatch = targetOrig?.stageCode === "4-3" || targetOrig?.stageCode === "5-3";
+        const installDate = isDispatch && !options?.skip
+          ? (options?.installationDate || options?.completedDate)
+          : undefined;
         if (installDate) {
           projectUpdateData.expectedDate = new Date(`${installDate.slice(0, 10)}T00:00:00.000Z`);
         }
@@ -795,6 +832,128 @@ export const MilestoneService = {
         });
 
         return { updatedMilestones: result.updatedMilestones, newStage: result.newCurrentStage, isDelayed: result.isProjectDelayed };
+      },
+      { maxWait: 10000, timeout: 25000 }
+    );
+  },
+
+  async jumpToMilestone(
+    projectId: string,
+    milestoneId: string,
+    options?: { skip?: boolean; completedDate?: string; notes?: string },
+    existingMilestones?: ProjectMilestoneItem[]
+  ) {
+    const defaultDays = await ConfigService.getMilestoneDefaultDays();
+
+    return prisma.$transaction(
+      async (tx) => {
+        await lockProjectInTx(tx, projectId);
+        const list = await fetchMilestonesInTx(tx, projectId, existingMilestones);
+        const projectRecord = typeof (tx as unknown as { project?: { findUnique?: unknown } }).project?.findUnique === "function"
+          ? await tx.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } })
+          : await prisma.project.findUnique({ where: { id: projectId }, select: { salesRepId: true } });
+
+        const originalById = new Map(list.map((m) => [m.id, m]));
+        const result = ScheduleEngine.jumpToMilestone(list, milestoneId, {
+          skip: options?.skip !== false,
+          completedDate: options?.completedDate,
+          notes: options?.notes,
+          defaultDays,
+        });
+
+        const jumpedCompletedIds: string[] = [];
+        for (const milestone of result.updatedMilestones) {
+          const orig = originalById.get(milestone.id);
+          const hasChanged =
+            !orig ||
+            orig.status !== milestone.status ||
+            orig.actualDueDate !== milestone.actualDueDate ||
+            orig.plannedDueDate !== milestone.plannedDueDate ||
+            orig.notes !== milestone.notes;
+
+          if (hasChanged) {
+            await tx.projectMilestone.update({
+              where: { id: milestone.id },
+              data: {
+                status: milestone.status,
+                plannedDueDate: milestone.plannedDueDate ? new Date(`${milestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : null,
+                actualDueDate: milestone.actualDueDate ? new Date(`${milestone.actualDueDate.slice(0, 10)}T00:00:00.000Z`) : null,
+                notes: milestone.notes,
+              },
+            });
+          }
+
+          if (orig && orig.status !== "COMPLETED" && milestone.status === "COMPLETED") {
+            jumpedCompletedIds.push(milestone.id);
+            await tx.salesTask.updateMany({
+              where: { milestoneId: milestone.id, isCompleted: false },
+              data: {
+                isCompleted: true,
+                completedAt: new Date(),
+                resultNotes: milestone.notes || null,
+              },
+            });
+          }
+        }
+
+        // 確保目標之前與其他非目標未完成進度不殘留未完成待辦
+        const targetMilestone = result.updatedMilestones.find((m) => m.id === milestoneId);
+        const cleanupTaskIds = result.updatedMilestones
+          .filter((m) => m.id !== milestoneId && !jumpedCompletedIds.includes(m.id))
+          .map((m) => m.id);
+        if (cleanupTaskIds.length > 0) {
+          await tx.salesTask.deleteMany({
+            where: { milestoneId: { in: cleanupTaskIds }, isCompleted: false },
+          });
+        }
+
+        if (targetMilestone) {
+          const origTarget = originalById.get(targetMilestone.id);
+          const targetAssigneeId = targetMilestone.assignedToId || origTarget?.assignedToId || projectRecord?.salesRepId;
+          const isDrawing =
+            targetMilestone.phase === "PROPOSAL" ||
+            targetMilestone.phase === "PRE_PROD" ||
+            targetMilestone.stageCode.startsWith("3-") ||
+            targetMilestone.stageCode.startsWith("4-");
+          if (targetAssigneeId) {
+            await tx.salesTask.upsert({
+              where: { milestoneId: targetMilestone.id },
+              update: {
+                assignedToId: targetAssigneeId,
+                subject: MILESTONE_STAGE_LABELS[targetMilestone.stageCode as MilestoneStageCode] || "里程碑任務",
+                dueDatetime: targetMilestone.plannedDueDate ? new Date(`${targetMilestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                isCompleted: false,
+                completedAt: null,
+                resultNotes: null,
+              },
+              create: {
+                projectId,
+                milestoneId: targetMilestone.id,
+                assignedToId: targetAssigneeId,
+                taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+                subject: MILESTONE_STAGE_LABELS[targetMilestone.stageCode as MilestoneStageCode] || "里程碑任務",
+                dueDatetime: targetMilestone.plannedDueDate ? new Date(`${targetMilestone.plannedDueDate.slice(0, 10)}T00:00:00.000Z`) : new Date(),
+                priority: targetMilestone.priority || TaskPriority.MEDIUM,
+                isCompleted: false,
+              },
+            });
+          }
+        }
+
+        await tx.project.update({
+          where: { id: projectId },
+          data: {
+            currentStage: result.newCurrentStage as ProjectStage,
+            isDelayed: result.isProjectDelayed,
+          },
+        });
+
+        return {
+          updatedMilestones: result.updatedMilestones,
+          newStage: result.newCurrentStage,
+          isDelayed: result.isProjectDelayed,
+          jumpedCount: result.jumpedCount,
+        };
       },
       { maxWait: 10000, timeout: 25000 }
     );
@@ -822,9 +981,11 @@ export const MilestoneService = {
         const targetChanged = target.status !== targetStatus;
         const nextNotes = isCompleted && notes?.trim() ? notes.trim() : target.notes;
 
-        // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數（立帳/結案階段全手動，不參與連動）
+        // 若正規進度實際完成日早於預定完成日，計算提前天數；若取消完成則還原天數（前段 1-1~5-2 與安裝段 6-1~6-5 各自獨立，立帳階段全手動）
         const isRegularStage = !["X-1", "X-2"].includes(target.stageCode);
         const canShiftSchedule = isRegularStage && !isClosureStageCode(target.stageCode);
+        const isPreInstallSource = isPreInstallStageCode(target.stageCode);
+        const isInstallSource = isInstallStageCode(target.stageCode);
 
         // 狀態機防呆：正規進度不可跳級完成，目標之前的所有進度必須已全數完成
         if (isCompleted && isRegularStage) {
@@ -868,12 +1029,14 @@ export const MilestoneService = {
               notes: nextNotes,
             };
           }
+          const inSameZone = isPreInstallSource
+            ? isPreInstallStageCode(milestone.stageCode)
+            : isInstallSource && isInstallStageCode(milestone.stageCode) && milestone.stageCode !== "6-1";
           if (
             daysSaved !== 0 &&
             idx > targetIndex &&
             milestone.status !== MilestoneStatus.COMPLETED &&
-            !["X-1", "X-2"].includes(milestone.stageCode) &&
-            !isClosureStageCode(milestone.stageCode) &&
+            inSameZone &&
             milestone.plannedDueDate
           ) {
             const [iy, im, id] = milestone.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -971,19 +1134,29 @@ export const MilestoneService = {
           throw new ConflictError("請由最後一個已完成的里程碑開始回退");
         }
         const target = milestones[targetIndex];
-        const isAutoSkipped = Boolean(target.notes?.includes("系統自動略過"));
+        const isAutoSkipped = Boolean(
+          target.notes?.includes("系統自動略過") || target.notes?.includes("已略過"),
+        );
+        const shouldClearNotes = isAutoSkipped && isPureSystemSkipNote(target.notes);
 
-        // 配套 2: 若為系統自動略過項目，重新展期預定完成日（避免過期變紅燈）
+        // 配套 2: 若為略過項目，前段項目一律重新展期；安裝段項目僅在已有進場日 (6-1) 時展期 6-2~6-5，6-1 自身保持原值不自動生出假進場日
         let targetNewPlannedDueDate = target.plannedDueDate;
         if (isAutoSkipped) {
-          const defaultDays = Number(defaultDaysConfig[target.stageCode]) || MILESTONE_DEFAULT_DAYS[target.stageCode] || 3;
-          const newDue = new Date();
-          newDue.setDate(newDue.getDate() + defaultDays);
-          targetNewPlannedDueDate = newDue.toISOString().slice(0, 10);
+          const m61 = milestones.find((m) => m.stageCode === "6-1");
+          const canReExtendInstallSub =
+            isInstallStageCode(target.stageCode) &&
+            target.stageCode !== "6-1" &&
+            Boolean(m61?.plannedDueDate);
+          if (isPreInstallStageCode(target.stageCode) || canReExtendInstallSub) {
+            const defaultDays = Number(defaultDaysConfig[target.stageCode]) || MILESTONE_DEFAULT_DAYS[target.stageCode] || 3;
+            targetNewPlannedDueDate = addDaysToDateStr(getTaiwanDateString(), defaultDays);
+          }
         }
 
         const stage = STAGE_CODE_TO_PROJECT_STAGE[target.stageCode] as ProjectStage;
 
+        const targetIsPreInstall = isPreInstallStageCode(target.stageCode);
+        const targetIsInstall = isInstallStageCode(target.stageCode);
         const canShiftSchedule = !["X-1", "X-2"].includes(target.stageCode) && !isClosureStageCode(target.stageCode);
         let daysToRestore = 0;
         if (canShiftSchedule && target.plannedDueDate && target.actualDueDate && !isAutoSkipped) {
@@ -1001,10 +1174,12 @@ export const MilestoneService = {
           if (idx === targetIndex) {
             updated.status = MilestoneStatus.IN_PROGRESS;
             updated.actualDueDate = null;
-            // 配套 2 & 3: 展期預定日，且只限第一次回退系統自動略過項目時清空該備註，避免誤清使用者輸入資訊
+            // 配套 2 & 3: 展期預定日，且只限純系統略過備註時清空，避免誤清使用者補充說明
             if (isAutoSkipped) {
               updated.plannedDueDate = targetNewPlannedDueDate;
-              updated.notes = null;
+              if (shouldClearNotes) {
+                updated.notes = null;
+              }
             }
           } else if (
             idx > targetIndex &&
@@ -1013,12 +1188,14 @@ export const MilestoneService = {
           ) {
             updated.status = MilestoneStatus.PENDING;
           }
+          const inSameZone = targetIsPreInstall
+            ? isPreInstallStageCode(m.stageCode)
+            : targetIsInstall && isInstallStageCode(m.stageCode) && m.stageCode !== "6-1";
           if (
             daysToRestore > 0 &&
             idx > targetIndex &&
             m.status !== "COMPLETED" &&
-            !["X-1", "X-2"].includes(m.stageCode) &&
-            !isClosureStageCode(m.stageCode) &&
+            inSameZone &&
             m.plannedDueDate
           ) {
             const [iy, im, id] = m.plannedDueDate.slice(0, 10).split("-").map(Number);
@@ -1040,6 +1217,9 @@ export const MilestoneService = {
           const orig = milestones[i];
           const isSubseqRegularIncomplete =
             m.status !== MilestoneStatus.COMPLETED && !["X-1", "X-2"].includes(m.stageCode);
+          const inSameZone = targetIsPreInstall
+            ? isPreInstallStageCode(m.stageCode)
+            : targetIsInstall && isInstallStageCode(m.stageCode) && m.stageCode !== "6-1";
 
           if (m.status !== orig.status && m.status === MilestoneStatus.PENDING) {
             resetPendingMilestoneIds.push(m.id);
@@ -1047,7 +1227,7 @@ export const MilestoneService = {
           if (isSubseqRegularIncomplete) {
             subsequentCleanupTaskMilestoneIds.push(m.id);
           }
-          if (isSubseqRegularIncomplete && daysToRestore > 0 && m.plannedDueDate) {
+          if (isSubseqRegularIncomplete && inSameZone && daysToRestore > 0 && m.plannedDueDate) {
             shiftMilestoneIds.push(m.id);
           }
         }
@@ -1062,14 +1242,14 @@ export const MilestoneService = {
           target.stageCode.startsWith("3-") ||
           target.stageCode.startsWith("4-");
 
-        // 1. 回退目標里程碑狀態並清空實際完成日（若為自動略過項目，同步更新重新展期之預定日並清空備註）
+        // 1. 回退目標里程碑狀態並清空實際完成日（若為略過項目，同步更新重新展期之預定日並依規則清除系統標記）
         await tx.projectMilestone.update({
           where: { id: target.id },
           data: {
             status: evaluatedTarget.status,
             actualDueDate: null,
             ...(isAutoSkipped && targetNewPlannedDueDate ? { plannedDueDate: new Date(`${targetNewPlannedDueDate}T00:00:00.000Z`) } : {}),
-            ...(isAutoSkipped ? { notes: null } : {}),
+            ...(shouldClearNotes ? { notes: null } : {}),
           },
         });
         // 2. 配套 1: 重置關聯任務為未完成，若無待辦任務（如自動略過項目）則自動補建對應類型之待辦任務
@@ -1640,10 +1820,13 @@ export const MilestoneService = {
           ])
         );
 
-        // 防撞車與狀態機不變量檢查：已完成/進行中/已逾期與額外階段不可變動順位，且待開始項目不可跨階段移動
+        // 防撞車與狀態機不變量檢查：已完成/進行中/已逾期、額外階段與「6-1 進場安裝」不可變動順位，且待開始項目不可跨階段移動
         for (let idx = 0; idx < existing.length; idx++) {
           const slotExisting = existing[idx];
           const targetId = fullOrderedIds[idx];
+          if (slotExisting.stageCode === "6-1" && targetId !== slotExisting.id) {
+            throw new ConflictError("「6-1 進場安裝」固定為安裝階段第一順位，不可調整至其他項目之後");
+          }
           if (
             (slotExisting.status !== MilestoneStatus.PENDING || ["X-1", "X-2"].includes(slotExisting.stageCode)) &&
             targetId !== slotExisting.id
@@ -1653,6 +1836,9 @@ export const MilestoneService = {
           if (targetId !== slotExisting.id) {
             const movedItem = existingMap.get(targetId);
             const slotPhase = STAGE_CODE_TO_PHASE[slotExisting.stageCode as MilestoneStageCode] || slotExisting.phase;
+            if (movedItem?.stageCode === "6-1") {
+              throw new ConflictError("「6-1 進場安裝」固定為安裝階段第一順位，不可調整順序");
+            }
             if (movedItem && (movedItem.status !== MilestoneStatus.PENDING || ["X-1", "X-2"].includes(movedItem.stageCode))) {
               throw new ConflictError("已完成與進行中項目不可調整順序，僅可調整待開始項目的先後順序");
             }

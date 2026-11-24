@@ -5,13 +5,14 @@ import {
   STAGE_CODE_TO_PROJECT_STAGE,
   getTaiwanDateString,
   getTaiwanDateTimeString,
-  getPausedScheduleOrder,
+  getPausedScheduleOrders,
   computeIsSubsequentToPaused,
 } from "@/lib/schedule-engine";
 import { getUserFromRequest, getRolePages } from "@/lib/access-control";
 import {
   AUDIT_STAGE_CODES,
   STANDARD_MILESTONE_STAGE_CODES,
+  isJumpableStageCode,
   parseAuditSubmittedAtInput,
   resolveBillingInfoFromMilestones,
 } from "@/lib/constants";
@@ -31,10 +32,10 @@ function attachTrafficLights<
   milestones: T[],
   isProjectLost = false,
 ) {
-  const pausedStageOrder = getPausedScheduleOrder(milestones);
+  const pausedOrders = getPausedScheduleOrders(milestones);
 
   return milestones.map((m) => {
-    const isSubsequentToPaused = computeIsSubsequentToPaused(m, pausedStageOrder);
+    const isSubsequentToPaused = computeIsSubsequentToPaused(m, pausedOrders);
     const itemWithSubsequent = { ...m, isSubsequentToPaused };
     const status = isProjectLost && itemWithSubsequent.status === "OVERDUE" ? ("IN_PROGRESS" as const) : itemWithSubsequent.status;
     return {
@@ -134,6 +135,7 @@ export async function PUT(
       installationDate,
       auditSubmittedAt,
       isCompleted,
+      skip,
       orderedMilestoneIds,
       milestoneDates,
       orderedMilestones,
@@ -440,6 +442,59 @@ export async function PUT(
       });
     }
 
+    if (action === "jump") {
+      const canJump = isManager || user.id === project.salesRepId;
+      if (!canJump) {
+        return NextResponse.json({ error: "僅主管或主責業務可使用一鍵跳轉功能" }, { status: 403 });
+      }
+      if (project.currentStage === "WRAP_UP" || project.currentStage === "LOST") {
+        return NextResponse.json({ error: "目前案場階段不支援一鍵跳轉" }, { status: 409 });
+      }
+      if (!targetMilestone) {
+        return NextResponse.json({ error: "找不到目標里程碑" }, { status: 404 });
+      }
+      if (!isJumpableStageCode(targetMilestone.stageCode)) {
+        return NextResponse.json({ error: "最多只能跳轉到「6-5 提交成果驗收」" }, { status: 400 });
+      }
+      if (skip !== undefined && typeof skip !== "boolean") {
+        return NextResponse.json({ error: "略過標記格式無效" }, { status: 400 });
+      }
+      if (notes !== undefined && typeof notes !== "string") {
+        return NextResponse.json({ error: "備註格式無效" }, { status: 400 });
+      }
+      const isSkip = skip !== false;
+      if (!isSkip && actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
+        return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
+      }
+
+      const result = await DataService.jumpToMilestone(
+        projectId,
+        milestoneId,
+        {
+          skip: isSkip,
+          completedDate: !isSkip ? actualDueDate : undefined,
+          notes,
+        },
+        initialMilestones,
+      );
+
+      const updatedProject = withProjectBillingInfo(
+        {
+          ...project,
+          currentStage: result.newStage,
+          isDelayed: result.isDelayed,
+        },
+        result.updatedMilestones,
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `已成功一鍵跳轉並推進案場階段至 ${result.newStage}`,
+        project: updatedProject,
+        milestones: attachTrafficLights(result.updatedMilestones),
+      });
+    }
+
     if (action !== "advance") {
       if (!canManageOrReorder) {
         return NextResponse.json({ error: "您無權編輯里程碑時程與人員" }, { status: 403 });
@@ -486,20 +541,43 @@ export async function PUT(
     }
 
     if (action === "advance") {
+      if (skip !== undefined && typeof skip !== "boolean") {
+        return NextResponse.json({ error: "略過標記格式無效" }, { status: 400 });
+      }
+      if (notes !== undefined && typeof notes !== "string") {
+        return NextResponse.json({ error: "推進備註格式無效" }, { status: 400 });
+      }
+      const isSkip = skip === true;
+      const canSkip = isManager || user.id === project.salesRepId;
+
+      if (isSkip) {
+        if (!canSkip) {
+          return NextResponse.json({ error: "僅主管或主責業務可執行項目略過" }, { status: 403 });
+        }
+        if (project.currentStage === "WRAP_UP" || project.currentStage === "LOST") {
+          return NextResponse.json({ error: "目前案場階段不支援項目略過" }, { status: 409 });
+        }
+        if (!targetMilestone || !isJumpableStageCode(targetMilestone.stageCode)) {
+          return NextResponse.json({ error: "立帳/結案與額外階段不可略過" }, { status: 400 });
+        }
+      }
+
       const isDispatch =
         targetMilestone?.stageCode === "4-3" ||
         targetMilestone?.stageCode === "5-3";
 
-      if (isDispatch) {
-        const effInstallationDate = (installationDate || actualDueDate)?.trim();
-        if (!effInstallationDate) {
-          return NextResponse.json({ error: "請設定進場日期" }, { status: 400 });
+      if (!isSkip) {
+        if (isDispatch) {
+          const effInstallationDate = (installationDate || actualDueDate)?.trim();
+          if (!effInstallationDate) {
+            return NextResponse.json({ error: "請設定進場日期" }, { status: 400 });
+          }
+          if (!isValidDateOnly(effInstallationDate)) {
+            return NextResponse.json({ error: "進場日期格式無效" }, { status: 400 });
+          }
+        } else if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
+          return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
         }
-        if (!isValidDateOnly(effInstallationDate)) {
-          return NextResponse.json({ error: "進場日期格式無效" }, { status: 400 });
-        }
-      } else if (actualDueDate !== undefined && !isValidDateOnly(actualDueDate)) {
-        return NextResponse.json({ error: "實際完成日格式無效" }, { status: 400 });
       }
       if (project.currentStage === "WRAP_UP") {
         if (!targetMilestone || targetMilestone.stageCode !== "X-1") {
@@ -527,7 +605,7 @@ export async function PUT(
       if (project.currentStage === "LOST") {
         return NextResponse.json({ error: "此案件已進入額外階段，無法繼續推進一般里程碑" }, { status: 409 });
       }
-      if (AUDIT_STAGE_CODES.has(targetMilestone?.stageCode || "")) {
+      if (!isSkip && AUDIT_STAGE_CODES.has(targetMilestone?.stageCode || "")) {
         if (!targetMilestone?.auditSubmitted) {
           return NextResponse.json({ error: "請先提交審核，再由審核人員完成此進度" }, { status: 409 });
         }
@@ -536,18 +614,21 @@ export async function PUT(
         }
       }
 
-      // 快速推進此里程碑完成，並啟動下一里程碑
-      const effInstallationDate = isDispatch ? (installationDate || actualDueDate)?.trim() : undefined;
+      // 快速推進此里程碑完成（或略過），並啟動下一里程碑
+      const effInstallationDate = isDispatch && !isSkip ? (installationDate || actualDueDate)?.trim() : undefined;
       const result = await DataService.advanceMilestone(
         projectId,
         milestoneId,
         {
           notes,
           attachments,
-          completedDate: isDispatch
-            ? (actualDueDate && actualDueDate !== effInstallationDate ? actualDueDate : getTaiwanDateString())
-            : actualDueDate,
+          completedDate: isSkip
+            ? undefined
+            : isDispatch
+              ? (actualDueDate && actualDueDate !== effInstallationDate ? actualDueDate : getTaiwanDateString())
+              : actualDueDate,
           installationDate: effInstallationDate,
+          skip: isSkip,
         },
         initialMilestones,
       );
@@ -564,7 +645,9 @@ export async function PUT(
 
       return NextResponse.json({
         success: true,
-        message: `成功完成里程碑並推進案場階段至 ${result.newStage}`,
+        message: isSkip
+          ? `已略過此項目並推進案場階段至 ${result.newStage}`
+          : `成功完成里程碑並推進案場階段至 ${result.newStage}`,
         project: updatedProject,
         milestones: attachTrafficLights(result.updatedMilestones),
       });

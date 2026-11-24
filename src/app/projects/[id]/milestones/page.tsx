@@ -28,6 +28,7 @@ import {
   RotateCcw,
   RefreshCw,
   Undo2,
+  FastForward,
 } from "lucide-react";
 import {
   MILESTONE_STAGE_LABELS,
@@ -39,13 +40,15 @@ import {
   QUOTE_STAGE_CODES,
   formatAuditSubmittedAt,
   isClosureStageCode,
+  isJumpableStageCode,
+  isMilestoneSkipped,
 } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import {
   getTaiwanDateString,
   getTaiwanDateTimeString,
   getTaskScheduleStatus,
-  getPausedScheduleOrder,
+  getPausedScheduleOrders,
   computeIsSubsequentToPaused,
 } from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
@@ -152,9 +155,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     milestone: MilestoneWithLight;
     actualDueDate: string;
     notes: string;
+    skip: boolean;
   } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [workflowError, setWorkflowError] = useState("");
+
+  // 一鍵跳轉確認彈窗
+  const [jumpModal, setJumpModal] = useState<{
+    milestone: MilestoneWithLight;
+    skip: boolean;
+    actualDueDate: string;
+    notes: string;
+  } | null>(null);
+  const [jumping, setJumping] = useState(false);
 
   // 審核提交彈窗
   const [submitAuditModal, setSubmitAuditModal] = useState<{
@@ -645,7 +658,8 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     e.preventDefault();
     if (!completionModal) return;
     const isDispatch = completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3";
-    if (isDispatch && !completionModal.actualDueDate.trim()) {
+    const isSkip = completionModal.skip;
+    if (!isSkip && isDispatch && !completionModal.actualDueDate.trim()) {
       toast.error("請設定進場日期");
       return;
     }
@@ -657,14 +671,23 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
         body: JSON.stringify({
           action: "advance",
           milestoneId: completionModal.milestone.id,
-          actualDueDate: isDispatch ? todayDate() : completionModal.actualDueDate,
-          installationDate: isDispatch ? completionModal.actualDueDate.trim() : undefined,
+          skip: isSkip,
+          actualDueDate: isSkip
+            ? undefined
+            : isDispatch
+              ? todayDate()
+              : completionModal.actualDueDate,
+          installationDate: !isSkip && isDispatch ? completionModal.actualDueDate.trim() : undefined,
           notes: completionModal.notes,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "推進失敗");
-      toast.success(`已完成【${MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}】並推進案件進度。`);
+      toast.success(
+        isSkip
+          ? `已略過【${MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}】並推進案件進度。`
+          : `已完成【${MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}】並推進案件進度。`,
+      );
       setCompletionModal(null);
       if (data.project && data.milestones) {
         applyMilestonesData(data);
@@ -683,6 +706,46 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       toast.error(err instanceof Error ? err.message : "完成推進失敗");
     } finally {
       setAdvancing(false);
+    }
+  };
+
+  // 一鍵跳轉至指定進度
+  const handleJump = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jumpModal) return;
+    setJumping(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/milestones`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "jump",
+          milestoneId: jumpModal.milestone.id,
+          skip: jumpModal.skip,
+          actualDueDate: !jumpModal.skip ? jumpModal.actualDueDate : undefined,
+          notes: jumpModal.notes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "一鍵跳轉失敗");
+      toast.success(`已成功跳轉至【${MILESTONE_STAGE_LABELS[jumpModal.milestone.stageCode]}】。`);
+      setJumpModal(null);
+      if (data.project && data.milestones) {
+        applyMilestonesData(data);
+        void fetch(`/api/tasks?projectId=${encodeURIComponent(projectId)}&isCompleted=false`, { cache: "no-store" })
+          .then((tRes) => tRes.ok ? tRes.json() : null)
+          .then((tData) => { if (Array.isArray(tData)) setTasks(tData); })
+          .catch(() => {});
+      } else {
+        await refreshMilestonesOnly();
+      }
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.workbench, refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "manager"], refetchType: "none" });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData, refetchType: "none" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "一鍵跳轉失敗");
+    } finally {
+      setJumping(false);
     }
   };
 
@@ -820,15 +883,17 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   }
 
   const isMutatingMilestones =
-    reordering || advancing || rollingBack || saving || submittingAudit || withdrawingAudit || cancellingLost;
+    reordering || advancing || jumping || rollingBack || saving || submittingAudit || withdrawingAudit || cancellingLost;
 
   const isProjectLost = project?.currentStage === "LOST";
   const canReviewAudit =
     canManageMilestones || (!!project && currentUserId === project.salesRepId);
   const canRollback = canManageMilestones || (!!project && currentUserId === project.salesRepId);
+  const canJumpOrSkip = canManageMilestones || (!!project && currentUserId === project.salesRepId);
+  const showJumpColumn = canJumpOrSkip && !isProjectLost && project?.currentStage !== "WRAP_UP" && activePhase !== "EXTRA";
 
   const sortedAllMilestones = [...milestones].sort((a, b) => a.stageOrder - b.stageOrder);
-  const pausedStageOrder = getPausedScheduleOrder(sortedAllMilestones);
+  const pausedOrders = getPausedScheduleOrders(sortedAllMilestones);
   const lastCompletedMilestone = [...sortedAllMilestones].reverse().find((m) => m.status === "COMPLETED");
   const currentActionableMilestone =
     project?.currentStage === "WRAP_UP"
@@ -1102,8 +1167,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
           <div className="space-y-3">
             {phaseGroups[activePhase].map((m) => {
               const isEditing = editingId === m.id;
-              const isSubsequent = computeIsSubsequentToPaused(m, pausedStageOrder);
+              const isSubsequent = computeIsSubsequentToPaused(m, pausedOrders);
               const isPaused = !isProjectLost && m.status !== "COMPLETED" && (!m.plannedDueDate || m.trafficLight?.label === "需追蹤") && !isSubsequent;
+              const isSkipped = isMilestoneSkipped(m);
               const isAuditStage = AUDIT_STAGE_CODES.has(m.stageCode);
               const isAuditSubmitted = m.auditSubmitted === true;
               const isDueToday = !isProjectLost && !isSubsequent && m.trafficLight?.label === "已到期";
@@ -1113,13 +1179,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
               const isQuoteStage = QUOTE_STAGE_CODES.has(m.stageCode);
               const isExpanded = !!expandedRecords[m.id];
               const records = recordsMap[m.id] || [];
-              const canDrag = canReorderMilestones && !isProjectLost && !isEditing && !isMutatingMilestones && m.status === "PENDING";
+              const canDrag = canReorderMilestones && !isProjectLost && !isEditing && !isMutatingMilestones && m.status === "PENDING" && m.stageCode !== "6-1";
               const isBeingDragged = draggedMilestoneId === m.id;
               const isDragOver = dragOverMilestoneId === m.id && draggedMilestoneId !== m.id;
+              const canJumpToThis =
+                showJumpColumn &&
+                m.status === "PENDING" &&
+                isJumpableStageCode(m.stageCode) &&
+                Boolean(currentActionableMilestone) &&
+                m.stageOrder > (currentActionableMilestone?.stageOrder ?? 0);
 
               return (
+                <div key={m.id} className={showJumpColumn ? "flex items-center gap-3" : ""}>
                 <div
-                  key={m.id}
                   draggable={canDrag}
                   onDragStart={(event) => {
                     if (!canDrag) return;
@@ -1141,7 +1213,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     }
                   }}
                   onDragEnd={handleDragEndItem}
-                  className={`rounded-xl border p-4 transition-all duration-150 ${
+                  className={`${showJumpColumn ? "flex-1 min-w-0 " : ""}rounded-xl border p-4 transition-all duration-150 ${
                     isDragOver
                       ? "ring-2 ring-blue-500 border-blue-400 bg-blue-50/50 scale-[1.01]"
                       : isBeingDragged
@@ -1294,15 +1366,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                     ? m.status === "COMPLETED"
                                       ? `${STATUS_MAP.COMPLETED.bg} ${STATUS_MAP.COMPLETED.text}`
                                       : `${STATUS_MAP.PENDING.bg} ${STATUS_MAP.PENDING.text}`
-                                    : isPaused
-                                      ? "bg-slate-100 text-slate-700 border border-slate-300"
-                                      : `${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`
+                                    : isSkipped
+                                      ? "bg-slate-200/80 text-slate-700"
+                                      : isPaused
+                                        ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                        : `${STATUS_MAP[m.status].bg} ${STATUS_MAP[m.status].text}`
                                 }`}>
                                   {isProjectLost
                                     ? m.status === "COMPLETED" ? "已完成" : "未進行"
-                                    : isPaused
-                                      ? "需追蹤"
-                                      : STATUS_MAP[m.status].label}
+                                    : isSkipped
+                                      ? "已略過"
+                                      : isPaused
+                                        ? "需追蹤"
+                                        : STATUS_MAP[m.status].label}
                                 </span>
                               )}
                               {isAuditStage && !isProjectLost && !isSubsequent && (
@@ -1329,7 +1405,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               {isAuditStage && m.auditSubmittedAt && (
                                 <span className="text-purple-700">實際提交審核：<b>{formatAuditSubmittedAt(m.auditSubmittedAt)}</b></span>
                               )}
-                              {m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>}
+                              {isSkipped ? (
+                                <span className="text-slate-600 font-semibold">已略過</span>
+                              ) : (
+                                m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>
+                              )}
                               {m.notes && <span className="italic text-slate-400">({m.notes})</span>}
                             </div>
                           </div>
@@ -1369,18 +1449,29 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
 
                           {/* [進度完成] 移至 [歷次紀錄] 左側 */}
                           {isActive && !isProjectLost && (
-                            (!isAuditStage || (isAuditSubmitted && canReviewAudit)) && (
-                            <button
-                              type="button"
-                              disabled={isMutatingMilestones}
-                              onClick={() => {
-                                const isDispatch = m.stageCode === "4-3" || m.stageCode === "5-3";
-                                setCompletionModal({ milestone: m, actualDueDate: isDispatch ? "" : todayDate(), notes: "" });
-                              }}
-                              className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition disabled:opacity-50"
-                            >
-                              <Sparkles className="w-3 h-3" /> {isAuditStage ? "審核完成" : "進度完成"}
-                            </button>
+                            (!isAuditStage || (isAuditSubmitted && canReviewAudit)) ? (
+                              <button
+                                type="button"
+                                disabled={isMutatingMilestones}
+                                onClick={() => {
+                                  const isDispatch = m.stageCode === "4-3" || m.stageCode === "5-3";
+                                  setCompletionModal({ milestone: m, actualDueDate: isDispatch ? "" : todayDate(), notes: "", skip: false });
+                                }}
+                                className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition disabled:opacity-50"
+                              >
+                                <Sparkles className="w-3 h-3" /> {isAuditStage ? "審核完成" : "進度完成"}
+                              </button>
+                            ) : (
+                              canJumpOrSkip && isJumpableStageCode(m.stageCode) && (
+                                <button
+                                  type="button"
+                                  disabled={isMutatingMilestones}
+                                  onClick={() => setCompletionModal({ milestone: m, actualDueDate: todayDate(), notes: "", skip: true })}
+                                  className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-slate-600 text-white hover:bg-slate-700 shadow-sm transition disabled:opacity-50"
+                                >
+                                  此項略過
+                                </button>
+                              )
                             )
                           )}
 
@@ -1560,6 +1651,23 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </div>
+                {showJumpColumn && (
+                  <div className="w-[92px] shrink-0 flex items-center justify-center">
+                    {canJumpToThis && (
+                      <button
+                        type="button"
+                        disabled={isMutatingMilestones}
+                        onClick={() => setJumpModal({ milestone: m, skip: true, actualDueDate: todayDate(), notes: "" })}
+                        className="h-8 w-full px-2 flex items-center justify-center gap-1 text-xs font-bold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-xs transition disabled:opacity-50"
+                        title={`一鍵跳轉至【${MILESTONE_STAGE_LABELS[m.stageCode]}】`}
+                      >
+                        <FastForward className="w-3.5 h-3.5 shrink-0" />
+                        <span>跳轉至此</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                </div>
               );
             })}
             {phaseGroups[activePhase].length === 0 && (
@@ -1659,13 +1767,19 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
       </section>
 
       {/* 完成並推進確認彈窗 */}
-      {completionModal && (
+      {completionModal && (() => {
+        const mustKeepSkip =
+          AUDIT_STAGE_CODES.has(completionModal.milestone.stageCode) &&
+          !completionModal.milestone.auditSubmitted;
+        const canToggleSkip =
+          canJumpOrSkip && isJumpableStageCode(completionModal.milestone.stageCode);
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-base flex items-center gap-2 text-slate-900">
                 <Sparkles className="w-5 h-5 text-blue-600" />
-                完成進度 — {MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}
+                {completionModal.skip ? "略過進度" : "完成進度"} — {MILESTONE_STAGE_LABELS[completionModal.milestone.stageCode]}
               </h3>
               <button type="button" onClick={() => setCompletionModal(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -1673,9 +1787,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             </div>
             <form onSubmit={handleAdvance} className="space-y-3 text-xs">
               <p className="text-slate-600 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                完成後，系統將自動啟動排在下一個順位的子進度，並連動更新案件總表當前進度。
+                {completionModal.skip
+                  ? "略過此項目後（實際完成日留空，僅標示已略過），系統將自動啟動排在下一個順位的子進度。"
+                  : "完成後，系統將自動啟動排在下一個順位的子進度，並連動更新案件總表當前進度。"}
               </p>
-              {MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode] && (
+              {!completionModal.skip && MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode] && (
                 <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2 font-medium">
                   <span className="text-sm">💡</span>
                   <span>提示：{MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode]}</span>
@@ -1686,38 +1802,130 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   實際提交審核時間：<b>{formatAuditSubmittedAt(completionModal.milestone.auditSubmittedAt)}</b>
                 </div>
               )}
+              {canToggleSkip && (
+                <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 font-semibold select-none ${mustKeepSkip ? "border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed" : "border-slate-200 bg-slate-50 text-slate-700 cursor-pointer hover:bg-slate-100/80"}`}>
+                  <input
+                    type="checkbox"
+                    checked={completionModal.skip}
+                    disabled={mustKeepSkip}
+                    onChange={(e) => setCompletionModal({ ...completionModal, skip: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>此項略過</span>
+                  <span className="text-[11px] font-normal text-slate-500">
+                    {mustKeepSkip ? "（未送審僅可略過，或先返回提交審核）" : "（不須執行此步驟，實際完成日留空）"}
+                  </span>
+                </label>
+              )}
+              {!completionModal.skip && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3" ? "進場日期" : "實際完成日"}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={completionModal.actualDueDate}
+                    onChange={(e) => setCompletionModal({ ...completionModal, actualDueDate: e.target.value })}
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  {completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3" ? "進場日期" : "實際完成日"}
+                  {completionModal.skip ? "略過備註說明（選填）" : "執行備註說明"}
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={completionModal.actualDueDate}
-                  onChange={(e) => setCompletionModal({ ...completionModal, actualDueDate: e.target.value })}
-                  className="w-full border rounded p-2 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">執行備註說明</label>
                 <textarea
                   rows={3}
                   value={completionModal.notes}
                   onChange={(e) => setCompletionModal({ ...completionModal, notes: e.target.value })}
-                  placeholder="如：圖面已全數確認完畢，客戶已簽認"
+                  placeholder={completionModal.skip ? "如：客戶已自備圖面，此步驟不須執行" : "如：圖面已全數確認完畢，客戶已簽認"}
                   className="w-full border rounded p-2 text-xs"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <button type="button" onClick={() => setCompletionModal(null)} className="px-3 py-1.5 bg-slate-200 rounded font-semibold">取消</button>
                 <button type="submit" disabled={advancing} className="px-4 py-1.5 bg-blue-600 text-white font-bold rounded shadow">
-                  {advancing ? "推進中..." : "確認完成並推進"}
+                  {advancing ? "處理中..." : completionModal.skip ? "確認略過並推進" : "確認完成並推進"}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
+
+      {/* 一鍵跳轉確認彈窗 */}
+      {jumpModal && (() => {
+        const crossedItems = sortedAllMilestones.filter(
+          (m) => m.status !== "COMPLETED" && m.stageOrder < jumpModal.milestone.stageOrder,
+        );
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="font-bold text-base flex items-center gap-2 text-slate-900">
+                  <FastForward className="w-5 h-5 text-indigo-600" />
+                  一鍵跳轉至 — {jumpModal.milestone.stageCode} {MILESTONE_STAGE_LABELS[jumpModal.milestone.stageCode]}
+                </h3>
+                <button type="button" onClick={() => setJumpModal(null)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleJump} className="space-y-3 text-xs">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-1">
+                  <p className="font-bold">
+                    將跨過前面 {crossedItems.length} 個未完成項目，並直接啟動【{jumpModal.milestone.stageCode} {MILESTONE_STAGE_LABELS[jumpModal.milestone.stageCode]}】。
+                  </p>
+                  <p className="text-[11px] text-amber-800">
+                    中間若有需審核項目或派工將直接跳過，進場日與立帳日不受影響；後續前段預定日將以今日為基準重新推算。
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700 cursor-pointer select-none hover:bg-slate-100/80">
+                  <input
+                    type="checkbox"
+                    checked={jumpModal.skip}
+                    onChange={(e) => setJumpModal({ ...jumpModal, skip: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>以上略過</span>
+                  <span className="text-[11px] font-normal text-slate-500">
+                    （勾選時實際完成日留空，僅標示為已略過）
+                  </span>
+                </label>
+                {!jumpModal.skip && (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">實際完成日</label>
+                    <input
+                      type="date"
+                      required
+                      value={jumpModal.actualDueDate}
+                      onChange={(e) => setJumpModal({ ...jumpModal, actualDueDate: e.target.value })}
+                      className="w-full border rounded p-2 text-xs"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">跳轉備註說明（選填）</label>
+                  <textarea
+                    rows={2}
+                    value={jumpModal.notes}
+                    onChange={(e) => setJumpModal({ ...jumpModal, notes: e.target.value })}
+                    placeholder="如：既有舊案匯入，直接進入此階段"
+                    className="w-full border rounded p-2 text-xs"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <button type="button" onClick={() => setJumpModal(null)} className="px-3 py-1.5 bg-slate-200 rounded font-semibold">取消</button>
+                  <button type="submit" disabled={jumping} className="px-4 py-1.5 bg-indigo-600 text-white font-bold rounded shadow hover:bg-indigo-700 disabled:opacity-50">
+                    {jumping ? "跳轉中..." : "確認一鍵跳轉"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 提交審核彈窗 */}
       {submitAuditModal && (

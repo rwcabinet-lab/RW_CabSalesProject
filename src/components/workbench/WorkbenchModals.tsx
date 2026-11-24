@@ -5,11 +5,15 @@ import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
-import { QUERY_KEYS } from "@/hooks/useQueries";
+import { QUERY_KEYS, useSessionQuery } from "@/hooks/useQueries";
 import { getTaiwanDateString, getTaiwanDateTimeString } from "@/lib/schedule-engine";
 import { toast } from "@/stores/useToastStore";
-import { MILESTONE_STAGE_LABELS, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
-import type { ApiResponse, TaskDTO, UserDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
+import {
+  MILESTONE_STAGE_LABELS,
+  STANDARD_MILESTONE_STAGE_CODES,
+  isJumpableStageCode,
+} from "@/lib/constants";
+import type { ApiResponse, MilestoneDTO, TaskDTO, UserDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
 
 interface WorkbenchModalsProps {
   currentUserId: string;
@@ -268,6 +272,7 @@ interface AdvanceMilestoneModalProps {
 
 export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMilestoneModalProps) {
   const queryClient = useQueryClient();
+  const { data: sessionUser } = useSessionQuery();
   const projectToAdvance = useWorkbenchStore((s) => s.projectToAdvance);
   const resetAdvanceModal = useWorkbenchStore((s) => s.resetAdvanceModal);
   const advanceNotes = useWorkbenchStore((s) => s.advanceNotes);
@@ -280,12 +285,50 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
   const [canSubmitAudit, setCanSubmitAudit] = useState(false);
   const [submittingAudit, setSubmittingAudit] = useState(false);
   const [auditSubmittedAt, setAuditSubmittedAt] = useState(() => getTaiwanDateTimeString());
+  const [projectMilestones, setProjectMilestones] = useState<MilestoneDTO[]>([]);
+  const [loadingMilestones, setLoadingMilestones] = useState(false);
+  const [selectedTargetId, setSelectedTargetId] = useState<string>("");
+  const [skipChecked, setSkipChecked] = useState(false);
+
+  const isManager = ["ADMIN", "LEVEL_MANAGER", "SALES_MANAGER"].includes(sessionUser?.role || "");
+  const canJumpOrSkip = Boolean(
+    projectToAdvance &&
+      sessionUser &&
+      (isManager || sessionUser.id === projectToAdvance.salesRepId),
+  );
 
   useEffect(() => {
     setAdvanceError("");
     setCanSubmitAudit(false);
     setAuditSubmittedAt(getTaiwanDateTimeString());
-  }, [projectToAdvance?.id, projectToAdvance?.activeMilestone?.id]);
+    setSelectedTargetId("");
+    setSkipChecked(false);
+    setProjectMilestones([]);
+
+    if (!projectToAdvance?.id || !canJumpOrSkip) return;
+    let active = true;
+    setLoadingMilestones(true);
+    fetch(`/api/projects/${projectToAdvance.id}/milestones`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data?.milestones) return;
+        const sorted = [...(data.milestones as MilestoneDTO[])].sort(
+          (a, b) => a.stageOrder - b.stageOrder,
+        );
+        setProjectMilestones(sorted);
+        const curIdx = sorted.findIndex((m) => m.id === projectToAdvance.activeMilestone?.id);
+        if (curIdx >= 0 && curIdx + 1 < sorted.length && isJumpableStageCode(sorted[curIdx + 1].stageCode)) {
+          setSelectedTargetId(sorted[curIdx + 1].id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingMilestones(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectToAdvance?.id, projectToAdvance?.activeMilestone?.id, canJumpOrSkip]);
 
   if (!projectToAdvance || !projectToAdvance.activeMilestone) return null;
 
@@ -302,11 +345,58 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
       : null;
   const nextStageName = nextStageCode ? MILESTONE_STAGE_LABELS[nextStageCode] : "全案完結";
 
+  const fetchedCurrentIdx = projectMilestones.findIndex(
+    (m) => m.id === projectToAdvance.activeMilestone?.id,
+  );
+  const immediateNextMilestone =
+    fetchedCurrentIdx >= 0 && fetchedCurrentIdx + 1 < projectMilestones.length
+      ? projectMilestones[fetchedCurrentIdx + 1]
+      : null;
+  const jumpableTargets =
+    fetchedCurrentIdx >= 0
+      ? projectMilestones.filter(
+          (m, idx) =>
+            idx > fetchedCurrentIdx &&
+            m.status === "PENDING" &&
+            isJumpableStageCode(m.stageCode),
+        )
+      : [];
+  const showJumpSelect =
+    canJumpOrSkip &&
+    isJumpableStageCode(currentStageCode) &&
+    currentStageCode !== "6-5" &&
+    jumpableTargets.length > 0;
+
+  const selectedTargetMilestone = jumpableTargets.find((m) => m.id === selectedTargetId) || immediateNextMilestone;
+  const isJumpMode = Boolean(
+    showJumpSelect &&
+      selectedTargetMilestone &&
+      immediateNextMilestone &&
+      selectedTargetMilestone.id !== immediateNextMilestone.id,
+  );
+  const crossedCount =
+    isJumpMode && selectedTargetMilestone && fetchedCurrentIdx >= 0
+      ? projectMilestones.findIndex((m) => m.id === selectedTargetMilestone.id) - fetchedCurrentIdx
+      : 0;
+  const canShowSkipCheckbox =
+    canJumpOrSkip && isJumpableStageCode(currentStageCode);
+  const displayNextName = selectedTargetMilestone
+    ? `${selectedTargetMilestone.stageCode} ${MILESTONE_STAGE_LABELS[selectedTargetMilestone.stageCode] || selectedTargetMilestone.stageCode}`
+    : nextStageName;
+
+  const handleTargetChange = (nextId: string) => {
+    setSelectedTargetId(nextId);
+    setAdvanceError("");
+    setCanSubmitAudit(false);
+    const nextIsJump = Boolean(immediateNextMilestone && nextId !== immediateNextMilestone.id);
+    setSkipChecked(nextIsJump);
+  };
+
   const handleAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectToAdvance.activeMilestone) return;
 
-    if (isDispatch && !advanceDate.trim()) {
+    if (!isJumpMode && !skipChecked && isDispatch && !advanceDate.trim()) {
       setAdvanceError("請設定進場日期");
       return;
     }
@@ -316,16 +406,31 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
     setCanSubmitAudit(false);
 
     try {
+      const requestBody = isJumpMode && selectedTargetMilestone
+        ? {
+            action: "jump",
+            milestoneId: selectedTargetMilestone.id,
+            skip: skipChecked,
+            actualDueDate: !skipChecked ? (advanceDate || getTaiwanDateString()) : undefined,
+            notes: advanceNotes.trim() || undefined,
+          }
+        : {
+            action: "advance",
+            milestoneId: projectToAdvance.activeMilestone.id,
+            skip: skipChecked,
+            actualDueDate: skipChecked
+              ? undefined
+              : isDispatch
+                ? getTaiwanDateString()
+                : (advanceDate || getTaiwanDateString()),
+            installationDate: !skipChecked && isDispatch ? advanceDate.trim() : undefined,
+            notes: advanceNotes.trim() || undefined,
+          };
+
       const res = await fetch(`/api/projects/${projectToAdvance.id}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "advance",
-          milestoneId: projectToAdvance.activeMilestone.id,
-          actualDueDate: isDispatch ? getTaiwanDateString() : (advanceDate || getTaiwanDateString()),
-          installationDate: isDispatch ? advanceDate.trim() : undefined,
-          notes: advanceNotes.trim() || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await res.json();
@@ -338,7 +443,13 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
         return;
       }
 
-      toast.success(`已成功推進「${projectToAdvance.projectName}」進度至 ${nextStageName}`);
+      toast.success(
+        isJumpMode
+          ? `已成功跳轉「${projectToAdvance.projectName}」進度至 ${displayNextName}`
+          : skipChecked
+            ? `已略過「${currentStageName}」並推進至 ${nextStageName}`
+            : `已成功推進「${projectToAdvance.projectName}」進度至 ${nextStageName}`,
+      );
       resetAdvanceModal();
       void onInvalidate({ includeViews: true });
     } catch (err) {
@@ -416,23 +527,61 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
             <div className="text-slate-400 font-bold text-sm">➔</div>
             <div className="flex-1">
               <span className="text-[11px] font-semibold text-slate-400 block">即將啟動進度</span>
-              <span className="text-sm font-bold text-blue-700">
-                ▶ {nextStageName}
-              </span>
+              {showJumpSelect ? (
+                <select
+                  aria-label="即將啟動進度"
+                  value={selectedTargetMilestone?.id || ""}
+                  onChange={(e) => handleTargetChange(e.target.value)}
+                  disabled={loadingMilestones}
+                  className="mt-0.5 w-full rounded border border-blue-200 bg-blue-50/40 px-2 py-1 text-xs font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  {jumpableTargets.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.stageCode} {MILESTONE_STAGE_LABELS[m.stageCode] || m.stageCode}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-sm font-bold text-blue-700">
+                  ▶ {nextStageName}
+                </span>
+              )}
             </div>
           </div>
+          {isJumpMode && (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-800">
+              將跨過中間 {crossedCount} 個項目（含未審核關卡或派工，進場日與立帳日不受影響）。
+            </p>
+          )}
         </div>
 
-        <label className="mb-4 block text-xs font-bold text-slate-700">
-          {isDispatch ? "進場日期" : "實際完成日"}
-          <input
-            type="date"
-            required
-            value={advanceDate}
-            onChange={(e) => setAdvanceDate(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-slate-300 p-2 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          />
-        </label>
+        {canShowSkipCheckbox && (
+          <label className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 cursor-pointer select-none hover:bg-slate-100/80">
+            <input
+              type="checkbox"
+              checked={skipChecked}
+              onChange={(e) => setSkipChecked(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{isJumpMode ? "以上略過" : "此項略過"}</span>
+            <span className="text-[11px] font-normal text-slate-500">
+              {isJumpMode ? "（實際完成日留空，並標記為已略過）" : "（不須執行此步驟，實際完成日留空）"}
+            </span>
+          </label>
+        )}
+
+        {!skipChecked && (
+          <label className="mb-4 block text-xs font-bold text-slate-700">
+            {!isJumpMode && isDispatch ? "進場日期" : "實際完成日"}
+            <input
+              type="date"
+              required
+              value={advanceDate}
+              onChange={(e) => setAdvanceDate(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-slate-300 p-2 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </label>
+        )}
 
         <label className="block text-xs font-bold text-slate-700">
           推進備註 (選填)
@@ -488,7 +637,7 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
             disabled={advancing || submittingAudit}
             className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors"
           >
-            {advancing ? "推進中..." : "確認推進 ➔"}
+            {advancing ? "處理中..." : isJumpMode ? "確認一鍵跳轉 ➔" : "確認推進 ➔"}
           </button>
         </div>
       </form>
