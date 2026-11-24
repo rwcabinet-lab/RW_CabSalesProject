@@ -1188,9 +1188,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                 isJumpableStageCode(m.stageCode) &&
                 Boolean(currentActionableMilestone) &&
                 m.stageOrder > (currentActionableMilestone?.stageOrder ?? 0);
+              const hasJumpColumnSlot =
+                showJumpColumn && activePhase !== "CLOSURE" && m.status !== "COMPLETED";
 
               return (
-                <div key={m.id} className={showJumpColumn ? "flex items-center gap-3" : ""}>
+                <div key={m.id} className={hasJumpColumnSlot ? "flex items-center gap-3" : ""}>
                 <div
                   draggable={canDrag}
                   onDragStart={(event) => {
@@ -1213,7 +1215,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     }
                   }}
                   onDragEnd={handleDragEndItem}
-                  className={`${showJumpColumn ? "flex-1 min-w-0 " : ""}rounded-xl border p-4 transition-all duration-150 ${
+                  className={`${hasJumpColumnSlot ? "flex-1 min-w-0 " : ""}rounded-xl border p-4 transition-all duration-150 ${
                     isDragOver
                       ? "ring-2 ring-blue-500 border-blue-400 bg-blue-50/50 scale-[1.01]"
                       : isBeingDragged
@@ -1651,7 +1653,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </div>
-                {showJumpColumn && (
+                {hasJumpColumnSlot && (
                   <div className="w-[92px] shrink-0 flex items-center justify-center">
                     {canJumpToThis && (
                       <button
