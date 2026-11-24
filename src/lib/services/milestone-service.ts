@@ -13,12 +13,16 @@ import {
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   STANDARD_MILESTONE_STAGE_CODES,
+  extractAuditSubmittedAt,
   isClosureStageCode,
+  parseAuditSubmittedAtInput,
+  withAuditSubmittedAtInAttachments,
 } from "../constants";
 import {
   ScheduleEngine,
   STAGE_CODE_TO_PROJECT_STAGE,
   getTaiwanDateString,
+  getTaiwanDateTimeString,
 } from "../schedule-engine";
 import type {
   MilestonePhaseDTO,
@@ -67,6 +71,9 @@ function mapMilestoneRowToItem(m: MilestoneRowWithRelations): ProjectMilestoneIt
     attachments: m.attachments,
     notes: m.notes,
     auditSubmitted: isAuditSubmitted,
+    auditSubmittedAt: AUDIT_STAGE_CODES.has(m.stageCode)
+      ? extractAuditSubmittedAt(m.attachments)
+      : null,
   };
 }
 
@@ -226,12 +233,13 @@ export const MilestoneService = {
     reviewerId: string,
     notes?: string,
     existingMilestones?: ProjectMilestoneItem[],
-  ) {
+    submittedAt?: string,
+  ): Promise<{ auditSubmittedAt: string }> {
     const milestone = existingMilestones
       ? existingMilestones.find((m) => m.id === milestoneId)
       : await prisma.projectMilestone.findFirst({
           where: { id: milestoneId, projectId },
-          select: { stageCode: true, status: true, priority: true, plannedDueDate: true },
+          select: { stageCode: true, status: true, priority: true, plannedDueDate: true, attachments: true },
         });
     if (!milestone) throw new NotFoundError("找不到此里程碑");
     if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
@@ -242,6 +250,15 @@ export const MilestoneService = {
       milestone.status !== MilestoneStatus.OVERDUE
     ) {
       throw new ConflictError("只能提交目前進行中的審核項目");
+    }
+
+    let effectiveSubmittedAt = getTaiwanDateTimeString();
+    if (submittedAt !== undefined && submittedAt !== "") {
+      const parsed = parseAuditSubmittedAtInput(submittedAt);
+      if (!parsed.valid || !parsed.value) {
+        throw new BadRequestError("實際提交審核時間格式無效");
+      }
+      effectiveSubmittedAt = parsed.value;
     }
 
     const dueDatetime = milestone.plannedDueDate
@@ -273,6 +290,17 @@ export const MilestoneService = {
         resultNotes: notes || null,
       },
     });
+
+    const nextAttachments = withAuditSubmittedAtInAttachments(
+      milestone.attachments,
+      effectiveSubmittedAt,
+    );
+    await prisma.projectMilestone.update({
+      where: { id: milestoneId },
+      data: { attachments: nextAttachments },
+    });
+
+    return { auditSubmittedAt: effectiveSubmittedAt };
   },
 
   async withdrawMilestoneReview(
@@ -287,7 +315,7 @@ export const MilestoneService = {
       ? existingMilestones.find((m) => m.id === milestoneId)
       : await prisma.projectMilestone.findFirst({
           where: { id: milestoneId, projectId },
-          select: { id: true, stageCode: true, status: true, priority: true, plannedDueDate: true, phase: true, assignedToId: true },
+          select: { id: true, stageCode: true, status: true, priority: true, plannedDueDate: true, phase: true, assignedToId: true, attachments: true },
         });
     if (!milestone) throw new NotFoundError("找不到此里程碑");
     if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
@@ -347,6 +375,14 @@ export const MilestoneService = {
         resultNotes: notes ? `[已撤回審核] ${notes}` : null,
       },
     });
+
+    const clearedAttachments = withAuditSubmittedAtInAttachments(milestone.attachments, null);
+    if (clearedAttachments !== (milestone.attachments ?? null)) {
+      await prisma.projectMilestone.update({
+        where: { id: milestoneId },
+        data: { attachments: clearedAttachments },
+      });
+    }
   },
 
   async getMilestoneStageCode(projectId: string, milestoneId: string) {
@@ -383,6 +419,7 @@ export const MilestoneService = {
                 priority: true,
                 assignedToId: true,
                 stageOrder: true,
+                attachments: true,
               },
             });
         if (!currentMilestone) {
@@ -390,6 +427,20 @@ export const MilestoneService = {
         }
         if (currentMilestone.status === MilestoneStatus.COMPLETED) {
           throw new ConflictError("已完成的里程碑不可編輯");
+        }
+        if (updates.auditSubmittedAt !== undefined && !AUDIT_STAGE_CODES.has(currentMilestone.stageCode)) {
+          throw new BadRequestError("僅需審核項目可設定實際提交審核時間");
+        }
+        let nextAuditAttachments: string | null | undefined = updates.attachments;
+        if (updates.auditSubmittedAt !== undefined) {
+          const parsedAuditAt = parseAuditSubmittedAtInput(updates.auditSubmittedAt);
+          if (!parsedAuditAt.valid) {
+            throw new BadRequestError("實際提交審核時間格式無效");
+          }
+          nextAuditAttachments = withAuditSubmittedAtInAttachments(
+            (currentMilestone as { attachments?: string | null }).attachments,
+            parsedAuditAt.value,
+          );
         }
 
         let targetStatus = updates.status;
@@ -464,7 +515,7 @@ export const MilestoneService = {
             status: targetStatus,
             priority: updates.priority,
             assignedToId: updates.assignedToId,
-            attachments: updates.attachments,
+            attachments: nextAuditAttachments,
             notes: updates.notes,
           },
           include: {
@@ -609,6 +660,9 @@ export const MilestoneService = {
           assignedToName: updatedRow.assignedTo?.name || (customerSalesRep ? customerSalesRep.name : m.assignedToName),
           attachments: updatedRow.attachments,
           notes: updatedRow.notes,
+          auditSubmittedAt: AUDIT_STAGE_CODES.has(m.stageCode)
+            ? extractAuditSubmittedAt(updatedRow.attachments)
+            : null,
         };
       }
       if (shiftedDateMap.has(m.id)) {

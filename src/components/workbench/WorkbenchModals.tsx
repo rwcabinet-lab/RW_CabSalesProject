@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useShallow } from "zustand/react/shallow";
 import { QUERY_KEYS } from "@/hooks/useQueries";
-import { getTaiwanDateString } from "@/lib/schedule-engine";
+import { getTaiwanDateString, getTaiwanDateTimeString } from "@/lib/schedule-engine";
 import { toast } from "@/stores/useToastStore";
 import { MILESTONE_STAGE_LABELS, STANDARD_MILESTONE_STAGE_CODES } from "@/lib/constants";
 import type { ApiResponse, TaskDTO, UserDTO, WorkbenchDashboardDTO, WorkbenchProjectDTO } from "@/types/dto";
@@ -279,6 +279,13 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
   const [advanceError, setAdvanceError] = useState("");
   const [canSubmitAudit, setCanSubmitAudit] = useState(false);
   const [submittingAudit, setSubmittingAudit] = useState(false);
+  const [auditSubmittedAt, setAuditSubmittedAt] = useState(() => getTaiwanDateTimeString());
+
+  useEffect(() => {
+    setAdvanceError("");
+    setCanSubmitAudit(false);
+    setAuditSubmittedAt(getTaiwanDateTimeString());
+  }, [projectToAdvance?.id, projectToAdvance?.activeMilestone?.id]);
 
   if (!projectToAdvance || !projectToAdvance.activeMilestone) return null;
 
@@ -326,6 +333,7 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
         setAdvanceError(result.error || "項目推進失敗，請稍後重試");
         if (res.status === 409 && result.error?.includes("審核")) {
           setCanSubmitAudit(true);
+          setAuditSubmittedAt(getTaiwanDateTimeString());
         }
         return;
       }
@@ -351,6 +359,7 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
         body: JSON.stringify({
           action: "submitAudit",
           milestoneId: projectToAdvance.activeMilestone.id,
+          auditSubmittedAt: auditSubmittedAt || getTaiwanDateTimeString(),
           notes: advanceNotes.trim() || undefined,
         }),
       });
@@ -440,16 +449,26 @@ export function WorkbenchAdvanceMilestoneModal({ onInvalidate }: AdvanceMileston
           <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700 border border-red-200">
             <p className="font-semibold">{advanceError}</p>
             {canSubmitAudit && (
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[11px] text-red-600">此節點需經審核，是否直接提交審核？</span>
-                <button
-                  type="button"
-                  disabled={submittingAudit}
-                  onClick={handleSubmitAudit}
-                  className="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700 shadow-sm"
-                >
-                  {submittingAudit ? "送審中..." : "立即提交審核"}
-                </button>
+              <div className="mt-2 space-y-2 border-t border-red-200/70 pt-2">
+                <span className="block text-[11px] text-red-600">此節點需經審核，請確認實際提交審核時間後直接提交：</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <input
+                    type="datetime-local"
+                    required
+                    value={auditSubmittedAt}
+                    onChange={(e) => setAuditSubmittedAt(e.target.value)}
+                    aria-label="實際提交審核時間"
+                    className="rounded border border-red-300 bg-white px-2 py-1 text-xs text-slate-800"
+                  />
+                  <button
+                    type="button"
+                    disabled={submittingAudit || !auditSubmittedAt}
+                    onClick={handleSubmitAudit}
+                    className="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700 shadow-sm disabled:opacity-50"
+                  >
+                    {submittingAudit ? "送審中..." : "立即提交審核"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

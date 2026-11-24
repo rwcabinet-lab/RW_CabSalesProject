@@ -4,6 +4,7 @@ import {
   ScheduleEngine,
   STAGE_CODE_TO_PROJECT_STAGE,
   getTaiwanDateString,
+  getTaiwanDateTimeString,
   getPausedScheduleOrder,
   computeIsSubsequentToPaused,
 } from "@/lib/schedule-engine";
@@ -11,6 +12,7 @@ import { getUserFromRequest, getRolePages } from "@/lib/access-control";
 import {
   AUDIT_STAGE_CODES,
   STANDARD_MILESTONE_STAGE_CODES,
+  parseAuditSubmittedAtInput,
   resolveBillingInfoFromMilestones,
 } from "@/lib/constants";
 import { AppError, handleApiError } from "@/lib/errors";
@@ -130,6 +132,7 @@ export async function PUT(
       reason,
       actualDueDate,
       installationDate,
+      auditSubmittedAt,
       isCompleted,
       orderedMilestoneIds,
       milestoneDates,
@@ -239,6 +242,16 @@ export async function PUT(
       if (notes !== undefined && typeof notes !== "string") {
         return NextResponse.json({ error: "審核備註格式無效" }, { status: 400 });
       }
+      let normalizedAuditSubmittedAt = getTaiwanDateTimeString();
+      if (auditSubmittedAt !== undefined) {
+        const parsedAuditAt = parseAuditSubmittedAtInput(auditSubmittedAt);
+        if (!parsedAuditAt.valid) {
+          return NextResponse.json({ error: "實際提交審核時間格式無效" }, { status: 400 });
+        }
+        if (parsedAuditAt.value) {
+          normalizedAuditSubmittedAt = parsedAuditAt.value;
+        }
+      }
       const milestone = initialMilestones.find((item) => item.id === milestoneId);
       if (!milestone) return NextResponse.json({ error: "找不到此里程碑" }, { status: 404 });
       if (!AUDIT_STAGE_CODES.has(milestone.stageCode)) {
@@ -253,16 +266,19 @@ export async function PUT(
       }
 
       const reviewerId = project.salesRepId || project.customerSalesRepId || user.id;
-      await DataService.submitMilestoneForReview(
+      const submitResult = await DataService.submitMilestoneForReview(
         projectId,
         milestoneId,
         user.id,
         reviewerId,
         notes,
         initialMilestones,
+        normalizedAuditSubmittedAt,
       );
       const updatedMilestones = initialMilestones.map((m) =>
-        m.id === milestoneId ? { ...m, auditSubmitted: true } : m
+        m.id === milestoneId
+          ? { ...m, auditSubmitted: true, auditSubmittedAt: submitResult.auditSubmittedAt }
+          : m
       );
       return NextResponse.json({
         success: true,
@@ -293,7 +309,9 @@ export async function PUT(
         initialMilestones,
       );
       const updatedMilestones = initialMilestones.map((m) =>
-        m.id === milestoneId ? { ...m, auditSubmitted: false } : m
+        m.id === milestoneId
+          ? { ...m, auditSubmitted: false, auditSubmittedAt: null }
+          : m
       );
       return NextResponse.json({
         success: true,
@@ -428,9 +446,9 @@ export async function PUT(
       }
       if (
         !updates ||
-        Object.keys(updates).some((key) => !["plannedDueDate", "assignedToId", "priority", "notes"].includes(key))
+        Object.keys(updates).some((key) => !["plannedDueDate", "assignedToId", "priority", "notes", "auditSubmittedAt"].includes(key))
       ) {
-        return NextResponse.json({ error: "僅可編輯預定完成日、負責人、優先度及備註" }, { status: 400 });
+        return NextResponse.json({ error: "僅可編輯預定完成日、負責人、優先度、備註及實際提交審核時間" }, { status: 400 });
       }
       if (
         (updates.plannedDueDate !== undefined &&
@@ -443,6 +461,16 @@ export async function PUT(
         (updates.priority !== undefined && !["HIGH", "MEDIUM", "LOW"].includes(updates.priority))
       ) {
         return NextResponse.json({ error: "里程碑欄位格式無效" }, { status: 400 });
+      }
+      if (updates.auditSubmittedAt !== undefined) {
+        if (!AUDIT_STAGE_CODES.has(targetMilestone?.stageCode || "")) {
+          return NextResponse.json({ error: "僅需審核項目可設定實際提交審核時間" }, { status: 400 });
+        }
+        const parsedAuditAt = parseAuditSubmittedAtInput(updates.auditSubmittedAt);
+        if (!parsedAuditAt.valid) {
+          return NextResponse.json({ error: "實際提交審核時間格式無效" }, { status: 400 });
+        }
+        updates.auditSubmittedAt = parsedAuditAt.value;
       }
       if (updates.assignedToId !== undefined) {
         if (targetMilestone?.auditSubmitted) {

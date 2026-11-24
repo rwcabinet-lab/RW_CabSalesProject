@@ -37,11 +37,13 @@ import {
   STAGE_CODE_TO_PHASE,
   AUDIT_STAGE_CODES,
   QUOTE_STAGE_CODES,
+  formatAuditSubmittedAt,
   isClosureStageCode,
 } from "@/lib/constants";
 import { isAssignableRole } from "@/lib/page-access";
 import {
   getTaiwanDateString,
+  getTaiwanDateTimeString,
   getTaskScheduleStatus,
   getPausedScheduleOrder,
   computeIsSubsequentToPaused,
@@ -140,7 +142,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   const [syncCascadeShift, setSyncCascadeShift] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    plannedDueDate: "", assignedToId: "", priority: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW", notes: ""
+    plannedDueDate: "", assignedToId: "", priority: "MEDIUM" as "HIGH" | "MEDIUM" | "LOW", notes: "", auditSubmittedAt: ""
   });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -157,6 +159,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
   // 審核提交彈窗
   const [submitAuditModal, setSubmitAuditModal] = useState<{
     milestone: MilestoneWithLight;
+    auditSubmittedAt: string;
     notes: string;
   } | null>(null);
   const [submittingAudit, setSubmittingAudit] = useState(false);
@@ -571,11 +574,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     if (!submitAuditModal) return;
     setSubmittingAudit(true);
     try {
-      const { milestone, notes } = submitAuditModal;
+      const { milestone, auditSubmittedAt, notes } = submitAuditModal;
       const response = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "submitAudit", milestoneId: milestone.id, notes }),
+        body: JSON.stringify({ action: "submitAudit", milestoneId: milestone.id, auditSubmittedAt, notes }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "提交審核失敗");
@@ -688,6 +691,14 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
     setSaving(true);
     setEditError("");
     try {
+      const targetMilestone = milestones.find((item) => item.id === milestoneId);
+      const normalizedPrevAuditAt = targetMilestone?.auditSubmittedAt
+        ? (/^\d{4}-\d{2}-\d{2}$/.test(targetMilestone.auditSubmittedAt) ? `${targetMilestone.auditSubmittedAt}T00:00` : targetMilestone.auditSubmittedAt)
+        : "";
+      const auditAtUpdate =
+        targetMilestone && AUDIT_STAGE_CODES.has(targetMilestone.stageCode) && editForm.auditSubmittedAt !== normalizedPrevAuditAt
+          ? { auditSubmittedAt: editForm.auditSubmittedAt || null }
+          : {};
       const res = await fetch(`/api/projects/${projectId}/milestones`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -698,6 +709,7 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
             assignedToId: editForm.assignedToId || null,
             priority: editForm.priority,
             notes: editForm.notes,
+            ...auditAtUpdate,
           },
           cascadeShift: canReorderMilestones ? syncCascadeShift : false,
         }),
@@ -1211,15 +1223,28 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                           </select>
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-slate-600 mb-1 font-semibold text-xs">備註說明</label>
-                        <input
-                          type="text"
-                          value={editForm.notes}
-                          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                          className="w-full border rounded p-1.5 text-xs"
-                          placeholder="例如：需再跟設計師確認線條"
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-600 mb-1 font-semibold text-xs">備註說明</label>
+                          <input
+                            type="text"
+                            value={editForm.notes}
+                            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                            className="w-full border rounded p-1.5 text-xs"
+                            placeholder="例如：需再跟設計師確認線條"
+                          />
+                        </div>
+                        {isAuditStage && (isAuditSubmitted || Boolean(m.auditSubmittedAt)) && (
+                          <div>
+                            <label className="block text-slate-600 mb-1 font-semibold text-xs">實際提交審核時間</label>
+                            <input
+                              type="datetime-local"
+                              value={editForm.auditSubmittedAt}
+                              onChange={(e) => setEditForm({ ...editForm, auditSubmittedAt: e.target.value })}
+                              className="w-full border rounded p-1.5 text-xs"
+                            />
+                          </div>
+                        )}
                       </div>
                       {editError && <p className="text-xs text-red-600 font-semibold">{editError}</p>}
                       <div className="flex justify-end gap-2 pt-2">
@@ -1301,6 +1326,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               {!isSubsequent && (
                                 <span>{m.stageCode === "6-1" ? "進場日期" : "預定完成"}：<b>{m.plannedDueDate || (isPaused ? "需追蹤" : "未設定")}</b></span>
                               )}
+                              {isAuditStage && m.auditSubmittedAt && (
+                                <span className="text-purple-700">實際提交審核：<b>{formatAuditSubmittedAt(m.auditSubmittedAt)}</b></span>
+                              )}
                               {m.actualDueDate && <span className="text-emerald-700">實際完成：<b>{m.actualDueDate}</b></span>}
                               {m.notes && <span className="italic text-slate-400">({m.notes})</span>}
                             </div>
@@ -1315,6 +1343,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                               disabled={isMutatingMilestones}
                               onClick={() => setSubmitAuditModal({
                                 milestone: m,
+                                auditSubmittedAt: m.auditSubmittedAt
+                                  ? (/^\d{4}-\d{2}-\d{2}$/.test(m.auditSubmittedAt) ? `${m.auditSubmittedAt}T00:00` : m.auditSubmittedAt)
+                                  : getTaiwanDateTimeString(),
                                 notes: currentUserId !== m.assignedToId ? `[主管/主責代送審] ` : "",
                               })}
                               className="h-7 px-2.5 flex items-center justify-center gap-1 text-xs font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition disabled:opacity-50"
@@ -1390,6 +1421,9 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                                   assignedToId: m.assignedToId || "",
                                   priority: (m.priority as any) || "MEDIUM",
                                   notes: m.notes || "",
+                                  auditSubmittedAt: m.auditSubmittedAt
+                                    ? (/^\d{4}-\d{2}-\d{2}$/.test(m.auditSubmittedAt) ? `${m.auditSubmittedAt}T00:00` : m.auditSubmittedAt)
+                                    : "",
                                 });
                               }}
                               className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-slate-800 rounded hover:bg-slate-100 border border-transparent hover:border-slate-200 transition disabled:opacity-50"
@@ -1647,6 +1681,11 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   <span>提示：{MILESTONE_STAGE_HINTS[completionModal.milestone.stageCode]}</span>
                 </div>
               )}
+              {AUDIT_STAGE_CODES.has(completionModal.milestone.stageCode) && completionModal.milestone.auditSubmittedAt && (
+                <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 text-xs font-medium">
+                  實際提交審核時間：<b>{formatAuditSubmittedAt(completionModal.milestone.auditSubmittedAt)}</b>
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   {completionModal.milestone.stageCode === "4-3" || completionModal.milestone.stageCode === "5-3" ? "進場日期" : "實際完成日"}
@@ -1699,6 +1738,16 @@ export default function MilestonesPage({ params }: { params: { id: string } }) {
                   ? `您正以主管／主責業務身分代【${submitAuditModal.milestone.assignedToName || "原負責人"}】提交審核。提交後系統會於審核人待辦清單建立待辦任務。`
                   : "提交後，系統會自動在審核人員（主責業務/主管）的待辦清單中建立待辦事項，僅審核人員具備完成權限。"}
               </p>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">實際提交審核時間</label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={submitAuditModal.auditSubmittedAt}
+                  onChange={(e) => setSubmitAuditModal({ ...submitAuditModal, auditSubmittedAt: e.target.value })}
+                  className="w-full border rounded p-2 text-xs"
+                />
+              </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">提交審核備註</label>
                 <textarea

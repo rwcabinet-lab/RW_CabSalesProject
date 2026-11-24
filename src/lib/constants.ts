@@ -112,6 +112,136 @@ export const AUDIT_STAGE_CODES = new Set<string>([
   "4-4", // 施工圖
 ]);
 
+function isValidCalendarDate(y: number, m: number, d: number): boolean {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+function formatDateInTaipeiDateTime(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`;
+}
+
+/** 驗證並正規化實際提交審核時間輸入值（支援 YYYY-MM-DDTHH:mm、YYYY-MM-DD HH:mm、YYYY-MM-DD 或 ISO 時間字串） */
+export function parseAuditSubmittedAtInput(
+  value: unknown,
+): { valid: true; value: string | null } | { valid: false } {
+  if (value === null || value === "") {
+    return { valid: true, value: null };
+  }
+  if (typeof value !== "string") {
+    return { valid: false };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { valid: true, value: null };
+  }
+
+  const dtMatch = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/.exec(trimmed);
+  if (dtMatch) {
+    const [, ys, ms, ds, hs, mins] = dtMatch;
+    const y = Number(ys);
+    const m = Number(ms);
+    const d = Number(ds);
+    const hh = Number(hs);
+    const mm = Number(mins);
+    if (!isValidCalendarDate(y, m, d) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+      return { valid: false };
+    }
+    return { valid: true, value: `${ys}-${ms}-${ds}T${hs}:${mins}` };
+  }
+
+  const dMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dMatch) {
+    const [, ys, ms, ds] = dMatch;
+    if (!isValidCalendarDate(Number(ys), Number(ms), Number(ds))) {
+      return { valid: false };
+    }
+    return { valid: true, value: `${ys}-${ms}-${ds}` };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)) {
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return { valid: true, value: formatDateInTaipeiDateTime(parsed) };
+    }
+  }
+
+  return { valid: false };
+}
+
+/** 自里程碑 attachments JSON 欄位萃取實際提交審核時間（無則回傳 null） */
+export function extractAuditSubmittedAt(attachments?: string | null): string | null {
+  if (!attachments) return null;
+  const trimmed = attachments.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as { auditSubmittedAt?: unknown };
+    if (typeof parsed?.auditSubmittedAt !== "string") return null;
+    const result = parseAuditSubmittedAtInput(parsed.auditSubmittedAt);
+    return result.valid ? result.value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 將實際提交審核時間寫入（或清除）attachments JSON 欄位，保留既有的非審核附檔資訊 */
+export function withAuditSubmittedAtInAttachments(
+  existingAttachments: string | null | undefined,
+  auditSubmittedAt: string | null,
+): string | null {
+  let meta: Record<string, unknown> = {};
+  if (existingAttachments) {
+    const trimmed = existingAttachments.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          meta = { ...(parsed as Record<string, unknown>) };
+        }
+      } catch {
+        meta = { raw: existingAttachments };
+      }
+    } else if (trimmed) {
+      meta = { raw: existingAttachments };
+    }
+  }
+
+  if (auditSubmittedAt) {
+    meta.auditSubmittedAt = auditSubmittedAt;
+  } else {
+    delete meta.auditSubmittedAt;
+  }
+
+  const keys = Object.keys(meta);
+  if (keys.length === 0) return null;
+  if (keys.length === 1 && typeof meta.raw === "string") {
+    return meta.raw;
+  }
+  return JSON.stringify(meta);
+}
+
+/** 格式化顯示實際提交審核時間（例如 2026-11-24T11:05 -> 2026-11-24 11:05） */
+export function formatAuditSubmittedAt(value?: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed.replace("T", " ");
+  }
+  return trimmed;
+}
+
 /** 哪些進度屬於報價相關 (只有此類項目歷次紀錄才有報價欄位) */
 export const QUOTE_STAGE_CODES = new Set<string>([
   "3-2", // 報價單

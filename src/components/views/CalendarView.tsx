@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import type { CalendarStaffDTO, ProjectWithMilestonesDTO, TaskDTO } from "@/types/dto";
-import { MILESTONE_STAGE_LABELS, MILESTONE_STAGE_HINTS } from "@/lib/constants";
+import { AUDIT_STAGE_CODES, MILESTONE_STAGE_LABELS, MILESTONE_STAGE_HINTS, formatAuditSubmittedAt } from "@/lib/constants";
 import { getTaiwanDateString } from "@/lib/schedule-engine";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { buildCalendarEventsByDate, toDateKey, type CalendarEvent } from "./calendar-events";
@@ -339,6 +339,12 @@ export function CalendarView({ projects, tasks, staff }: CalendarProps) {
                     <span className="block font-semibold text-slate-400">負責人</span>
                     <span className="font-medium text-slate-800">{activeEvent.milestone.assignedToName || "未指定"}</span>
                   </div>
+                  {AUDIT_STAGE_CODES.has(activeEvent.milestone.stageCode) && activeEvent.milestone.auditSubmittedAt && (
+                    <div>
+                      <span className="block font-semibold text-slate-400">實際提交審核時間</span>
+                      <span className="font-medium text-purple-700">{formatAuditSubmittedAt(activeEvent.milestone.auditSubmittedAt)}</span>
+                    </div>
+                  )}
                   {activeEvent.milestone.actualDueDate && (
                     <div>
                       <span className="block font-semibold text-slate-400">實際完成日</span>

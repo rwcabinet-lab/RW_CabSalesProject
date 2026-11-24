@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MilestoneService } from "@/lib/services/milestone-service";
 import { prisma } from "@/lib/prisma";
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
-import { MilestoneStatus, TaskPriority, TaskType } from "@prisma/client";
+import { BadRequestError, ConflictError, ForbiddenError } from "@/lib/errors";
+import { MilestoneStatus, TaskPriority } from "@prisma/client";
+import {
+  extractAuditSubmittedAt,
+  formatAuditSubmittedAt,
+  parseAuditSubmittedAtInput,
+  withAuditSubmittedAtInAttachments,
+} from "@/lib/constants";
 
 const mockTx = {
   projectMilestone: {
@@ -301,6 +307,92 @@ describe("Milestone Audit Withdrawal Mechanism (里程碑審核撤回與駁回�
       expect(rolledBack?.status).toBe(MilestoneStatus.IN_PROGRESS);
       // 保留原使用者輸入之備註
       expect(rolledBack?.notes).toBe("業主現場確認尺寸，已手動填報");
+    });
+  });
+
+  describe("實際提交審核時間 (auditSubmittedAt) 紀錄與清除機制", () => {
+    it("parseAuditSubmittedAtInput 與 attachments 輔助函式應正確驗證、序列化、格式化與保留既有附檔資訊", () => {
+      expect(parseAuditSubmittedAtInput("2026-11-24T11:05")).toEqual({
+        valid: true,
+        value: "2026-11-24T11:05",
+      });
+      expect(parseAuditSubmittedAtInput("2026-11-24 09:30")).toEqual({
+        valid: true,
+        value: "2026-11-24T09:30",
+      });
+      expect(parseAuditSubmittedAtInput("2026-11-24")).toEqual({
+        valid: true,
+        value: "2026-11-24",
+      });
+      expect(parseAuditSubmittedAtInput("2026-02-31T10:00")).toEqual({ valid: false });
+      expect(parseAuditSubmittedAtInput("invalid-date")).toEqual({ valid: false });
+
+      expect(formatAuditSubmittedAt("2026-11-24T11:05")).toBe("2026-11-24 11:05");
+
+      const serialized = withAuditSubmittedAtInAttachments("legacy-file.pdf", "2026-11-24T11:05");
+      expect(extractAuditSubmittedAt(serialized)).toBe("2026-11-24T11:05");
+      const restored = withAuditSubmittedAtInAttachments(serialized, null);
+      expect(restored).toBe("legacy-file.pdf");
+      expect(extractAuditSubmittedAt(restored)).toBeNull();
+    });
+
+    it("提交審核時應寫入指定的實際提交審核時間至里程碑 attachments，並拒絕無效格式", async () => {
+      vi.mocked(prisma.salesTask.upsert).mockResolvedValueOnce({} as any);
+      vi.mocked(prisma.projectMilestone.update).mockResolvedValueOnce({} as any);
+
+      const res = await MilestoneService.submitMilestoneForReview(
+        "proj-1",
+        "m-audit-1",
+        "user-assignee",
+        "user-salesrep",
+        "設計圖請審核",
+        [mockMilestone as any],
+        "2026-11-24 14:20",
+      );
+
+      expect(res.auditSubmittedAt).toBe("2026-11-24T14:20");
+      expect(prisma.projectMilestone.update).toHaveBeenCalledWith({
+        where: { id: "m-audit-1" },
+        data: {
+          attachments: JSON.stringify({ auditSubmittedAt: "2026-11-24T14:20" }),
+        },
+      });
+
+      await expect(
+        MilestoneService.submitMilestoneForReview(
+          "proj-1",
+          "m-audit-1",
+          "user-assignee",
+          "user-salesrep",
+          "設計圖請審核",
+          [mockMilestone as any],
+          "not-a-valid-datetime",
+        )
+      ).rejects.toThrowError(BadRequestError);
+    });
+
+    it("撤回審核時應同步清除里程碑上儲存的實際提交審核時間", async () => {
+      const milestoneWithAuditAt = {
+        ...mockMilestone,
+        attachments: JSON.stringify({ auditSubmittedAt: "2026-11-24T14:20" }),
+      };
+      vi.mocked(prisma.salesTask.findUnique).mockResolvedValueOnce(mockAuditTask as any);
+      vi.mocked(prisma.salesTask.update).mockResolvedValueOnce({} as any);
+      vi.mocked(prisma.projectMilestone.update).mockResolvedValueOnce({} as any);
+
+      await MilestoneService.withdrawMilestoneReview(
+        "proj-1",
+        "m-audit-1",
+        "user-assignee",
+        false,
+        "補件後重送",
+        [milestoneWithAuditAt as any],
+      );
+
+      expect(prisma.projectMilestone.update).toHaveBeenCalledWith({
+        where: { id: "m-audit-1" },
+        data: { attachments: null },
+      });
     });
   });
 });

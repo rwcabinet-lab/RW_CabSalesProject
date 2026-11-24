@@ -8,12 +8,14 @@ import {
 } from "@prisma/client";
 import { BadRequestError, ConflictError } from "../errors";
 import {
+  AUDIT_STAGE_CODES,
   CUSTOMER_TYPE_LABELS,
   CUSTOMER_TYPE_START_STAGE_CODES,
   MILESTONE_DEFAULT_DAYS,
   MILESTONE_STAGE_LABELS,
   STAGE_CODE_TO_PHASE,
   STANDARD_MILESTONE_STAGE_CODES,
+  extractAuditSubmittedAt,
   isClosureStageCode,
   resolveBillingInfoFromMilestones,
 } from "../constants";
@@ -171,6 +173,9 @@ export const ProjectService = {
         attachments: m.attachments,
         notes: m.notes,
         auditSubmitted: isAuditSubmitted,
+        auditSubmittedAt: AUDIT_STAGE_CODES.has(m.stageCode)
+          ? extractAuditSubmittedAt(m.attachments)
+          : null,
       };
     });
     const evaluated = ScheduleEngine.evaluateMilestones(rawMilestones);
