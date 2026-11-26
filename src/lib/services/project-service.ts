@@ -37,6 +37,137 @@ import {
 import { ConfigService } from "./config-service";
 import { MilestoneService } from "./milestone-service";
 
+const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 25000 } as const;
+
+async function buildStandardMilestonesAndInitialStage(params: {
+  customerType: string;
+  assignedSalesRepId: string;
+  expectedDate?: string | null;
+  billingDate?: string | null;
+  startStageCode?: string;
+}) {
+  const defaultDays = await ConfigService.getMilestoneDefaultDays();
+  const dynamicTypeStages = await ConfigService.getCustomerTypeStartStages();
+  const allCodes = STANDARD_MILESTONE_STAGE_CODES;
+
+  // 依客戶類型或指定參數決定起始進度（方案一：自動批次略過前置進度）
+  const targetStartCode =
+    (params.startStageCode && allCodes.includes(params.startStageCode as MilestoneStageCode)
+      ? (params.startStageCode as MilestoneStageCode)
+      : undefined) ||
+    dynamicTypeStages[params.customerType] ||
+    CUSTOMER_TYPE_START_STAGE_CODES[params.customerType] ||
+    "1-1";
+
+  const targetIndex = allCodes.indexOf(targetStartCode);
+  const validTargetIndex = targetIndex !== -1 ? targetIndex : 0;
+  const finalStartCode = allCodes[validTargetIndex];
+  const customerTypeLabel = CUSTOMER_TYPE_LABELS[params.customerType] || params.customerType;
+
+  const today = new Date();
+  let cursorDate = new Date(today);
+  let installCursorDate: Date | null = params.expectedDate
+    ? new Date(`${params.expectedDate.slice(0, 10)}T00:00:00.000Z`)
+    : null;
+
+  const milestoneRows = allCodes.map((code, index) => {
+    const isSkipped = index < validTargetIndex;
+    const isActive = index === validTargetIndex;
+
+    let plannedDueDate: Date | null;
+    const actualDueDate: Date | null = null;
+    let status: MilestoneStatus;
+    let notes: string | null = null;
+
+    if (isSkipped) {
+      status = MilestoneStatus.COMPLETED;
+      plannedDueDate = isInstallStageCode(code)
+        ? (code === "6-1" && params.expectedDate ? new Date(`${params.expectedDate.slice(0, 10)}T00:00:00.000Z`) : null)
+        : new Date(today);
+      notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
+    } else if (isClosureStageCode(code)) {
+      // 第七階段【立帳/結案】採全手動設定日期與推進，不納入自動天數推算（僅 7-2 立帳承接表單選填之立帳日期）
+      status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
+      if (code === "7-2" && params.billingDate) {
+        const dateStr = params.billingDate.slice(0, 10);
+        plannedDueDate = new Date(`${dateStr}T00:00:00.000Z`);
+      } else {
+        plannedDueDate = null;
+      }
+    } else if (isInstallStageCode(code)) {
+      // 第六階段【安裝及驗收】未填寫進場日前一律空白；有填入進場日時才以 6-1 為基準推算 6-2 ~ 6-5
+      status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
+      if (!installCursorDate) {
+        plannedDueDate = null;
+      } else if (code === "6-1") {
+        plannedDueDate = new Date(installCursorDate);
+      } else {
+        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+        installCursorDate = new Date(installCursorDate);
+        installCursorDate.setUTCDate(installCursorDate.getUTCDate() + days);
+        plannedDueDate = new Date(installCursorDate);
+      }
+    } else if (isActive) {
+      status = MilestoneStatus.IN_PROGRESS;
+      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+      plannedDueDate = new Date(today);
+      plannedDueDate.setDate(plannedDueDate.getDate() + days);
+      cursorDate = new Date(plannedDueDate);
+    } else {
+      status = MilestoneStatus.PENDING;
+      const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
+      plannedDueDate = new Date(cursorDate);
+      plannedDueDate.setDate(plannedDueDate.getDate() + days);
+      cursorDate = new Date(plannedDueDate);
+    }
+
+    return {
+      stageCode: code,
+      phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP",
+      stageOrder: index + 1,
+      plannedDueDate,
+      actualDueDate,
+      status,
+      notes,
+      assignedToId: params.assignedSalesRepId,
+    };
+  });
+
+  const initialProjectStage = (STAGE_CODE_TO_PROJECT_STAGE[finalStartCode] || ProjectStage.DEVELOP) as ProjectStage;
+  return { milestoneRows, finalStartCode, initialProjectStage, defaultDays };
+}
+
+async function createInitialSalesTask(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  finalStartCode: MilestoneStageCode,
+  assignedSalesRepId: string,
+) {
+  const activeMilestone = await tx.projectMilestone.findFirst({
+    where: { projectId, stageCode: finalStartCode },
+  });
+  if (!activeMilestone) return;
+
+  const isDrawing =
+    activeMilestone.phase === "PROPOSAL" ||
+    activeMilestone.phase === "PRE_PROD" ||
+    finalStartCode.startsWith("3-") ||
+    finalStartCode.startsWith("4-");
+
+  await tx.salesTask.create({
+    data: {
+      projectId,
+      milestoneId: activeMilestone.id,
+      assignedToId: assignedSalesRepId,
+      taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
+      subject: MILESTONE_STAGE_LABELS[finalStartCode] || "里程碑任務",
+      dueDatetime: activeMilestone.plannedDueDate || new Date(),
+      priority: TaskPriority.MEDIUM,
+      isCompleted: false,
+    },
+  });
+}
+
 async function syncInstallMilestonesByExpectedDate(
   tx: Prisma.TransactionClient | typeof prisma,
   projectId: string,
@@ -334,99 +465,14 @@ export const ProjectService = {
     }
 
     const assignedSalesRepId = data.salesRepId || customer.salesRepId;
-
-    const defaultDays = await ConfigService.getMilestoneDefaultDays();
-    const dynamicTypeStages = await ConfigService.getCustomerTypeStartStages();
-    const allCodes = STANDARD_MILESTONE_STAGE_CODES;
-
-    // 依客戶類型或指定參數決定起始進度（方案一：自動批次略過前置進度）
-    const targetStartCode =
-      (data.startStageCode && allCodes.includes(data.startStageCode as MilestoneStageCode)
-        ? (data.startStageCode as MilestoneStageCode)
-        : undefined) ||
-      dynamicTypeStages[customer.customerType] ||
-      CUSTOMER_TYPE_START_STAGE_CODES[customer.customerType] ||
-      "1-1";
-
-    const targetIndex = allCodes.indexOf(targetStartCode);
-    const validTargetIndex = targetIndex !== -1 ? targetIndex : 0;
-    const finalStartCode = allCodes[validTargetIndex];
-    const customerTypeLabel = CUSTOMER_TYPE_LABELS[customer.customerType] || customer.customerType;
-
-    const today = new Date();
-    let cursorDate = new Date(today);
-    let installCursorDate: Date | null = data.expectedDate
-      ? new Date(`${data.expectedDate.slice(0, 10)}T00:00:00.000Z`)
-      : null;
-
-    const milestoneRows = allCodes.map((code, index) => {
-      const isSkipped = index < validTargetIndex;
-      const isActive = index === validTargetIndex;
-
-      let plannedDueDate: Date | null;
-      let actualDueDate: Date | null = null;
-      let status: MilestoneStatus;
-      let notes: string | null = null;
-
-      if (isSkipped) {
-        status = MilestoneStatus.COMPLETED;
-        plannedDueDate = isInstallStageCode(code)
-          ? (code === "6-1" && data.expectedDate ? new Date(`${data.expectedDate.slice(0, 10)}T00:00:00.000Z`) : null)
-          : new Date(today);
-        actualDueDate = null;
-        notes = `【系統自動略過：依客戶類型（${customerTypeLabel}）跳轉】`;
-      } else if (isClosureStageCode(code)) {
-        // 第七階段【立帳/結案】採全手動設定日期與推進，不納入自動天數推算（僅 7-2 立帳承接表單選填之立帳日期）
-        status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
-        if (code === "7-2" && data.billingDate) {
-          const dateStr = data.billingDate.slice(0, 10);
-          plannedDueDate = new Date(`${dateStr}T00:00:00.000Z`);
-        } else {
-          plannedDueDate = null;
-        }
-      } else if (isInstallStageCode(code)) {
-        // 第六階段【安裝及驗收】未填寫進場日前一律空白；有填入進場日時才以 6-1 為基準推算 6-2 ~ 6-5
-        status = isActive ? MilestoneStatus.IN_PROGRESS : MilestoneStatus.PENDING;
-        if (!installCursorDate) {
-          plannedDueDate = null;
-        } else if (code === "6-1") {
-          plannedDueDate = new Date(installCursorDate);
-        } else {
-          const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
-          installCursorDate = new Date(installCursorDate);
-          installCursorDate.setUTCDate(installCursorDate.getUTCDate() + days);
-          plannedDueDate = new Date(installCursorDate);
-        }
-      } else if (isActive) {
-        status = MilestoneStatus.IN_PROGRESS;
-        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
-        plannedDueDate = new Date(today);
-        plannedDueDate.setDate(plannedDueDate.getDate() + days);
-        cursorDate = new Date(plannedDueDate);
-      } else {
-        status = MilestoneStatus.PENDING;
-        const days = Number(defaultDays[code]) || MILESTONE_DEFAULT_DAYS[code] || 3;
-        plannedDueDate = new Date(cursorDate);
-        plannedDueDate.setDate(plannedDueDate.getDate() + days);
-        cursorDate = new Date(plannedDueDate);
-      }
-
-      return {
-        stageCode: code,
-        phase: STAGE_CODE_TO_PHASE[code] || "DEVELOP",
-        stageOrder: index + 1,
-        plannedDueDate,
-        actualDueDate,
-        status,
-        notes,
-        assignedToId: assignedSalesRepId,
-      };
-    });
-
-    const initialProjectStage = (STAGE_CODE_TO_PROJECT_STAGE[finalStartCode] || ProjectStage.DEVELOP) as ProjectStage;
-
-    const defaultDaysForInstall =
-      data.expectedDate !== undefined ? await ConfigService.getMilestoneDefaultDays() : null;
+    const { milestoneRows, finalStartCode, initialProjectStage } =
+      await buildStandardMilestonesAndInitialStage({
+        customerType: customer.customerType,
+        assignedSalesRepId,
+        expectedDate: data.expectedDate,
+        billingDate: data.billingDate,
+        startStageCode: data.startStageCode,
+      });
 
     return await prisma.$transaction(async (tx) => {
       const p = await tx.project.create({
@@ -455,29 +501,7 @@ export const ProjectService = {
         include: projectInclude,
       });
 
-      const activeMilestone = await tx.projectMilestone.findFirst({
-        where: { projectId: p.id, stageCode: finalStartCode },
-      });
-      if (activeMilestone) {
-        const isDrawing =
-          activeMilestone.phase === "PROPOSAL" ||
-          activeMilestone.phase === "PRE_PROD" ||
-          finalStartCode.startsWith("3-") ||
-          finalStartCode.startsWith("4-");
-
-        await tx.salesTask.create({
-          data: {
-            projectId: p.id,
-            milestoneId: activeMilestone.id,
-            assignedToId: assignedSalesRepId,
-            taskType: isDrawing ? TaskType.DRAWING : TaskType.SITE_VISIT,
-            subject: MILESTONE_STAGE_LABELS[finalStartCode as MilestoneStageCode] || "里程碑任務",
-            dueDatetime: activeMilestone.plannedDueDate || new Date(),
-            priority: TaskPriority.MEDIUM,
-            isCompleted: false,
-          },
-        });
-      }
+      await createInitialSalesTask(tx, p.id, finalStartCode, assignedSalesRepId);
 
       const billingInfo = resolveBillingInfoFromMilestones(milestoneRows);
       return {
@@ -508,7 +532,7 @@ export const ProjectService = {
         phaseNumber: p.phaseNumber ?? undefined,
         phaseName: p.phaseName ?? undefined,
       };
-    });
+    }, TRANSACTION_OPTIONS);
   },
 
   async addProjectPhase(
@@ -690,7 +714,20 @@ export const ProjectService = {
     phaseName?: string | null;
     phaseNumber?: number | null;
   }): Promise<ProjectDetail | undefined> {
-    if (data.salesRepId) {
+    const existing = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        salesRepId: true,
+        expectedDate: true,
+        parentId: true,
+        customer: { select: { customerType: true } },
+        _count: { select: { phases: true, milestones: true } },
+      },
+    });
+    if (!existing) return undefined;
+
+    const salesRepChanged = Boolean(data.salesRepId && data.salesRepId !== existing.salesRepId);
+    if (salesRepChanged && data.salesRepId) {
       const rep = await prisma.user.findUnique({
         where: { id: data.salesRepId },
         select: { role: true },
@@ -700,12 +737,16 @@ export const ProjectService = {
       }
     }
 
-    const existing = data.salesRepId
-      ? await prisma.project.findUnique({
-          where: { id },
-          select: { salesRepId: true },
-        })
-      : null;
+    const oldExpectedStr = existing.expectedDate ? dateOnlyValue(existing.expectedDate) : null;
+    const newExpectedStr =
+      data.expectedDate !== undefined
+        ? (data.expectedDate ? data.expectedDate.slice(0, 10) : null)
+        : oldExpectedStr;
+    const expectedDateChanged = data.expectedDate !== undefined && newExpectedStr !== oldExpectedStr;
+    const isEmptyShellStandalone =
+      !existing.parentId &&
+      existing._count.phases === 0 &&
+      existing._count.milestones === 0;
 
     const updateData: Prisma.ProjectUncheckedUpdateInput = {
       ...(data.projectName !== undefined ? { projectName: data.projectName } : {}),
@@ -723,11 +764,28 @@ export const ProjectService = {
       ...(data.phaseNumber !== undefined ? { phaseNumber: data.phaseNumber } : {}),
     };
 
+    const assignedSalesRepId = data.salesRepId || existing.salesRepId;
+    const rebuiltMilestones = isEmptyShellStandalone
+      ? await buildStandardMilestonesAndInitialStage({
+          customerType: existing.customer.customerType,
+          assignedSalesRepId,
+          expectedDate: newExpectedStr,
+          billingDate: data.billingDate ?? undefined,
+        })
+      : null;
+
+    if (rebuiltMilestones) {
+      updateData.currentStage = rebuiltMilestones.initialProjectStage;
+      updateData.isDelayed = false;
+    }
+
     const defaultDaysForInstall =
-      data.expectedDate !== undefined ? await ConfigService.getMilestoneDefaultDays() : null;
+      !rebuiltMilestones && expectedDateChanged
+        ? await ConfigService.getMilestoneDefaultDays()
+        : null;
 
     return await prisma.$transaction(async (tx) => {
-      if (data.salesRepId && existing && existing.salesRepId !== data.salesRepId) {
+      if (salesRepChanged && data.salesRepId && !rebuiltMilestones) {
         const oldSalesRepId = existing.salesRepId;
         const newSalesRepId = data.salesRepId;
 
@@ -763,43 +821,61 @@ export const ProjectService = {
         include: projectInclude,
       });
 
-      // 雙向同步：若更新案件主檔之 expectedDate，同步更新未完成之 6-1 進場安裝預定日並推算 6-2 ~ 6-5
-      if (data.expectedDate !== undefined && defaultDaysForInstall) {
-        await syncInstallMilestonesByExpectedDate(tx, id, data.expectedDate, defaultDaysForInstall);
-      }
-
-      // 雙向同步：同步 7-2 立帳里程碑（未完成時可更新預定立帳日；已完成則鎖定依實際完成日為準）
       let syncedBillingDate: string | undefined;
       let syncedBillingCompleted = false;
-      const m72 = await tx.projectMilestone.findFirst({
-        where: { projectId: id, stageCode: "7-2" },
-        select: { id: true, status: true, plannedDueDate: true, actualDueDate: true },
-      });
-      if (m72) {
-        syncedBillingCompleted = m72.status === MilestoneStatus.COMPLETED;
-        if (data.billingDate !== undefined) {
-          const normalizedInput = data.billingDate ? data.billingDate.slice(0, 10) : null;
-          const currentActual = m72.actualDueDate ? dateOnlyValue(m72.actualDueDate) : null;
-          if (m72.status === MilestoneStatus.COMPLETED) {
-            if (normalizedInput !== currentActual) {
-              throw new ConflictError("7-2 立帳已完成，立帳日期已鎖定為實際完成日，請至項目 7-2 修改");
+
+      if (rebuiltMilestones) {
+        // 既有空殼母案補齊標準 28 項里程碑與起始待辦
+        await tx.projectMilestone.createMany({
+          data: rebuiltMilestones.milestoneRows.map((m) => ({
+            ...m,
+            projectId: id,
+          })),
+        });
+        await createInitialSalesTask(tx, id, rebuiltMilestones.finalStartCode, assignedSalesRepId);
+        const billingInfo = resolveBillingInfoFromMilestones(rebuiltMilestones.milestoneRows);
+        syncedBillingDate = billingInfo.billingDate ?? undefined;
+        syncedBillingCompleted = billingInfo.isBillingCompleted;
+      } else {
+        // 雙向同步：若更新案件主檔之 expectedDate，同步更新未完成之 6-1 進場安裝預定日並推算 6-2 ~ 6-5
+        if (expectedDateChanged && defaultDaysForInstall) {
+          await syncInstallMilestonesByExpectedDate(tx, id, data.expectedDate, defaultDaysForInstall);
+        }
+
+        // 雙向同步：同步 7-2 立帳里程碑（未完成時可更新預定立帳日；已完成則鎖定依實際完成日為準）
+        const m72 = await tx.projectMilestone.findFirst({
+          where: { projectId: id, stageCode: "7-2" },
+          select: { id: true, status: true, plannedDueDate: true, actualDueDate: true },
+        });
+        if (m72) {
+          syncedBillingCompleted = m72.status === MilestoneStatus.COMPLETED;
+          if (data.billingDate !== undefined) {
+            const normalizedInput = data.billingDate ? data.billingDate.slice(0, 10) : null;
+            const currentActual = m72.actualDueDate ? dateOnlyValue(m72.actualDueDate) : null;
+            const currentPlanned = m72.plannedDueDate ? dateOnlyValue(m72.plannedDueDate) : null;
+            if (m72.status === MilestoneStatus.COMPLETED) {
+              if (normalizedInput !== currentActual) {
+                throw new ConflictError("7-2 立帳已完成，立帳日期已鎖定為實際完成日，請至項目 7-2 修改");
+              }
+              syncedBillingDate = currentActual || undefined;
+            } else if (normalizedInput !== currentPlanned) {
+              const newBillingDate = normalizedInput ? new Date(`${normalizedInput}T00:00:00.000Z`) : null;
+              await tx.projectMilestone.update({
+                where: { id: m72.id },
+                data: { plannedDueDate: newBillingDate },
+              });
+              await tx.salesTask.updateMany({
+                where: { milestoneId: m72.id, isCompleted: false },
+                data: { dueDatetime: newBillingDate || new Date() },
+              });
+              syncedBillingDate = normalizedInput || undefined;
+            } else {
+              syncedBillingDate = currentPlanned || undefined;
             }
           } else {
-            const newBillingDate = normalizedInput ? new Date(`${normalizedInput}T00:00:00.000Z`) : null;
-            await tx.projectMilestone.update({
-              where: { id: m72.id },
-              data: { plannedDueDate: newBillingDate },
-            });
-            await tx.salesTask.updateMany({
-              where: { milestoneId: m72.id, isCompleted: false },
-              data: { dueDatetime: newBillingDate || new Date() },
-            });
-            syncedBillingDate = normalizedInput || undefined;
+            const info = resolveBillingInfoFromMilestones([{ stageCode: "7-2", ...m72 }]);
+            syncedBillingDate = info.billingDate ?? undefined;
           }
-        }
-        if (!(data.billingDate !== undefined && m72.status !== MilestoneStatus.COMPLETED)) {
-          const info = resolveBillingInfoFromMilestones([{ stageCode: "7-2", ...m72 }]);
-          syncedBillingDate = info.billingDate ?? undefined;
         }
       }
 
@@ -831,12 +907,76 @@ export const ProjectService = {
         phaseNumber: p.phaseNumber ?? undefined,
         phaseName: p.phaseName ?? undefined,
       };
-    });
+    }, TRANSACTION_OPTIONS);
   },
 
-  async deleteProject(id: string): Promise<boolean> {
-    const result = await prisma.project.deleteMany({ where: { id } });
-    return result.count > 0;
+  async deleteProject(id: string): Promise<{ deleted: boolean; revertedToSingle: boolean; parentId?: string }> {
+    return await prisma.$transaction(async (tx) => {
+      const target = await tx.project.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          parentId: true,
+          siteAddress: true,
+          siteCondition: true,
+          salesRepId: true,
+          salesAssistantId: true,
+          currentStage: true,
+          isDelayed: true,
+          expectedDate: true,
+          unitCount: true,
+          cost: true,
+          quoteAmount: true,
+          estimatedBudget: true,
+        },
+      });
+      if (!target) {
+        return { deleted: false, revertedToSingle: false };
+      }
+
+      if (target.parentId) {
+        const siblingCount = await tx.project.count({
+          where: { parentId: target.parentId },
+        });
+
+        // 方案 B：刪除僅存的最後一個分期時，無損還原回母案並恢復為單一案件
+        if (siblingCount <= 1) {
+          await tx.projectMilestone.updateMany({
+            where: { projectId: target.id },
+            data: { projectId: target.parentId },
+          });
+          await tx.salesTask.updateMany({
+            where: { projectId: target.id },
+            data: { projectId: target.parentId },
+          });
+          await tx.project.update({
+            where: { id: target.parentId },
+            data: {
+              siteAddress: target.siteAddress,
+              siteCondition: target.siteCondition,
+              salesRepId: target.salesRepId,
+              salesAssistantId: target.salesAssistantId,
+              currentStage: target.currentStage,
+              isDelayed: target.isDelayed,
+              expectedDate: target.expectedDate,
+              unitCount: target.unitCount,
+              cost: target.cost,
+              quoteAmount: target.quoteAmount,
+              estimatedBudget: target.estimatedBudget,
+            },
+          });
+          const result = await tx.project.deleteMany({ where: { id: target.id } });
+          return {
+            deleted: result.count > 0,
+            revertedToSingle: result.count > 0,
+            parentId: target.parentId,
+          };
+        }
+      }
+
+      const result = await tx.project.deleteMany({ where: { id: target.id } });
+      return { deleted: result.count > 0, revertedToSingle: false };
+    }, TRANSACTION_OPTIONS);
   },
 
   async evaluateAllSchedules(currentDate: Date = new Date()) {

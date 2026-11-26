@@ -169,9 +169,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "僅所屬業務、業務助理或主管可刪除此分期" }, { status: 403 });
     }
 
-    const deleted = await DataService.deleteProject(body.id);
-    if (!deleted) return NextResponse.json({ error: "找不到案件" }, { status: 404 });
-    return NextResponse.json({ success: true });
+    const result = await DataService.deleteProject(body.id);
+    if (!result.deleted) return NextResponse.json({ error: "找不到案件" }, { status: 404 });
+    return NextResponse.json({
+      success: true,
+      revertedToSingle: result.revertedToSingle,
+      parentId: result.parentId ?? null,
+    });
   } catch (error) {
     return handleApiError(error, "刪除案場失敗");
   }

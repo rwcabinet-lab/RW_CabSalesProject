@@ -185,8 +185,19 @@ export default function ManagerDashboardPage() {
     }
   };
 
-  const handleDeleteProject = async (project: ManagerDashboardDTO["allProjectsOverview"][number]) => {
-    if (!window.confirm(`確定刪除案件「${project.projectName}」？\n此操作會一併刪除相關里程碑、待辦與報價資料，且無法復原。`)) return;
+  const handleDeleteProject = async (
+    project: ManagerDashboardDTO["allProjectsOverview"][number],
+    options?: { isLastPhase?: boolean; parentName?: string }
+  ) => {
+    const isSubPhase = Boolean(project.parentId);
+    const isLastPhase = Boolean(isSubPhase && options?.isLastPhase);
+    const confirmMessage = isLastPhase
+      ? `「${project.phaseName || "此分期"}」為目前僅存的最後一個分期。\n確定要解除分期並將此期的進度、待辦、金額與日期完整還原為單一案件「${options?.parentName || project.projectName}」嗎？\n（若要整案刪除，請由管理員刪除母案）`
+      : isSubPhase
+      ? `確定刪除分期「${project.projectName}」？\n此操作會一併刪除該分期的里程碑、待辦與報價資料，且無法復原。`
+      : `確定刪除案件「${project.projectName}」？\n此操作會一併刪除相關里程碑、待辦與報價資料，且無法復原。`;
+
+    if (!window.confirm(confirmMessage)) return;
     setDeletingProjectId(project.id);
     try {
       const res = await fetch("/api/projects", {
@@ -194,23 +205,48 @@ export default function ManagerDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: project.id }),
       });
-      const result = await res.json() as ApiResponse<{ success: boolean }>;
+      const result = (await res.json()) as ApiResponse<{
+        success: boolean;
+        revertedToSingle?: boolean;
+        parentId?: string | null;
+      }>;
       if (!res.ok) throw new Error(result.error || "刪除案件失敗");
       queryClient.setQueryData<ManagerDashboardDTO>(
         QUERY_KEYS.managerDashboard(),
-        (current) =>
-          current
-            ? {
-                ...current,
-                allProjectsOverview: current.allProjectsOverview.filter((item) => item.id !== project.id),
-                alertList: current.alertList.filter((item) => item.id !== project.id),
-              }
-            : current
+        (current) => {
+          if (!current) return current;
+          if (isSubPhase && project.parentId) {
+            return {
+              ...current,
+              allProjectsOverview: current.allProjectsOverview.map((item) =>
+                item.id === project.parentId
+                  ? {
+                      ...item,
+                      phases: (item.phases || []).filter((ph) => ph.id !== project.id),
+                    }
+                  : item
+              ),
+              alertList: current.alertList.filter((item) => item.id !== project.id),
+            };
+          }
+          return {
+            ...current,
+            allProjectsOverview: current.allProjectsOverview.filter((item) => item.id !== project.id),
+            alertList: current.alertList.filter((item) => item.id !== project.id),
+          };
+        }
       );
       void invalidateManager();
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.customers });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.managerCustomerStats });
-      toast.success(`已成功刪除案件「${project.projectName}」`);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.viewsData });
+      if (result.revertedToSingle) {
+        toast.success(`已解除分期，並將「${project.phaseName || "第 1 期"}」資料完整還原為單一案件`);
+      } else if (isSubPhase) {
+        toast.success(`已成功刪除分期「${project.projectName}」`);
+      } else {
+        toast.success(`已成功刪除案件「${project.projectName}」`);
+      }
     } catch (error) {
       console.error("Failed to delete project:", error);
       toast.error(error instanceof Error ? error.message : "刪除案件時發生錯誤，請稍後重試");
@@ -1084,11 +1120,16 @@ export default function ManagerDashboardPage() {
                                       {canDeletePhase && (
                                         <button
                                           type="button"
-                                          onClick={() => void handleDeleteProject(phase)}
+                                          onClick={() =>
+                                            void handleDeleteProject(phase, {
+                                              isLastPhase: (p.phases?.length || 0) <= 1,
+                                              parentName: p.projectName,
+                                            })
+                                          }
                                           disabled={deletingProjectId !== null}
                                           className="inline-flex h-7 items-center justify-center rounded bg-red-50 border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors whitespace-nowrap"
-                                          title="刪除此分期"
-                                          aria-label="刪除此分期"
+                                          title={(p.phases?.length || 0) <= 1 ? "解除分期並還原為單一案件" : "刪除此分期"}
+                                          aria-label={(p.phases?.length || 0) <= 1 ? "解除分期並還原為單一案件" : "刪除此分期"}
                                         >
                                           <Trash2 className="h-3.5 w-3.5" />
                                         </button>

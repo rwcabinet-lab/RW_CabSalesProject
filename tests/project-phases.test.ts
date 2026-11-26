@@ -9,6 +9,7 @@ vi.mock("@/lib/prisma", () => ({
     project: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       deleteMany: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/lib/prisma", () => ({
     },
     projectMilestone: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       createMany: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
@@ -251,6 +253,139 @@ describe("案件分期架構與業務邏輯 (Project Phasing & Hierarchy)", () =
       expect(canAddPhase("SITE_ENGINEER")).toBe(true);
       expect(canAddPhase("GUEST")).toBe(false);
       expect(canAddPhase("EXTERNAL_VIEWER")).toBe(false);
+    });
+  });
+
+  describe("分期刪除無損還原回單一案件與空殼修復 (deleteProject & updateProject)", () => {
+    it("當母案仍有多個分期時，刪除其中一期僅移除該分期且不觸發還原", async () => {
+      vi.mocked(prisma.project.findUnique).mockResolvedValueOnce({
+        id: "phase-2",
+        parentId: "master-1",
+      } as any);
+      vi.mocked(prisma.project.count).mockResolvedValueOnce(2);
+      vi.mocked(prisma.project.deleteMany).mockResolvedValueOnce({ count: 1 });
+
+      const result = await ProjectService.deleteProject("phase-2");
+
+      expect(result).toEqual({ deleted: true, revertedToSingle: false });
+      expect(prisma.projectMilestone.updateMany).not.toHaveBeenCalled();
+      expect(prisma.project.update).not.toHaveBeenCalled();
+      expect(prisma.project.deleteMany).toHaveBeenCalledWith({ where: { id: "phase-2" } });
+    });
+
+    it("當刪除僅存的最後一個分期時，應將里程碑、待辦、金額與日期無損還原回母案並移除分期", async () => {
+      const expectedDate = new Date("2026-12-20T00:00:00.000Z");
+      vi.mocked(prisma.project.findUnique).mockResolvedValueOnce({
+        id: "phase-1",
+        parentId: "master-1",
+        siteAddress: "台北市仁愛路 100 號",
+        siteCondition: "木作進場前",
+        salesRepId: "sales-2",
+        salesAssistantId: "asst-1",
+        currentStage: ProjectStage.PROPOSAL,
+        isDelayed: true,
+        expectedDate,
+        unitCount: 18,
+        cost: 320000,
+        quoteAmount: 520000,
+        estimatedBudget: 520000,
+      } as any);
+      vi.mocked(prisma.project.count).mockResolvedValueOnce(1);
+      vi.mocked(prisma.project.deleteMany).mockResolvedValueOnce({ count: 1 });
+
+      const result = await ProjectService.deleteProject("phase-1");
+
+      expect(result).toEqual({ deleted: true, revertedToSingle: true, parentId: "master-1" });
+      expect(prisma.projectMilestone.updateMany).toHaveBeenCalledWith({
+        where: { projectId: "phase-1" },
+        data: { projectId: "master-1" },
+      });
+      expect(prisma.salesTask.updateMany).toHaveBeenCalledWith({
+        where: { projectId: "phase-1" },
+        data: { projectId: "master-1" },
+      });
+      expect(prisma.project.update).toHaveBeenCalledWith({
+        where: { id: "master-1" },
+        data: {
+          siteAddress: "台北市仁愛路 100 號",
+          siteCondition: "木作進場前",
+          salesRepId: "sales-2",
+          salesAssistantId: "asst-1",
+          currentStage: ProjectStage.PROPOSAL,
+          isDelayed: true,
+          expectedDate,
+          unitCount: 18,
+          cost: 320000,
+          quoteAmount: 520000,
+          estimatedBudget: 520000,
+        },
+      });
+      expect(prisma.project.deleteMany).toHaveBeenCalledWith({ where: { id: "phase-1" } });
+    });
+
+    it("編輯僅剩空殼的無分期母案時，應使用加長交易逾時上限並自動補齊標準 28 項里程碑", async () => {
+      vi.mocked(prisma.project.findUnique).mockResolvedValueOnce({
+        salesRepId: "sales-1",
+        expectedDate: null,
+        parentId: null,
+        customer: { customerType: "DESIGN_COMPANY" },
+        _count: { phases: 0, milestones: 0 },
+      } as any);
+
+      vi.mocked(prisma.project.update).mockResolvedValueOnce({
+        id: "master-shell",
+        projectName: "補齊測試案",
+        customerId: "cust-1",
+        siteAddress: "台中市西屯區",
+        siteCondition: null,
+        salesRepId: "sales-1",
+        salesAssistantId: null,
+        currentStage: ProjectStage.DEVELOP,
+        isDelayed: false,
+        expectedDate: new Date("2026-12-15T00:00:00.000Z"),
+        estimatedBudget: null,
+        unitCount: 12,
+        cost: 180000,
+        quoteAmount: 260000,
+        parentId: null,
+        phaseNumber: null,
+        phaseName: null,
+        customer: {
+          name: "大雅設計",
+          customerType: "DESIGN_COMPANY",
+          defaultDiscount: 1,
+          salesRepId: "sales-1",
+          salesRep: { name: "王業務" },
+        },
+        salesRep: { id: "sales-1", name: "王業務" },
+        salesAssistant: null,
+      } as any);
+      vi.mocked(prisma.projectMilestone.findFirst).mockResolvedValueOnce({
+        id: "ms-1-1",
+        phase: "DEVELOP",
+        plannedDueDate: new Date("2026-12-01T00:00:00.000Z"),
+      } as any);
+
+      const updated = await ProjectService.updateProject("master-shell", {
+        projectName: "補齊測試案",
+        expectedDate: "2026-12-15",
+        billingDate: "2026-12-28",
+        unitCount: 12,
+        cost: 180000,
+        quoteAmount: 260000,
+        salesRepId: "sales-1",
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { maxWait: 10000, timeout: 25000 }
+      );
+      expect(prisma.projectMilestone.createMany).toHaveBeenCalledTimes(1);
+      const createManyArg = vi.mocked(prisma.projectMilestone.createMany).mock.calls[0]?.[0];
+      expect(createManyArg?.data).toHaveLength(28);
+      expect(prisma.salesTask.create).toHaveBeenCalledTimes(1);
+      expect(updated?.billingDate).toBe("2026-12-28");
+      expect(updated?.quoteAmount).toBe(260000);
     });
   });
 });
