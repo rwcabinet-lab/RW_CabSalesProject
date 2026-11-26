@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Users, Plus, Phone, MapPin, Receipt, Percent, AlertCircle, Pencil, Trash2, RefreshCw, Search, X, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse, CustomerDTO } from "@/types/dto";
 import { isAssignableRole } from "@/lib/page-access";
 import { useCustomersQuery, useUsersQuery, useSessionQuery, QUERY_KEYS } from "@/hooks/useQueries";
 import { SectionHelpButton } from "@/components/common/SectionHelpButton";
 import { toast } from "@/stores/useToastStore";
+import { useCustomersStore, filterCustomers } from "@/stores/useCustomersStore";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -18,11 +19,50 @@ export default function CustomersPage() {
   const isAdmin = sessionUser?.role === "ADMIN";
   const loadError = queryError instanceof Error ? queryError.message : "";
 
+  const searchQuery = useCustomersStore((s) => s.searchQuery);
+  const typeFilter = useCustomersStore((s) => s.typeFilter);
+  const termsFilter = useCustomersStore((s) => s.termsFilter);
+  const salesFilter = useCustomersStore((s) => s.salesFilter);
+  const setSearchQuery = useCustomersStore((s) => s.setSearchQuery);
+  const setTypeFilter = useCustomersStore((s) => s.setTypeFilter);
+  const setTermsFilter = useCustomersStore((s) => s.setTermsFilter);
+  const setSalesFilter = useCustomersStore((s) => s.setSalesFilter);
+  const resetFilters = useCustomersStore((s) => s.resetFilters);
+  const initFromStorage = useCustomersStore((s) => s.initFromStorage);
+
+  useEffect(() => {
+    initFromStorage();
+  }, [initFromStorage]);
+
   const salesReps = useMemo(() => {
     return users.filter(
       (user) => isAssignableRole(user.role) && (user.role === "SALES_MANAGER" || user.role === "SALES")
     );
   }, [users]);
+
+  const filterSalesOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const rep of salesReps) {
+      map.set(rep.id, rep.name);
+    }
+    for (const c of customers) {
+      if (c.salesRepId && c.salesRepName && !map.has(c.salesRepId)) {
+        map.set(c.salesRepId, c.salesRepName);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [salesReps, customers]);
+
+  const filteredCustomers = useMemo(() => {
+    return filterCustomers(customers, {
+      searchQuery,
+      typeFilter,
+      termsFilter,
+      salesFilter,
+    });
+  }, [customers, searchQuery, typeFilter, termsFilter, salesFilter]);
+
+  const hasActiveFilters = Boolean(searchQuery.trim() || typeFilter || termsFilter || salesFilter);
 
   const defaultSalesRepId = useMemo(() => {
     if (sessionUser?.id && salesReps.some((rep) => rep.id === sessionUser.id)) {
@@ -210,9 +250,6 @@ export default function CustomersPage() {
             <span>客戶資料管理</span>
             <SectionHelpButton sectionId="customers-management" />
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            支援 B2B (設計師、公關、經銷) 與 B2C (一般業主)，設定預設折率與付款帳期，報價單將自動連動套用。
-          </p>
         </div>
         <button
           onClick={openAddModal}
@@ -224,6 +261,99 @@ export default function CustomersPage() {
 
       {/* 客戶列表 Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* 篩選與搜尋工具列 */}
+        <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜尋客戶名稱、統編、電話、地址、業務..."
+              className="w-full h-8 border border-slate-300 rounded-md pl-8 pr-7 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="清除搜尋"
+                aria-label="清除搜尋"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            客群：
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="h-8 border border-slate-300 rounded-md px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            >
+              <option value="">全部客群</option>
+              <option value="LONGMEI_STORE">隆美</option>
+              <option value="DESIGN_COMPANY">設計公司</option>
+              <option value="DEALER_COMPANY">經銷公司</option>
+              <option value="CABINET_FACTORY">工廠</option>
+              <option value="CONSTRUCTION">建設/營造</option>
+              <option value="INDIVIDUAL">一般消費者</option>
+              <option value="PR">公關案</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            付款條件：
+            <select
+              value={termsFilter}
+              onChange={(e) => setTermsFilter(e.target.value)}
+              className="h-8 border border-slate-300 rounded-md px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            >
+              <option value="">全部條件</option>
+              <option value="MONTHLY_30">月結 30 天</option>
+              <option value="DEPOSIT_BALANCE">訂金 40% / 進場 30% / 尾款 30%</option>
+              <option value="CASH">現金完工結算</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            業務：
+            <select
+              value={salesFilter}
+              onChange={(e) => setSalesFilter(e.target.value)}
+              className="h-8 border border-slate-300 rounded-md px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            >
+              <option value="">全部業務</option>
+              {filterSalesOptions.map((rep) => (
+                <option key={rep.id} value={rep.id}>
+                  {rep.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`inline-flex h-8 items-center gap-1.5 px-2.5 rounded-md border text-xs font-semibold transition-colors ${
+              hasActiveFilters
+                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+            title="回復預設篩選條件"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            回復預設
+          </button>
+        </div>
+
+        {/* 篩選結果摘要 */}
+        <div className="px-4 sm:px-6 py-2 bg-blue-50/40 border-b border-slate-200 flex items-center justify-between text-xs text-blue-900 font-semibold">
+          <span>
+            篩選結果：共 <span className="text-sm font-bold text-blue-700">{filteredCustomers.length}</span> 筆客戶
+            {hasActiveFilters && customers.length !== filteredCustomers.length && (
+              <span className="text-slate-500 font-normal ml-1.5">（全部共 {customers.length} 筆）</span>
+            )}
+          </span>
+        </div>
+
         {loading ? (
           <div className="flex flex-col items-center justify-center min-h-[300px] p-12">
             <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mb-3" />
@@ -245,7 +375,24 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {customers.map((c) => (
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 px-4 text-center text-slate-500 text-sm">
+                      <p>{hasActiveFilters ? "沒有符合目前篩選條件的客戶資料。" : "目前尚無客戶資料。"}</p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          清除篩選條件
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-4 px-4">
                       <div className="font-semibold text-slate-900">{c.name}</div>
@@ -297,7 +444,8 @@ export default function CustomersPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
           </div>

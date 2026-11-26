@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkbenchStore } from "@/stores/useWorkbenchStore";
 import { useManagerStore } from "@/stores/useManagerStore";
 import { useViewsStore } from "@/stores/useViewsStore";
+import { useCustomersStore, filterCustomers } from "@/stores/useCustomersStore";
 import { DEFAULT_PROJECT_COLUMNS, normalizeProjectColumns } from "@/lib/constants";
 import { compareSalesRepByStroke, compareManagerOverviewProjects } from "@/lib/sort-utils";
 import { sortProjectsWithPins } from "@/hooks/usePinnedProjects";
-import type { WorkbenchProjectDTO, ManagerProjectOverviewDTO } from "@/types/dto";
+import type { WorkbenchProjectDTO, ManagerProjectOverviewDTO, CustomerDTO } from "@/types/dto";
 
 describe("搜尋與篩選條件功能測試", () => {
   describe("useWorkbenchStore 關鍵字搜尋狀態管理", () => {
@@ -475,6 +476,88 @@ describe("搜尋與篩選條件功能測試", () => {
       const normalized = normalizeProjectColumns(savedWithOldLabel);
       const normalizedExpectedDate = normalized.find((c) => c.key === "expectedDate");
       expect(normalizedExpectedDate?.label).toBe("進場日");
+    });
+  });
+
+  describe("客戶資料管理頁面搜尋與篩選功能 (useCustomersStore & filterCustomers)", () => {
+    const mockCustomers: CustomerDTO[] = [
+      {
+        id: "c1",
+        customerType: "DESIGN_COMPANY",
+        name: "品辰室內設計",
+        taxId: "12345678",
+        phone: "02-27001111",
+        address: "台北市大安區敦化南路",
+        defaultDiscount: 0.85,
+        paymentTerms: "MONTHLY_30",
+        salesRepId: "rep-1",
+        salesRepName: "陳小明",
+      },
+      {
+        id: "c2",
+        customerType: "INDIVIDUAL",
+        name: "林公館",
+        taxId: undefined,
+        phone: "0912-345-678",
+        address: "台中市西屯區公益路",
+        defaultDiscount: 1.0,
+        paymentTerms: "DEPOSIT_BALANCE",
+        salesRepId: "rep-2",
+        salesRepName: "李大同",
+      },
+      {
+        id: "c3",
+        customerType: "LONGMEI_STORE",
+        name: "隆美台北門市",
+        taxId: "87654321",
+        phone: "02-88889999",
+        address: "台北市中山區南京東路",
+        defaultDiscount: 0.85,
+        paymentTerms: "CASH",
+        salesRepId: "rep-1",
+        salesRepName: "陳小明",
+      },
+    ];
+
+    it("useCustomersStore 正確管理篩選狀態與 resetFilters", () => {
+      const store = useCustomersStore.getState();
+      store.resetFilters();
+
+      expect(store.searchQuery).toBe("");
+      expect(store.typeFilter).toBe("");
+      expect(store.termsFilter).toBe("");
+      expect(store.salesFilter).toBe("");
+
+      store.setSearchQuery("品辰");
+      store.setTypeFilter("DESIGN_COMPANY");
+      store.setTermsFilter("MONTHLY_30");
+      store.setSalesFilter("rep-1");
+
+      expect(useCustomersStore.getState().searchQuery).toBe("品辰");
+      expect(useCustomersStore.getState().typeFilter).toBe("DESIGN_COMPANY");
+      expect(useCustomersStore.getState().termsFilter).toBe("MONTHLY_30");
+      expect(useCustomersStore.getState().salesFilter).toBe("rep-1");
+
+      store.resetFilters();
+      expect(useCustomersStore.getState().searchQuery).toBe("");
+      expect(useCustomersStore.getState().typeFilter).toBe("");
+      expect(useCustomersStore.getState().termsFilter).toBe("");
+      expect(useCustomersStore.getState().salesFilter).toBe("");
+    });
+
+    it("filterCustomers 可依關鍵字（名稱、統編、電話、地址、業務）精準過濾", () => {
+      expect(filterCustomers(mockCustomers, { searchQuery: "品辰" }).map((c) => c.id)).toEqual(["c1"]);
+      expect(filterCustomers(mockCustomers, { searchQuery: "87654321" }).map((c) => c.id)).toEqual(["c3"]);
+      expect(filterCustomers(mockCustomers, { searchQuery: "0912-345" }).map((c) => c.id)).toEqual(["c2"]);
+      expect(filterCustomers(mockCustomers, { searchQuery: "公益路" }).map((c) => c.id)).toEqual(["c2"]);
+      expect(filterCustomers(mockCustomers, { searchQuery: "陳小明" }).map((c) => c.id)).toEqual(["c1", "c3"]);
+    });
+
+    it("filterCustomers 可組合客群類型、付款條件與負責業務進行交集篩選", () => {
+      expect(filterCustomers(mockCustomers, { typeFilter: "INDIVIDUAL" }).map((c) => c.id)).toEqual(["c2"]);
+      expect(filterCustomers(mockCustomers, { termsFilter: "CASH" }).map((c) => c.id)).toEqual(["c3"]);
+      expect(filterCustomers(mockCustomers, { salesFilter: "rep-1", termsFilter: "MONTHLY_30" }).map((c) => c.id)).toEqual(["c1"]);
+      expect(filterCustomers(mockCustomers, { searchQuery: "高雄" })).toHaveLength(0);
     });
   });
 });
