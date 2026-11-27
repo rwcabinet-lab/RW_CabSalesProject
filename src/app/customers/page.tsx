@@ -364,7 +364,7 @@ export default function CustomersPage() {
             {loadError && <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>}
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider [&>th]:whitespace-nowrap">
                   <th className="py-3.5 px-4">客戶名稱 / 統編</th>
                   <th className="py-3.5 px-4">客群類型</th>
                   <th className="py-3.5 px-4">聯絡電話 / 地址</th>
@@ -393,12 +393,12 @@ export default function CustomersPage() {
                   </tr>
                 ) : (
                   filteredCustomers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                  <tr key={c.id} className="hover:bg-slate-50/80 transition [&>td]:whitespace-nowrap">
                     <td className="py-4 px-4">
                       <div className="font-semibold text-slate-900">{c.name}</div>
                       {c.taxId ? (
                         <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Receipt className="w-3 h-3 text-slate-400" /> 統編: {c.taxId}
+                          <Receipt className="w-3 h-3 text-slate-400 shrink-0" /> 統編: {c.taxId}
                         </div>
                       ) : (
                         <span className="text-[11px] text-slate-400">無統編 (個人業主)</span>
@@ -407,19 +407,20 @@ export default function CustomersPage() {
                     <td className="py-4 px-4">{getTypeBadge(c.customerType)}</td>
                     <td className="py-4 px-4 text-slate-600 space-y-1">
                       <div className="flex items-center gap-1.5 text-xs">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" /> {c.phone}
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {c.phone}
                       </div>
                       {c.address && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-xs">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {c.address}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 max-w-xs truncate" title={c.address}>
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{c.address}</span>
                         </div>
                       )}
                     </td>
                     <td className="py-4 px-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
                         c.defaultDiscount < 1.0 ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
                       }`}>
-                        <Percent className="w-3 h-3" />
+                        <Percent className="w-3 h-3 shrink-0" />
                         {c.defaultDiscount < 1.0 ? `${(c.defaultDiscount * 10).toFixed(1)} 折 (${c.defaultDiscount})` : "牌價無折 (1.00)"}
                       </span>
                     </td>
@@ -427,17 +428,17 @@ export default function CustomersPage() {
                       {getTermsLabel(c.paymentTerms)}
                     </td>
                     <td className="py-4 px-4">
-                      <span className="text-xs px-2 py-1 rounded bg-slate-100 font-medium text-slate-800">
+                      <span className="inline-block text-xs px-2 py-1 rounded bg-slate-100 font-medium text-slate-800 whitespace-nowrap">
                         {c.salesRepName || "林宏遠"}
                       </span>
                     </td>
                     <td className="py-4 px-4 text-right">
-                      <div className="inline-flex items-center justify-end gap-1.5">
-                        <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs transition-colors">
+                      <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                        <button type="button" onClick={() => openEditModal(c)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs transition-colors whitespace-nowrap">
                           <Pencil className="h-3.5 w-3.5" /> 編輯
                         </button>
                         {isAdmin && (
-                          <button type="button" onClick={() => handleDeleteCustomer(c)} className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors">
+                          <button type="button" onClick={() => handleDeleteCustomer(c)} className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 hover:border-red-300 shadow-2xs transition-colors whitespace-nowrap">
                             <Trash2 className="h-3.5 w-3.5" /> 刪除
                           </button>
                         )}
