@@ -32,6 +32,17 @@ export const CHANGELOG_CATEGORY_CONFIG = {
 
 export const DEFAULT_CHANGELOG: ChangelogEntry[] = [
   {
+    id: "cl-20261127-01",
+    version: "v1.6.5",
+    date: "2026-11-27",
+    title: "精簡置頂案件標記，並調整業務專員僅顯示主責案件",
+    category: "OPTIMIZE",
+    details: [
+      "置頂標記精簡：移除案場筆記與主管總控清單中置頂案件名稱右側的黃色「置頂」方塊標記，保留案名前方圖釘圖示，畫面更簡潔",
+      "業務專員案場檢視調整：業務專員登入後，案場筆記總覽與案場清單僅顯示主責業務為本人的案件；業務助理、工務人員與主管層級維持既有顯示範圍",
+    ],
+  },
+  {
     id: "cl-20261124-03",
     version: "v1.6.4",
     date: "2026-11-24",
