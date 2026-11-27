@@ -725,11 +725,9 @@ export function WorkbenchAddPhaseModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={() => !saving && setProjectToAddPhase(null)}
     >
       <form
         onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl space-y-4"
       >
         <div className="flex items-center justify-between border-b pb-3">

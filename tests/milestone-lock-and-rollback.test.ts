@@ -77,7 +77,7 @@ describe("防撞車鎖定與回退徹底清理機制", () => {
           stageCode: "2-5",
           phase: "REQUIREMENT",
           stageOrder: 7,
-          plannedDueDate: new Date("2026-11-25"),
+          plannedDueDate: new Date("2099-11-25"),
           actualDueDate: new Date("2026-11-20"),
           status: MilestoneStatus.COMPLETED,
           priority: TaskPriority.MEDIUM,

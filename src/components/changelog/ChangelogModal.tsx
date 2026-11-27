@@ -384,14 +384,12 @@ export function ChangelogModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex justify-center items-stretch bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="changelog-modal-title"
     >
       <div
         className="relative flex flex-col h-screen max-h-screen w-full max-w-3xl sm:max-w-4xl bg-white shadow-2xl border-x border-slate-200 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* 表頭 Header（上下滿版頂部固定、無版本號） */}
         <div className="shrink-0 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50/90 via-slate-50/80 to-white px-5 py-4 sm:px-6 sm:py-4.5">

@@ -124,7 +124,7 @@ export const SECTION_DOCS: Record<string, SectionDoc> = {
     keyPoints: [
       {
         label: "進行中總案場數",
-        desc: "統計目前系統內納管之案場總數量，反映整體業務接案規模。",
+        desc: "統計目前系統內進行中之案場總數量（自動排除已結案與已流標案件，多期案件不重複計入母案容器），反映團隊當前實際執行中的案場規模。",
       },
       {
         label: "已簽約/生產預估總額",

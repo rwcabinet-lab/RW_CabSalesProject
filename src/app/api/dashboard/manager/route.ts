@@ -45,6 +45,15 @@ export async function GET(req: NextRequest) {
       return ScheduleEngine.isProjectClosed(p, ms);
     };
 
+    // Helper to evaluate if project is lost (流標階段或 X-2 流標里程碑已完成)
+    const isProjectLost = (p: (typeof projects)[0]) => {
+      const ms = milestonesByProject[p.id] || [];
+      return (
+        p.currentStage === "LOST" ||
+        ms.some((m) => m.stageCode === "X-2" && m.status === "COMPLETED")
+      );
+    };
+
     // Helper to evaluate project delayed state
     const isProjectDelayed = (p: (typeof projects)[0]) => {
       const ms = milestonesByProject[p.id] || [];
@@ -62,8 +71,13 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    // 1. KPI 計算
-    const totalProjects = projects.length;
+    // 1. KPI 計算（進行中總案場數排除已結案、已流標與多期母案彙總容器）
+    const parentProjectIds = new Set(
+      projects.map((p) => p.parentId).filter((id): id is string => Boolean(id))
+    );
+    const totalProjects = projects.filter(
+      (p) => !parentProjectIds.has(p.id) && !isProjectLost(p) && !isProjectClosed(p)
+    ).length;
     const delayedCount = projects.filter(isProjectDelayed).length;
 
     let signedTotal = 0;
@@ -74,7 +88,7 @@ export async function GET(req: NextRequest) {
         signedTotal += p.quoteAmount || p.estimatedBudget || 0;
       }
     }
-    const conversionRate = totalProjects > 0 ? Math.round((contractedCount / totalProjects) * 100) : 0;
+    const conversionRate = projects.length > 0 ? Math.round((contractedCount / projects.length) * 100) : 0;
 
     // 2. 時程警示清單
     const alertList = projects

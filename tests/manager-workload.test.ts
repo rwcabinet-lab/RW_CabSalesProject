@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import { computeSalesWorkload, type WorkloadProjectInput } from "@/lib/manager-workload";
+import { GET as getManagerDashboard } from "@/app/api/dashboard/manager/route";
+import * as accessControl from "@/lib/access-control";
+import { DataService } from "@/lib/data-service";
 
 describe("人員案場負載統計 (computeSalesWorkload)", () => {
   const users = [
@@ -249,5 +253,143 @@ describe("人員案場負載統計 (computeSalesWorkload)", () => {
     });
 
     expect(result.find((r) => r.salesRepName === "陳柔穎")?.totalProjects).toBe(1);
+  });
+
+  describe("主管總控 KPI - 進行中總案場數 (totalProjects)", () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("進行中總案場數應排除已結案、已流標與多期母案彙總容器", async () => {
+      vi.spyOn(accessControl, "getUserFromRequest").mockResolvedValue({
+        id: "mgr-1",
+        name: "業務主管",
+        role: "SALES_MANAGER",
+        email: "M0001",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      vi.spyOn(DataService, "getProjects").mockResolvedValue([
+        // 1. 進行中一般案場 (應計入)
+        {
+          id: "p-active-1",
+          projectName: "進行中案場A",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址1",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "PROPOSAL",
+          isDelayed: false,
+        },
+        // 2. 流標案場 (應排除)
+        {
+          id: "p-lost",
+          projectName: "流標案場",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址2",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "LOST",
+          isDelayed: false,
+        },
+        // 3. 已結案案場 - 階段 BILLED (應排除)
+        {
+          id: "p-billed",
+          projectName: "已結案案場B",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址3",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "BILLED",
+          isDelayed: false,
+        },
+        // 4. 已結案案場 - 7-2 立帳里程碑已完成 (應排除)
+        {
+          id: "p-closed-72",
+          projectName: "已完成立帳案場C",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址4",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "CLOSURE",
+          isDelayed: false,
+        },
+        // 5. 多期母案容器 (應排除) + 進行中第 1 期 (應計入)
+        {
+          id: "p-master",
+          projectName: "多期母案",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址5",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "INSTALL",
+          isDelayed: false,
+        },
+        {
+          id: "p-phase-1",
+          projectName: "多期母案 - 第 1 期",
+          parentId: "p-master",
+          phaseNumber: 1,
+          phaseName: "第 1 期",
+          customerId: "c1",
+          customerName: "客戶1",
+          customerType: "INDIVIDUAL",
+          defaultDiscount: 1,
+          siteAddress: "地址5",
+          salesRepId: "sales-1",
+          salesRepName: "陳柔穎",
+          currentStage: "INSTALL",
+          isDelayed: false,
+        },
+      ]);
+
+      vi.spyOn(DataService, "getTasks").mockResolvedValue([]);
+      vi.spyOn(DataService, "getMilestonesByProjectIds").mockResolvedValue({
+        "p-active-1": [],
+        "p-lost": [],
+        "p-billed": [],
+        "p-closed-72": [
+          {
+            id: "m-72",
+            projectId: "p-closed-72",
+            stageCode: "7-2",
+            phase: "CLOSURE",
+            stageOrder: 27,
+            plannedDueDate: null,
+            actualDueDate: "2026-11-20",
+            status: "COMPLETED",
+            priority: "MEDIUM",
+            assignedToId: "sales-1",
+            assignedToName: "陳柔穎",
+          },
+        ],
+        "p-master": [],
+        "p-phase-1": [],
+      });
+      vi.spyOn(DataService, "getLoginUsers").mockResolvedValue(users as any);
+
+      const req = new NextRequest("http://localhost:3000/api/dashboard/manager");
+      const res = await getManagerDashboard(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      // 僅 p-active-1 與 p-phase-1 為進行中，故進行中總案場數應為 2
+      expect(data.kpi.totalProjects).toBe(2);
+    });
   });
 });

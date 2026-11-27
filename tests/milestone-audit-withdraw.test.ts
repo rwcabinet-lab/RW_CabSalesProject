@@ -274,7 +274,7 @@ describe("Milestone Audit Withdrawal Mechanism (里程碑審核撤回與駁回�
           stageOrder: 1,
           phase: "DEVELOP",
           status: MilestoneStatus.COMPLETED,
-          plannedDueDate: "2026-11-25",
+          plannedDueDate: "2099-11-25",
           actualDueDate: "2026-11-20",
           notes: "業主現場確認尺寸，已手動填報",
           assignedToId: "user-rep",
