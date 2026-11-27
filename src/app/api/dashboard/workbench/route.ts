@@ -20,16 +20,19 @@ export async function GET(req: NextRequest) {
     }
     const currentUser = { id: user.id, name: user.name, role: user.role };
 
+    const isSalesOnly = currentUser.role === "SALES";
     const [initialProjects, tasks] = await Promise.all([
       DataService.getProjects({
-        where: {
-          OR: [
-            { salesRepId: currentUser.id },
-            { salesAssistantId: currentUser.id },
-            { milestones: { some: { assignedToId: currentUser.id } } },
-            { tasks: { some: { assignedToId: currentUser.id } } },
-          ],
-        },
+        where: isSalesOnly
+          ? { salesRepId: currentUser.id }
+          : {
+              OR: [
+                { salesRepId: currentUser.id },
+                { salesAssistantId: currentUser.id },
+                { milestones: { some: { assignedToId: currentUser.id } } },
+                { tasks: { some: { assignedToId: currentUser.id } } },
+              ],
+            },
       }),
       DataService.getTasks({ assignedToId: currentUser.id }),
     ]);

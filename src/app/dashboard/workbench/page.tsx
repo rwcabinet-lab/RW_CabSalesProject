@@ -671,11 +671,6 @@ export default function SalesWorkbenchPage() {
                                           <Layers className="w-2.5 h-2.5 inline" /> 共 {p.phases?.length} 期
                                         </span>
                                       )}
-                                      {pinned && (
-                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
-                                          <Pin className="w-2.5 h-2.5 fill-amber-700 -rotate-45 inline" /> 置頂
-                                        </span>
-                                      )}
                                     </div>
                                     <div className="text-[10px] text-slate-500 font-normal">{p.siteAddress}</div>
                                   </div>

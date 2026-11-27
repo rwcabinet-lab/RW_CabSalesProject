@@ -12,20 +12,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "請先登入" }, { status: 401 });
     }
 
-    const isSalesOrAssistant = user.role === "SALES" || user.role === "ASSISTANT";
-    const filter = isSalesOrAssistant
-      ? {
-          where: {
-            OR: [
-              { salesRepId: user.id },
-              { salesAssistantId: user.id },
-              { customer: { salesRepId: user.id } },
-              { milestones: { some: { assignedToId: user.id } } },
-              { tasks: { some: { assignedToId: user.id } } },
-            ],
-          },
-        }
-      : undefined;
+    const filter =
+      user.role === "SALES"
+        ? {
+            where: {
+              salesRepId: user.id,
+            },
+          }
+        : user.role === "ASSISTANT"
+          ? {
+              where: {
+                OR: [
+                  { salesRepId: user.id },
+                  { salesAssistantId: user.id },
+                  { customer: { salesRepId: user.id } },
+                  { milestones: { some: { assignedToId: user.id } } },
+                  { tasks: { some: { assignedToId: user.id } } },
+                ],
+              },
+            }
+          : undefined;
 
     // 輕量化下拉選單查詢：僅撈取 id 與 projectName，大幅縮短響應時間（從 1.1s 降至 <20ms）
     const fields = req.nextUrl.searchParams.get("fields");
